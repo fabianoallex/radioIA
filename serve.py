@@ -15,6 +15,41 @@ FALLBACK_INTRO_TEXT  = 'Enquanto aguardamos novos episódios, fiquem com algumas
 FALLBACK_INTRO_VOICE = 'pt-BR-ThalitaMultilingualNeural'
 
 
+def _jamendo_cache_empty() -> bool:
+    catalog_path = os.path.join('music', 'cache', 'jamendo', 'catalog.json')
+    if not os.path.exists(catalog_path):
+        return True
+    try:
+        with open(catalog_path, 'r', encoding='utf-8') as f:
+            return len(json.load(f)) == 0
+    except Exception:
+        return True
+
+
+def _auto_download_jamendo():
+    """Se o cache do Jamendo estiver vazio e houver fonte configurada, baixa automaticamente."""
+    if not _jamendo_cache_empty():
+        return
+    try:
+        import yaml
+        with open('config.yaml', 'r', encoding='utf-8') as f:
+            cfg = yaml.safe_load(f)
+    except Exception:
+        return
+    jamendo_sources = [
+        s for s in cfg.get('sources', [])
+        if s.get('type') == 'music'
+        and (s.get('settings') or {}).get('source') == 'jamendo'
+    ]
+    if not jamendo_sources:
+        return
+    print("Cache do Jamendo vazio — baixando músicas para o fallback...")
+    from src.sources import music as music_source
+    for src in jamendo_sources:
+        n = music_source.download_cache(src)
+        print(f"  {n} faixa(s) baixada(s) ({src.get('name', src['id'])}).")
+
+
 def _generate_fallback_intro():
     if os.path.exists(FALLBACK_INTRO_PATH):
         return
@@ -1266,6 +1301,7 @@ if __name__ == '__main__':
     threading.Thread(target=lambda: _gen_clips(_tc_voice, _tc_rate), daemon=True).start()
     threading.Thread(target=_warm_announcement, daemon=True).start()
     threading.Thread(target=_warm_spots, daemon=True).start()
+    threading.Thread(target=_auto_download_jamendo, daemon=True).start()
     threading.Timer(1.0, open_browser).start()
     n_music = len(scan_music_files())
     print(f"{_get_radio_name()} rodando em http://localhost:5000")

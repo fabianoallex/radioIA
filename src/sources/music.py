@@ -96,7 +96,7 @@ def _fetch_from_api(client_id: str, tags: str, min_dur: int, max_dur: int, limit
     params = {
         'client_id':             client_id,
         'format':                'json',
-        'limit':                 min(limit, 20),
+        'limit':                 min(limit, 200),
         'tags':                  tags,
         'audioformat':           'mp32',
         'audiodownload_allowed': 1,
@@ -140,6 +140,46 @@ def _download_track(track: dict) -> str | None:
         if os.path.exists(path):
             os.remove(path)
         return None
+
+
+def download_cache(source_config: dict) -> int:
+    """Baixa faixas do Jamendo para o cache local. Retorna o número de novas faixas."""
+    settings    = source_config.get('settings') or {}
+    jamendo_cfg = settings.get('jamendo') or {}
+
+    client_id = os.getenv(jamendo_cfg.get('api_key_env', 'JAMENDO_CLIENT_ID'), '')
+    if not client_id:
+        print("  [jamendo] JAMENDO_CLIENT_ID não configurado no .env")
+        return 0
+
+    tags    = jamendo_cfg.get('tags', 'lounge')
+    min_dur = jamendo_cfg.get('min_duration', 60)
+    max_dur = jamendo_cfg.get('max_duration', 360)
+    limit   = min(settings.get('cache_size', 50), 200)
+
+    catalog    = _load_catalog()
+    downloaded = 0
+
+    print(f"  Buscando até {limit} faixas no Jamendo (tags: {tags})...")
+    try:
+        api_tracks = _fetch_from_api(client_id, tags, min_dur, max_dur, limit)
+        for track in api_tracks:
+            tid  = str(track['id'])
+            path = _download_track(track)
+            if path:
+                catalog[tid] = {
+                    'title':  track.get('name', ''),
+                    'artist': track.get('artist_name', ''),
+                    'album':  track.get('album_name', ''),
+                    'tags':   tags,
+                    'file':   os.path.basename(path),
+                }
+                downloaded += 1
+        _save_catalog(catalog)
+    except Exception as e:
+        print(f"  [jamendo] erro: {e}")
+
+    return downloaded
 
 
 def _get_jamendo_tracks(jamendo_cfg: dict, num_tracks: int) -> list[dict]:

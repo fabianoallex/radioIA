@@ -378,9 +378,30 @@ def _cmd_gen_time_clips():
         print("  Todos os clips já existem. Use --gen-time-clips --force para regenerar.")
 
 
+def _cmd_download_musica():
+    config = load_config()
+    from src.sources import music as music_source
+    jamendo_sources = [
+        s for s in config.get('sources', [])
+        if s.get('type') == 'music'
+        and (s.get('settings') or {}).get('source') == 'jamendo'
+    ]
+    if not jamendo_sources:
+        print("Nenhuma fonte de música Jamendo configurada no config.yaml.")
+        return
+    for src in jamendo_sources:
+        print(f"Baixando músicas — {src.get('name', src['id'])}...")
+        n = music_source.download_cache(src)
+        print(f"  {n} faixa(s) nova(s) baixada(s).\n")
+
+
 def main():
     if '--gen-time-clips' in sys.argv:
         _cmd_gen_time_clips()
+        sys.exit(0)
+
+    if 'download-musica' in sys.argv:
+        _cmd_download_musica()
         sys.exit(0)
 
     config = load_config()
