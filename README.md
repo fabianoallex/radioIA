@@ -927,34 +927,45 @@ output/
 
 ```
 radioIA/
-├── main.py                 # ponto de entrada principal
-├── serve.py                # player web (Flask)
-├── scheduler.py            # agendador de episódios
-├── mcp_server.py           # servidor MCP para agentes de IA
-├── config.yaml             # configuração completa
-├── .env                    # chaves de API (não versionar)
+├── main.py                      # ponto de entrada principal
+├── serve.py                     # player web (Flask)
+├── scheduler.py                 # agendador de episódios
+├── mcp_server.py                # servidor MCP para agentes de IA
+├── config.yaml                  # configuração completa
+├── .env                         # chaves de API (não versionar)
 ├── src/
-│   ├── script_generator.py # geração de roteiros (LiteLLM — multi-provedor)
-│   ├── tts_generator.py    # síntese de voz (Edge TTS)
-│   ├── audio_mixer.py      # mixagem e exportação do episódio
-│   ├── vinheta.py          # geração das vinhetas
-│   ├── time_clips.py       # clips de hora/minuto para avisos de grade
-│   ├── history.py          # controle de itens já veiculados
-│   ├── auth.py             # autenticação OAuth YouTube
-│   └── sources/
-│       ├── youtube.py      # fonte YouTube
-│       ├── rss.py          # fonte RSS
-│       ├── utility.py      # clima, finanças, loteria, futebol
-│       ├── efemerides.py   # hoje na história (Wikipedia)
-│       ├── trivia.py       # quiz (Open Trivia DB)
-│       ├── reddit.py       # Reddit (top posts)
-│       ├── horoscopo.py    # horóscopo por signo (Personare)
-│       ├── receitas.py     # receitas culinárias (RSS brasileiro + TheMealDB)
-│       ├── filmes.py       # indicações de filmes (TMDB)
-│       └── music.py        # blocos musicais
-├── plugins/                # geradores personalizados (carregados automaticamente)
-├── music/                  # músicas locais para o fallback do player
-└── output/                 # episódios gerados (não versionar)
+│   ├── script_generator.py      # geração de roteiros (LiteLLM — multi-provedor)
+│   ├── tts_generator.py         # síntese de voz (multi-provedor)
+│   ├── audio_mixer.py           # mixagem e exportação do episódio
+│   ├── vinheta.py               # geração das vinhetas
+│   ├── time_clips.py            # clips de hora/minuto para avisos de grade
+│   ├── history.py               # controle de itens já veiculados
+│   ├── spots.py                 # sistema de spots (propagandas/comunicados)
+│   ├── auth.py                  # autenticação OAuth YouTube
+│   ├── text_utils.py            # normalização de texto para TTS
+│   ├── sources/                 # fontes de infraestrutura (core)
+│   │   ├── youtube.py           # fonte YouTube (requer OAuth)
+│   │   ├── rss.py               # fonte RSS genérica
+│   │   ├── music.py             # blocos musicais (Jamendo + local)
+│   │   └── utility.py           # clima, finanças, loteria, futebol
+│   └── tts_providers/           # providers de síntese de voz
+│       ├── edge_tts_provider.py # Edge TTS — padrão, gratuito
+│       ├── openai_provider.py   # OpenAI TTS (tts-1 / tts-1-hd)
+│       ├── elevenlabs_provider.py # ElevenLabs
+│       └── google_provider.py   # Google Cloud TTS
+├── plugins/                     # fontes de conteúdo (carregadas automaticamente)
+│   ├── efemerides.py            # hoje na história (Wikipedia)
+│   ├── trivia.py                # quiz (Open Trivia DB)
+│   ├── reddit.py                # Reddit (top posts via RSS)
+│   ├── horoscopo.py             # horóscopo por signo (Personare)
+│   ├── receitas.py              # receitas culinárias (RSS + TheMealDB)
+│   ├── filmes.py                # indicações de filmes (TMDB)
+│   ├── url.py                   # episódio a partir de URL avulsa
+│   ├── biblia.py                # passagens bíblicas (ABíbliaDigital)
+│   ├── concursos_pci.py         # concursos públicos (PCI Concursos)
+│   └── exemplo_plugin.py        # template para novos plugins
+├── music/                       # músicas locais para o fallback do player
+└── output/                      # episódios gerados (não versionar)
 ```
 
 ---
