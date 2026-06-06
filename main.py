@@ -488,7 +488,7 @@ def main():
 
         if param is not None and source_config.get('type') == 'horoscopo':
             try:
-                from src.sources.horoscopo import SIGN_PAIRS, SIGN_PT
+                from plugins.horoscopo import SIGN_PAIRS, SIGN_PT
                 n = int(param) % 6
                 pair = SIGN_PAIRS[n]
                 label = f"{SIGN_PT[pair[0]]} e {SIGN_PT[pair[1]]}"
