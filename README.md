@@ -673,6 +673,29 @@ python main.py horoscopo:0    # Áries e Touro
 python main.py horoscopo:3    # Libra e Escorpião
 ```
 
+### Download de músicas (Jamendo)
+
+```bash
+python main.py download-musica
+```
+
+Baixa faixas do Jamendo para o cache local (`music/cache/jamendo/`) sem gerar episódio. Útil para popular o fallback antes de receber o primeiro episódio ou para ampliar a variedade musical.
+
+O `serve.py` também faz esse download automaticamente na primeira inicialização, se o cache estiver vazio e o Jamendo estiver configurado.
+
+O número de faixas baixadas por execução é controlado pelo parâmetro `cache_size` (padrão: 50):
+
+```yaml
+- id: musica
+  type: music
+  settings:
+    source: jamendo
+    cache_size: 100   # máximo de faixas a baixar por execução (padrão: 50)
+    jamendo:
+      api_key_env: JAMENDO_CLIENT_ID
+      tags: lounge
+```
+
 ### Player web
 
 ```bash
