@@ -1,0 +1,758 @@
+sources:
+
+  - id: youtube
+    type: youtube
+    name: "Vídeos do Youtube"
+    enabled: true
+    model: "claude-haiku-4-5-20251001"   # estrutura rígida — Haiku suficiente
+    channels:
+      # Jornalismo
+      - id: UCaGmdJSSiR7fkh2A-c6emsA
+        name: "G1"
+      - id: UC-wcdrzucnlKGBjyEUaEWaQ
+        name: "Jovem Pan News"
+      - id: UCvdwhh_fDyWccR42-rReZLw
+        name: "CNN Brasil"
+      # Podcasts
+      - id: UC4ncvgh5hFr5O83MH7-jRJg
+        name: "Flow Podcast"
+      - id: UCvmWNQH4c2T3Triih3lftiw
+        name: "Inteligência Ltda"
+      # Educação e Ciência
+      - id: UCzBTlYfHYMwVEru4hmLM8hg
+        name: "Manual do Mundo"
+      - id: UClu474HMt895mVxZdlIHXEA
+        name: "Nerdologia"
+      - id: UCn9Erjy00mpnWeLnRqhsA1g
+        name: "Ciência Todo Dia"
+      - id: UC9zqTTVeClpqMQ5CLuJdWtw
+        name: "Drauzio Varella"
+      # Finanças
+      - id: UCfMA8s_QXPPcuOTjTDFb4vA
+        name: "Primo Rico"
+      # Esportes
+      - id: UCw5-xj3AKqEizC7MvHaIPqA
+        name: "ESPN Brasil"
+    settings:
+      max_videos_per_channel: 2
+      max_videos_total: 15
+      days_lookback: 7
+      language_preference: [pt, en]
+      subscriptions_ratio: 0.6
+
+  - id: noticias
+    type: rss
+    name: "Notícias do Dia"
+    enabled: true
+    model: "claude-haiku-4-5-20251001"   # estrutura rígida — Haiku suficiente
+    feeds:
+      - url: "https://g1.globo.com/rss/g1/"
+        name: "G1"
+      - url: "https://feeds.folha.uol.com.br/emcimadahora/rss091.xml"
+        name: "Folha"
+      - url: "https://www.gazetadopovo.com.br/feed/rss/economia.xml"
+        name: "Gazeta do Povo - Economia"
+      - url: "https://www.gazetadopovo.com.br/feed/rss/ultimas-noticias.xml"
+        name: "Gazeta do Povo"
+      - url: "https://news.google.com/rss/search?q=brasil"
+        name: "Google Brasil"
+      - url: "https://agenciabrasil.ebc.com.br/rss/ultimasnoticias/feed.xml"
+        name: "Agência Brasil"
+      - url: "https://admin.cnnbrasil.com.br/rss"
+        name: "CNN Brasil"
+      - url: "https://www.metropoles.com/feed/"
+        name: "Metrópoles"
+      - url: "https://www.poder360.com.br/feed/"
+        name: "Poder360"
+      - url: "https://www.bcb.gov.br/api/feed/sitebcb/sitefeeds/noticias"
+        name: "Banco Central"
+      - url: "https://www.nasa.gov/feed/"
+        name: "Nasa"
+    settings:
+      max_items_per_feed: 1
+      max_items_total: 7
+      days_lookback: 1
+
+  - id: noticias-locais
+    type: rss
+    name: "Notícias Locais"
+    enabled: true
+    model: "claude-haiku-4-5-20251001"   # estrutura rígida — Haiku suficiente
+    # Configure aqui os feeds RSS do seu portal local.
+    # Use https://news.google.com/rss/search?q=sua+cidade para busca por cidade.
+    feeds:
+      - url: "https://g1.globo.com/sao-paulo/rss/g1/sao-paulo.xml"
+        name: "G1 São Paulo"
+      - url: "https://news.google.com/rss/search?q=s%C3%A3o+paulo&hl=pt-BR&gl=BR&ceid=BR:pt-419"
+        name: "Google São Paulo"
+    settings:
+      max_items_per_feed: 2
+      max_items_total: 10
+      days_lookback: 1
+
+  - id: horoscopo
+    type: horoscopo
+    name: "Horóscopo do Dia"
+    enabled: true
+    model: "claude-haiku-4-5-20251001"   # estrutura rígida — Haiku suficiente
+    settings:
+      # pair_index: 0   # 0=Áries+Touro, 1=Gêmeos+Câncer, 2=Leão+Virgem,
+                        # 3=Libra+Escorpião, 4=Sagitário+Capricórnio, 5=Aquário+Peixes
+                        # omitir = rotação automática por dia do ano
+
+  - id: loteria
+    type: utility
+    name: "Resultados da Loteria"
+    enabled: true
+    model: "claude-haiku-4-5-20251001"   # estrutura rígida — Haiku suficiente
+    settings:
+      weather:
+        enabled: false
+      finance:
+        enabled: false
+      lottery:
+        enabled: true
+        games:
+          - megasena
+          - lotofacil
+          - quina
+
+  - id: tecnologia
+    type: rss
+    name: "Tecnologia"
+    enabled: true
+    model: "claude-haiku-4-5-20251001"   # estrutura rígida — Haiku suficiente
+    feeds:
+      - url: "https://rss.tecmundo.com.br/feed"
+        name: "TecMundo"
+      - url: "https://olhardigital.com.br/feed/"
+        name: "Olhar Digital"
+      - url: "https://canaltech.com.br/rss/"
+        name: "Canaltech"
+      - url: "https://www.tabnews.com.br/recentes/rss"
+        name: "Tab News"
+    settings:
+      max_items_per_feed: 3
+      max_items_total: 8
+      days_lookback: 1
+
+  - id: copa
+    type: utility
+    name: "Copa do Mundo 2026"
+    enabled: true
+    settings:
+      weather:
+        enabled: false
+      finance:
+        enabled: false
+      lottery:
+        enabled: false
+      football:
+        enabled: true
+        competition: WC
+        api_key_env: FOOTBALL_DATA_API_KEY
+
+  - id: brasileirao
+    type: utility
+    name: "Brasileirão"
+    enabled: true
+    settings:
+      weather:
+        enabled: false
+      finance:
+        enabled: false
+      lottery:
+        enabled: false
+      football:
+        enabled: true
+        competition: BSA         # Campeonato Brasileiro Série A
+        api_key_env: FOOTBALL_DATA_API_KEY
+
+  - id: champions
+    type: utility
+    name: "Champions League"
+    enabled: true
+    settings:
+      weather:
+        enabled: false
+      finance:
+        enabled: false
+      lottery:
+        enabled: false
+      football:
+        enabled: true
+        competition: CL          # UEFA Champions League
+        api_key_env: FOOTBALL_DATA_API_KEY
+
+  - id: reddit
+    type: reddit
+    name: "Tendências do Reddit"
+    enabled: true
+    subreddits:
+      - programacao
+      - brasil
+      - investimentos
+      - brdev
+      - futebol
+      - ciencia
+    settings:
+      max_per_subreddit: 3
+      max_total: 10
+      timeframe: day     # hour | day | week | month | year
+      min_score: 50
+
+  - id: quiz
+    type: trivia
+    name: "Quiz do Dia"
+    enabled: true
+    model: "claude-haiku-4-5-20251001"   # estrutura rígida — Haiku suficiente
+    settings:
+      amount: 5
+      # category: 22   # 9=Geral, 17=Ciência, 18=Tech, 21=Esportes, 22=Geografia, 23=História, 25=Arte
+      # difficulty: medium  # easy | medium | hard  (omitir = aleatório)
+
+  - id: receitas
+    type: receitas
+    name: "Receita do Dia"
+    enabled: true
+    model: "claude-haiku-4-5-20251001"   # estrutura rígida — Haiku suficiente
+    settings:
+      feeds:
+        - url: "https://www.panelaterapia.com/feed/"
+          name: "Panelaterapia"
+        - url: "https://www.naminhapanela.com/feed/"
+          name: "Na Minha Panela"
+      # Fallback TheMealDB (usado se os feeds RSS falharem)
+      areas:
+        - Italian
+        - Portuguese
+        - Mexican
+        - French
+        - Japanese
+
+  - id: filmes
+    type: filmes
+    name: "Cine Indica"
+    enabled: true
+    model: "claude-haiku-4-5-20251001"   # estrutura rígida — Haiku suficiente
+    settings:
+      api_key_env: TMDB_API_KEY
+      mode: trending      # trending | now_playing | upcoming | top_rated
+      language: pt-BR
+      region: BR
+      max_movies: 5
+
+  - id: filmes-cartaz
+    type: filmes
+    name: "Filmes em Cartaz"
+    enabled: true
+    model: "claude-haiku-4-5-20251001"   # estrutura rígida — Haiku suficiente
+    settings:
+      api_key_env: TMDB_API_KEY
+      mode: now_playing
+      language: pt-BR
+      region: BR
+      max_movies: 4
+
+  - id: efemerides
+    type: efemerides
+    name: "Hoje na História"
+    enabled: true
+    model: "claude-haiku-4-5-20251001"   # estrutura rígida — Haiku suficiente
+    settings:
+      max_events: 3
+      categories:
+        - selected   # eventos curados pela Wikipedia (melhor qualidade)
+        - events     # demais eventos do dia (complementa se selected < max_events)
+        - births   # nascimentos notáveis
+        # - deaths   # falecimentos notáveis
+
+  - id: utilidades
+    type: utility
+    name: "Resumo do Dia"
+    enabled: true
+    model: "claude-haiku-4-5-20251001"   # estrutura rígida — Haiku suficiente
+    settings:
+      weather:
+        enabled: true
+        cities:
+          - "Sao Paulo,BR"
+        api_key_env: "OPENWEATHER_API_KEY"
+        forecast_days: 3
+      finance:
+        enabled: true
+        pairs:
+          - "USD-BRL"
+          - "EUR-BRL"
+          - "BTC-USD"
+
+      ibovespa:
+        enabled: true
+        top_movers: 3    # quantas altas e baixas mostrar
+
+      sun:
+        enabled: true
+        lat: -23.5505
+        lng: -46.6333
+        tzid: "America/Sao_Paulo"  # America/Sao_Paulo, America/Manaus, America/Cuiaba, etc.
+
+  - id: musica
+    type: music
+    name: "Seleção Musical"
+    enabled: false
+    model: "claude-haiku-4-5-20251001"   # estrutura rígida — Haiku suficiente
+    settings:
+      num_tracks: 3
+      source: "jamendo"       # "jamendo" ou "local"
+      jamendo:
+        api_key_env: "JAMENDO_CLIENT_ID"
+        tags: "rock"        # lounge, jazz, ambient, pop, electronic, classical, rock
+        min_duration: 60
+        max_duration: 360
+      intro_text: "E hora da nossa selecao musical! Preparamos algumas faixas para voce."
+      outro_text: "E assim encerramos nossa selecao musical. Voltamos logo com mais programacao."
+
+  - id: musica-local
+    type: music
+    name: "Playlist Local"
+    model: "claude-haiku-4-5-20251001"   # estrutura rígida — Haiku suficiente
+    enabled: false
+    settings:
+      num_tracks: 2
+      source: "local"
+      paths:
+        - "D:/musicas"
+
+  # ── Plugin: Concursos Públicos (PCI Concursos) ───────────────────────────────
+  # Requer: pip install beautifulsoup4  (já incluído em requirements.txt)
+  - id: concursos
+    type: concursos_pci
+    name: "Concursos Públicos"
+    enabled: true
+    settings:
+      max_items: 2       # máximo de notícias por execução
+      days_lookback: 2   # busca notícias dos últimos N dias
+
+  # ── Plugin: Passagens Bíblicas (ABíbliaDigital) ───────────────────────────────
+  # Requer: pip install requests  (já incluído em requirements.txt)
+  # Token gratuito em: https://www.abibliadigital.com.br/pt
+  # Adicione no .env:  ABIBLIADIGITAL_TOKEN=seu_jwt_aqui
+  - id: biblia
+    type: biblia
+    name: "Palavra do Dia"
+    enabled: true
+    model: "claude-haiku-4-5-20251001"   # estrutura rígida — Haiku suficiente
+    settings:
+      token_env: ABIBLIADIGITAL_TOKEN   # nome da variável no .env
+      version: nvi                      # nvi | acf | ra | kjv | bbe | apee | rvr
+      mode: random                      # random | book | passage
+      # book: sl                        # livro específico (usado se mode=book)
+      # passage: jo:3:16                # referência exata (usado se mode=passage)
+      max_items: 3
+
+# 1, 2 ou 3 narradores. Remova ou comente entradas para reduzir.
+# Vozes pt-BR disponiveis (apenas 3):
+#   pt-BR-ThalitaMultilingualNeural (Female)
+#   pt-BR-AntonioNeural (Male)
+#   pt-BR-FranciscaNeural (Female)
+narrators:
+  - name: "Ana"
+    voice: "pt-BR-ThalitaMultilingualNeural"
+    personality: "descontraida, curiosa e bem-humorada — faz perguntas e reage com naturalidade"
+  - name: "Carlos"
+    voice: "pt-BR-AntonioNeural"
+    personality: "analitico e direto — complementa com contexto e opiniao assertiva"
+  # Terceiro narrador: descomente para ativar
+  # - name: "Julia"
+  #   voice: "pt-BR-FranciscaNeural"
+  #   personality: "irreverente e critica — traz pontos de vista inesperados e humor"
+
+# ── Spots (propagandas / comunicados) ─────────────────────────────────────────
+# Três origens: file (MP3 pronto), tts (texto → voz), llm (tema → LLM → voz)
+# Rotação ponderada, sem repetição consecutiva, com cap diário por spot.
+#
+spots:
+#   - id: promo-evento
+#     type: file
+#     path: "spots/evento.mp3"     # caminho relativo ao projeto
+#     weight: 2                    # toca 2x mais (padrão: 1)
+#     max_per_day: 5
+#
+  - id: aviso-reuniao
+    type: tts
+    text: "Atenção colaboradores: reunião geral às 15h na sala principal."
+    voice: "pt-BR-AntonioNeural"   # opcional — usa vinheta.voice se omitido
+#
+#   - id: chamada-produto
+#     type: llm
+#     topic: "Promova o produto XYZ de forma descontraída em 20 segundos"
+#     duration_seconds: 20
+#     max_per_day: 3
+#     # model: "claude-haiku-4-5-20251001"   # opcional — usa llm.model se omitido
+#
+spots_config:
+  fallback_every: 2            # injeta spot a cada N músicas no modo fallback (0 = desativa)
+  between_episodes_every: 3   # injeta break a cada N transições entre episódios (0 = desativa)
+#
+# Para usar como fonte agendável na grade (aparece na playlist):
+#   - id: comunicado
+#     type: spot
+#     name: "Comunicado"
+#     enabled: true
+
+# ── Síntese de voz (TTS) ──────────────────────────────────────────────────────
+# Provider padrão: edge_tts (gratuito, sem chave de API)
+# Outros providers requerem instalação e chave de API — veja comentários abaixo.
+#
+# tts:
+#   provider: edge_tts   # edge_tts (padrão) | openai | elevenlabs | google
+#
+#   # ── OpenAI TTS (pip install openai) ──────────────────────────────────────
+#   # Vozes: alloy, ash, coral, echo, fable, onyx, nova, sage, shimmer
+#   openai:
+#     api_key_env: OPENAI_API_KEY
+#     model: tts-1-hd          # tts-1 (rápido) | tts-1-hd (maior qualidade)
+#     voice_map:               # converte vozes edge-tts → OpenAI automaticamente
+#       pt-BR-AntonioNeural: onyx
+#       pt-BR-ThalitaMultilingualNeural: nova
+#       pt-BR-FranciscaNeural: shimmer
+#
+#   # ── ElevenLabs (pip install elevenlabs) ──────────────────────────────────
+#   # Voice IDs em: https://elevenlabs.io/voice-library
+#   elevenlabs:
+#     api_key_env: ELEVENLABS_API_KEY
+#     model: eleven_multilingual_v2   # eleven_multilingual_v2 | eleven_turbo_v2_5
+#     voice_map:
+#       pt-BR-AntonioNeural: <voice_id>
+#       pt-BR-ThalitaMultilingualNeural: <voice_id>
+#
+#   # ── Google Cloud TTS (pip install google-cloud-texttospeech) ─────────────
+#   # Vozes pt-BR: pt-BR-Studio-B (M) | pt-BR-Studio-C (F) | pt-BR-Neural2-A (F)
+#   google:
+#     credentials_env: GOOGLE_APPLICATION_CREDENTIALS   # path do service account JSON
+#     language_code: pt-BR
+#     voice_map:
+#       pt-BR-AntonioNeural: pt-BR-Studio-B
+#       pt-BR-ThalitaMultilingualNeural: pt-BR-Studio-C
+#       pt-BR-FranciscaNeural: pt-BR-Neural2-C
+
+# ── Modelo de linguagem (LLM) ─────────────────────────────────────────────────
+# Suporta qualquer provedor via LiteLLM. Exemplos:
+#
+#   Anthropic (padrão) — requer ANTHROPIC_API_KEY no .env
+#     model: "claude-sonnet-4-6"
+#     model: "claude-haiku-4-5-20251001"
+#     model: "claude-opus-4-8"
+#
+#   OpenAI — requer OPENAI_API_KEY no .env
+#     model: "gpt-4o"
+#     model: "gpt-4o-mini"
+#
+#   Google Gemini — requer GEMINI_API_KEY no .env
+#     model: "gemini/gemini-2.0-flash"
+#
+#   Groq (rápido e gratuito) — requer GROQ_API_KEY no .env
+#     model: "groq/llama-3.3-70b-versatile"
+#
+#   Ollama (local, sem custo de API) — requer Ollama instalado
+#     model: "ollama/llama3.2"
+#     api_base: "http://localhost:11434"   # endpoint padrão do Ollama
+#
+# Override por fonte: adicione  model: "..."  em qualquer source abaixo.
+llm:
+  model: "claude-sonnet-4-6"
+  # api_base: "http://localhost:11434"   # necessário apenas para Ollama
+
+vinheta:
+  voice: "pt-BR-FranciscaNeural"
+  rate: "+20%"
+  # abertura, id e encerramento são gerados automaticamente a partir de radio.name.
+  # Descomente e edite apenas se quiser um texto personalizado:
+  # abertura: "RadioIA — sua rádio personalizada!"
+  # id: "RadioIA!"
+  # encerramento: "RadioIA — até o próximo episódio!"
+
+# ── Avisos entre músicas (modo fallback) ──────────────────────────────────────
+announcements:
+  enabled: true      # false = desativa os avisos de grade entre músicas
+
+radio:
+  name: "RadioIA"             # nome da rádio — mude aqui para personalizar toda a programação
+  background_music: ""
+  background_volume_db: -22
+
+# ── Agendamento ───────────────────────────────────────────────────────────────
+# Modos:
+#   Diário  — omita 'date': roda todo dia no horário indicado
+#   Pontual — adicione 'date: YYYY-MM-DD': roda uma única vez nessa data
+#
+# Uso: python scheduler.py
+#       python scheduler.py --list   (apenas exibe a grade)
+schedule:
+
+  # ── Manhã (07:00–09:45) ─────────────────────────────────────────────────────
+  - time: "07:00"
+    label: "Manhã"
+    sources: [utilidades, noticias-locais]
+
+  - time: "07:15"
+    label: "Notícias"
+    sources: [noticias]
+
+  - time: "07:30"
+    slot_id: 1
+    label: "Playlist Local"
+    sources: [musica-local]
+
+  - time: "07:45"
+    label: "Tecnologia"
+    sources: [tecnologia]
+
+  - time: "08:00"
+    label: "Horóscopo — Áries e Touro"
+    sources: ["horoscopo:0"]
+
+  - time: "08:15"
+    label: "Notícias Locais"
+    sources: [noticias-locais]
+
+  - time: "08:30"
+    label: "Notícias"
+    sources: [noticias, tecnologia]
+
+  - time: "08:45"
+    slot_id: 2
+    label: "Hoje na História"
+    sources: [efemerides]
+
+  - time: "08:57"
+    replay_of: 1
+    label: "Teste de Replay"
+
+  - time: "09:00"
+    slot_id: 3
+    label: "Quiz do Dia"
+    sources: [quiz]
+
+  - time: "09:15"
+    slot_id: 4
+    label: "Receita do Dia"
+    sources: [receitas]
+
+  - time: "09:30"
+    label: "YouTube"
+    sources: [youtube]
+
+  - time: "09:45"
+    slot_id: 5
+    label: "Cine Indica"
+    sources: [filmes]
+
+  # ── Meio da manhã (10:00–11:45) ──────────────────────────────────────────────
+  - time: "10:00"
+    label: "Horóscopo — Gêmeos e Câncer"
+    sources: ["horoscopo:1"]
+
+  - time: "10:15"
+    label: "Notícias"
+    sources: [noticias]
+
+  - time: "10:30"
+    label: "Notícias Locais"
+    sources: [noticias-locais]
+
+  - time: "10:45"
+    label: "YouTube"
+    sources: [youtube]
+
+  - time: "11:00"
+    label: "Horóscopo — Leão e Virgem"
+    sources: ["horoscopo:2"]
+
+  - time: "11:15"
+    replay_of: 3
+    label: "Quiz (manhã)"
+
+  - time: "11:30"
+    label: "Tecnologia"
+    sources: [tecnologia]
+
+  - time: "11:45"
+    replay_of: 4
+    label: "Receita do Dia (manhã)"
+
+  # ── Meio-dia (12:00–13:45) ────────────────────────────────────────────────────
+  - time: "12:00"
+    label: "Meio-dia"
+    sources: [loteria, copa]
+
+  - time: "12:15"
+    label: "Notícias"
+    sources: [noticias]
+
+  - time: "12:30"
+    slot_id: 6
+    label: "Filmes em Cartaz"
+    sources: [filmes-cartaz]
+
+  - time: "12:45"
+    slot_id: 7
+    label: "Seleção Musical"
+    sources: [musica]
+
+  - time: "13:00"
+    label: "Horóscopo — Libra e Escorpião"
+    sources: ["horoscopo:3"]
+
+  - time: "13:15"
+    replay_of: 5
+    label: "Cine Indica (tarde)"
+
+  - time: "13:30"
+    label: "YouTube"
+    sources: [youtube]
+
+  - time: "13:45"
+    replay_of: 2
+    label: "Hoje na História (tarde)"
+
+  # ── Tarde (14:00–17:45) ───────────────────────────────────────────────────────
+  - time: "14:00"
+    label: "Horóscopo — Sagitário e Capricórnio"
+    sources: ["horoscopo:4"]
+
+  - time: "14:15"
+    label: "Notícias Locais"
+    sources: [noticias-locais]
+
+  - time: "14:30"
+    label: "Reddit"
+    sources: [reddit]
+
+  - time: "14:45"
+    replay_of: 1
+    label: "Playlist Local (tarde)"
+
+  - time: "15:00"
+    label: "Horóscopo — Aquário e Peixes"
+    sources: ["horoscopo:5"]
+
+  - time: "15:15"
+    label: "Notícias"
+    sources: [noticias]
+
+  - time: "15:30"
+    label: "Tecnologia"
+    sources: [tecnologia]
+
+  - time: "15:45"
+    replay_of: 6
+    label: "Filmes em Cartaz (tarde)"
+
+  - time: "16:00"
+    replay_of: 7
+    label: "Seleção Musical (tarde)"
+
+  - time: "16:15"
+    label: "YouTube"
+    sources: [youtube]
+
+  - time: "16:30"
+    label: "Notícias Locais"
+    sources: [noticias-locais]
+
+  - time: "16:45"
+    replay_of: 3
+    label: "Quiz (tarde)"
+
+  - time: "17:00"
+    label: "Notícias"
+    sources: [noticias]
+
+  - time: "17:15"
+    label: "Tecnologia"
+    sources: [tecnologia]
+
+  - time: "17:30"
+    replay_of: 4
+    label: "Receita do Dia (tarde)"
+
+  - time: "17:45"
+    label: "Reddit"
+    sources: [reddit]
+
+  # ── Noite (18:00–21:45) ───────────────────────────────────────────────────────
+  - time: "18:00"
+    label: "Tarde"
+    sources: [youtube]
+
+  - time: "18:15"
+    replay_of: 1
+    label: "Playlist Local (noite)"
+
+  - time: "18:30"
+    replay_of: 5
+    label: "Cine Indica (noite)"
+
+  - time: "18:45"
+    replay_of: 2
+    label: "Hoje na História (noite)"
+
+  - time: "19:00"
+    label: "Futebol"
+    sources: [brasileirao, champions]
+
+  - time: "19:15"
+    label: "Notícias"
+    sources: [noticias]
+
+  - time: "19:30"
+    label: "YouTube"
+    sources: [youtube]
+
+  - time: "19:45"
+    replay_of: 6
+    label: "Filmes em Cartaz (noite)"
+
+  - time: "20:00"
+    label: "Tecnologia"
+    sources: [tecnologia]
+
+  - time: "20:15"
+    replay_of: 4
+    label: "Receita do Dia (noite)"
+
+  - time: "20:30"
+    label: "Notícias Locais"
+    sources: [noticias-locais]
+
+  - time: "20:45"
+    replay_of: 7
+    label: "Seleção Musical (noite)"
+
+  - time: "21:00"
+    label: "Noite"
+    sources: [reddit]
+
+  - time: "21:15"
+    label: "YouTube"
+    sources: [youtube]
+
+  - time: "21:30"
+    replay_of: 3
+    label: "Quiz (noite)"
+
+  - time: "21:45"
+    replay_of: 5
+    label: "Cine Indica (noite)"
+
+  # Pontual — Copa do Mundo (exemplos)
+  - time: "11:00"
+    date: "2026-06-11"
+    label: "Abertura da Copa"
+    sources: [copa]
+
+  - time: "15:00"
+    date: "2026-06-13"
+    label: "Brasil x Marrocos"
+    sources: [copa]
