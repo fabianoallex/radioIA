@@ -54,19 +54,20 @@ def _source_name(entry) -> str:
     return 'Fonte desconhecida'
 
 
-def _fetch_content(url: str, max_chars: int) -> tuple[str, str]:
-    """Retorna (título, texto) extraídos via trafilatura."""
+def _fetch_content(url: str, max_chars: int) -> tuple[str, str, str]:
+    """Retorna (título, texto, url_canonica) extraídos via trafilatura."""
     try:
         downloaded = trafilatura.fetch_url(url)
         if not downloaded:
-            return '', ''
+            return '', '', ''
         text  = trafilatura.extract(downloaded, include_comments=False,
                                     include_tables=False, no_fallback=False) or ''
         meta  = trafilatura.extract_metadata(downloaded)
-        title = (meta.title if meta else '') or ''
-        return title, text[:max_chars]
+        title     = (meta.title if meta else '') or ''
+        canonical = (meta.url   if meta else '') or ''
+        return title, text[:max_chars], canonical
     except Exception:
-        return '', ''
+        return '', '', ''
 
 
 def _rss_summary(entry) -> str:
@@ -111,12 +112,15 @@ def _fetch_entries(url: str, since: date, max_entries: int,
 
         text  = ''
         title = clean_title
+        final_url = entry_url
         if fetch_full:
-            fetched_title, fetched_text = _fetch_content(entry_url, max_chars)
+            fetched_title, fetched_text, canonical = _fetch_content(entry_url, max_chars)
             if fetched_text:
                 text = fetched_text
             if fetched_title:
                 title = fetched_title
+            if canonical:
+                final_url = canonical   # URL do site original, não do Google
         if not text:
             text = _rss_summary(entry)
         if not text:
@@ -126,7 +130,7 @@ def _fetch_entries(url: str, since: date, max_entries: int,
         items.append({
             'id':           f'clipping-{uid}-{today}',
             'title':        title,
-            'url':          entry_url,
+            'url':          final_url,
             'text':         text,
             'source_name':  source,
             'source_type':  source_config.get('type', 'clipping'),
