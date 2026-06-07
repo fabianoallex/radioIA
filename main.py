@@ -460,6 +460,7 @@ def main():
             'settings': {'url': target_url},
         })
 
+    followup = '--followup' in sys.argv
     for topic in clipping_targets:
         # Mescla defaults do config (se existir fonte id=clipping) com o tópico CLI
         base = next((s for s in all_sources if s['id'] == 'clipping'), {})
@@ -469,7 +470,7 @@ def main():
             'type':    'clipping',
             'name':    f"Clipping — {topic[:60]}",
             'enabled': True,
-            'settings': {**(base.get('settings') or {}), 'topic': topic},
+            'settings': {**(base.get('settings') or {}), 'topic': topic, 'followup': followup},
         })
 
     if not sources and not replay_targets:

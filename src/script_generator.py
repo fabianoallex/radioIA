@@ -138,8 +138,9 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
     names = [nr['name'] for nr in active]
 
     if source_type == 'clipping':
-        cards = [_build_clipping_card(i, item) for i, item in enumerate(items, 1)]
-        prompt = _clipping_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
+        cards    = [_build_clipping_card(i, item) for i, item in enumerate(items, 1)]
+        followup = bool((source_config.get('settings') or {}).get('followup', False))
+        prompt   = _clipping_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name, followup)
     elif source_type == 'whatsapp':
         cards = [_build_whatsapp_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _whatsapp_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
@@ -580,7 +581,8 @@ def _build_clipping_card(i: int, item: dict) -> str:
 
 def _clipping_prompt(narrators: list[dict], names: list[str], source_name: str,
                      content: str, is_first_of_day: bool = True,
-                     station_name: str = 'RadioIA') -> str:
+                     station_name: str = 'RadioIA',
+                     followup: bool = False) -> str:
     n = len(narrators)
     narrator_block = _narrator_block(narrators)
     format_block   = _format_block(narrators)
@@ -592,18 +594,48 @@ def _clipping_prompt(narrators: list[dict], names: list[str], source_name: str,
         f"- Distribua as falas entre os {n} apresentadores — um pode questionar, outro contextualizar"
     )
 
-    if is_first_of_day:
+    if followup:
         abertura = (
-            f"1. ABERTURA: {names_str} dao bom dia, dizem que os ouvintes estao na {station_name} "
-            f'e apresentam o clipping — o que a mídia está falando sobre o assunto do dia (2-3 falas)'
+            '1. ENTRADA DE CONTINUIDADE: retome o assunto como desdobramento — '
+            '"A repercussão continua...", "Novos detalhes surgiram sobre...", '
+            '"A mídia segue acompanhando..." ou similar. '
+            'SEM bom dia, SEM apresentação do assunto do zero. (1-2 falas)'
+        )
+        tarefa = (
+            "Você receberá nova cobertura da mídia sobre um assunto que JÁ FOI apresentado anteriormente.\n"
+            "O ouvinte conhece o contexto básico — não repita o que é o assunto.\n"
+            "Foque no que é NOVO: novos ângulos, novos fatos, mudança de posição dos veículos, "
+            "informações que não estavam na cobertura anterior."
+        )
+        estrutura_meio = (
+            "2. Destaque o que há de novo na cobertura desde o último clipping (2-3 falas)\n"
+            "3. Para cada veículo: o que ele traz de diferente ou inédito — novo ângulo, nova fonte, novo dado (1-2 falas cada)\n"
+            "4. Síntese: como a cobertura evoluiu? O que ainda está em aberto? (2-3 falas)"
+        )
+        encerramento = "5. Encerramento sinalizando que o assunto continua sendo acompanhado (1-2 falas)"
+    else:
+        if is_first_of_day:
+            abertura = (
+                f"1. ABERTURA: {names_str} dao bom dia, dizem que os ouvintes estao na {station_name} "
+                f'e apresentam o clipping — o que a mídia está falando sobre o assunto do dia (2-3 falas)'
+            )
+        else:
+            abertura = (
+                '1. ENTRADA: entre direto no assunto — "Vamos ao clipping do dia...", '
+                '"A mídia está repercutindo..." ou similar. SEM bom dia. (1-2 falas)'
+            )
+        tarefa = (
+            "Você receberá o conteúdo de vários veículos de comunicação cobrindo o mesmo assunto.\n"
+            "Analise como cada um aborda o tema — quais aspectos enfatizam, qual ângulo adotam, "
+            "que informações destacam.\n"
+            "Construa um panorama de cobertura midiática, não um resumo de cada artigo individualmente."
+        )
+        estrutura_meio = (
+            "2. Apresente o assunto em poucas frases — o que aconteceu, o contexto geral (2-3 falas)\n"
+            "3. Para cada veículo: como ele está abordando o assunto — ângulo, ênfase, informação exclusiva (1-2 falas cada)\n"
+            "4. Síntese: o que a cobertura revela? Há consenso? Divergências? (2-3 falas)"
         )
         encerramento = "5. Encerramento: convide o ouvinte a continuar na programacao (1-2 falas)"
-    else:
-        abertura = (
-            '1. ENTRADA: entre direto no assunto — "Vamos ao clipping do dia...", '
-            '"A mídia está repercutindo..." ou similar. SEM bom dia. (1-2 falas)'
-        )
-        encerramento = "5. Encerramento curto sinalizando que a programacao continua (1 fala)"
 
     return f"""Voce e um roteirista de análise de mídia para radio FM brasileira.
 Crie o roteiro do segmento de clipping — uma análise de como diferentes veículos estão cobrindo um mesmo assunto.
@@ -618,15 +650,11 @@ ATENCAO: responda APENAS com as linhas do roteiro no formato acima. Sem titulos,
 PERSONALIDADES: respeite o perfil de cada apresentador mesmo no tom analítico.
 
 TAREFA:
-Você receberá o conteúdo de vários veículos de comunicação cobrindo o mesmo assunto.
-Analise como cada um aborda o tema — quais aspectos enfatizam, qual ângulo adotam, que informações destacam.
-Construa um panorama de cobertura midiática, não um resumo de cada artigo individualmente.
+{tarefa}
 
 ESTRUTURA:
 {abertura}
-2. Apresente o assunto em poucas frases — o que aconteceu, o contexto geral (2-3 falas)
-3. Para cada veículo: como ele está abordando o assunto — ângulo, ênfase, informação exclusiva (1-2 falas cada)
-4. Síntese: o que a cobertura revela? Há consenso? Divergências? Algo que chama atenção na forma como a mídia está tratando o tema? (2-3 falas)
+{estrutura_meio}
 {encerramento}
 
 REGRAS:
