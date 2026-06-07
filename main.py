@@ -425,7 +425,9 @@ def main():
                 result[arg] = None
         return result
 
-    cli = _parse_cli(sys.argv[1:]) if len(sys.argv) > 1 else {}
+    # Filtra flags (--flag) antes de parsear — não são IDs de fonte
+    cli_args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    cli = _parse_cli(cli_args) if cli_args else {}
 
     # Extrai replay: direto do argv para suportar múltiplos (replay:X replay:Y)
     replay_targets = [a.split(':', 1)[1] for a in sys.argv[1:] if a.startswith('replay:')]
