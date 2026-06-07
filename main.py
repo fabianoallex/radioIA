@@ -486,6 +486,14 @@ def main():
             except ValueError:
                 print(f"  Parametro invalido '{param}' — usando config padrao.")
 
+        if param is not None and source_config.get('type') == 'clipping':
+            source_config = {
+                **source_config,
+                'settings': {**(source_config.get('settings') or {}), 'topic': param},
+                'name': f"Clipping — {param[:60]}",
+            }
+            print(f"  Tópico: {param}")
+
         if param is not None and source_config.get('type') == 'horoscopo':
             try:
                 from plugins.horoscopo import SIGN_PAIRS, SIGN_PT
