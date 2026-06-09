@@ -231,6 +231,17 @@ def gerar_episodios(fontes: list[str]) -> str:
                 'name': 'Conteudo da Web',
                 'settings': {'url': param},
             }
+        # Clipping: tópico passado como parâmetro, mescla com config se existir
+        elif source_id == 'clipping' and param:
+            base = next((s for s in all_sources if s['id'] == 'clipping'), {})
+            source_cfg = {
+                **base,
+                'id':      'clipping',
+                'type':    'clipping',
+                'name':    f"Clipping — {param[:60]}",
+                'enabled': True,
+                'settings': {**(base.get('settings') or {}), 'topic': param},
+            }
         else:
             source_cfg = next((s for s in all_sources if s['id'] == source_id), None)
             if not source_cfg:
@@ -1257,6 +1268,75 @@ def testar_tts(texto: str, voz: str = '') -> str:
         'arquivo':  output_path,
         'tamanho_kb': size_kb,
         'mensagem': f"Audio gerado com sucesso. Acesse em http://localhost:5000 ou abra o arquivo diretamente.",
+    }, ensure_ascii=False, indent=2)
+
+
+# ── Tools — Clipping ─────────────────────────────────────────────────────────
+
+@mcp.tool()
+def gerar_clipping(topico: str, followup: bool = False) -> str:
+    """
+    Gera um episodio de clipping — panorama de como a midia esta cobrindo um tema.
+    Busca no Google News como diferentes veiculos abordam o topico e narra as
+    convergencias e divergencias entre eles.
+
+    Nao requer configuracao previa no config.yaml.
+
+    Args:
+        topico:  Tema a pesquisar. Pode ser qualquer assunto atual. Exemplos:
+                 "queda de aviao da empresa xyz"
+                 "reforma tributaria 2026"
+                 "copa do mundo abertura"
+                 "novo iphone lancamento"
+        followup: Se True, busca apenas artigos mais recentes sobre o tema
+                  (util para acompanhar um assunto que ja foi clippado antes).
+                  Default: False.
+
+    Equivalente CLI: python main.py "clipping:tema"  (ou com --followup)
+    """
+    config      = _load_config()
+    all_sources = config.get('sources', [])
+    seen_ids    = load_seen_ids()
+    credentials = radio_main._get_oauth_credentials()
+    first_of_day = not radio_main._has_episodes_today()
+
+    base = next((s for s in all_sources if s['id'] == 'clipping'), {})
+    source_cfg = {
+        **base,
+        'id':      'clipping',
+        'type':    'clipping',
+        'name':    f"Clipping — {topico[:60]}",
+        'enabled': True,
+        'settings': {**(base.get('settings') or {}), 'topic': topico, 'followup': followup},
+    }
+
+    path, log, err = _capture(
+        radio_main._run_source, source_cfg, config, credentials, seen_ids, first_of_day
+    )
+
+    if path and os.path.exists(path):
+        meta_path = os.path.join(os.path.dirname(path), 'episode.json')
+        meta = {}
+        if os.path.exists(meta_path):
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+        dur = meta.get('duration_seconds', 0)
+        return json.dumps({
+            'status':   'ok',
+            'topico':   topico,
+            'followup': followup,
+            'nome':     meta.get('source_name', source_cfg['name']),
+            'duracao':  f"{dur // 60}m {dur % 60}s",
+            'itens':    meta.get('videos_covered', 0),
+            'arquivo':  path,
+            'log':      log.strip(),
+        }, ensure_ascii=False, indent=2)
+
+    return json.dumps({
+        'status':   'erro',
+        'topico':   topico,
+        'mensagem': err or 'Nenhum episodio gerado. Verifique se ha artigos recentes sobre o tema.',
+        'log':      log.strip(),
     }, ensure_ascii=False, indent=2)
 
 
