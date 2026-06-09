@@ -886,7 +886,7 @@ O estado das execuções é salvo em `scheduler_state.json`:
 
 ## Servidor MCP
 
-O `mcp_server.py` expõe a RadioIA como um servidor [MCP (Model Context Protocol)](https://modelcontextprotocol.io), permitindo que agentes de IA (como o Claude no Claude Code) gerem episódios diretamente por conversa.
+O `mcp_server.py` expõe a RadioIA como um servidor [MCP (Model Context Protocol)](https://modelcontextprotocol.io), permitindo que agentes de IA operem a rádio completamente por conversa — gerando episódios, gerenciando a grade, alterando configurações e monitorando o sistema.
 
 ### Iniciar o servidor
 
@@ -896,21 +896,49 @@ python mcp_server.py
 
 ### Ferramentas disponíveis
 
+#### Geração de conteúdo
+
 | Ferramenta | Descrição |
 |-----------|-----------|
-| `listar_fontes()` | Lista todas as fontes configuradas e o estado do histórico |
+| `listar_fontes()` | Lista todas as fontes configuradas com tipo, status e histórico |
 | `gerar_episodios(["noticias", "copa"])` | Gera episódios para as fontes especificadas |
-| `gerar_episodios(["filmes"])` | Gera quadro de indicações de filmes (TMDB trending) |
-| `gerar_episodios(["filmes-cartaz"])` | Gera quadro de filmes em cartaz no Brasil |
+| `gerar_episodios(["musica:3"])` | Gera bloco musical com N faixas |
 | `gerar_episodios(["url:https://..."])` | Gera episódio a partir de uma URL avulsa |
-| `listar_episodios("2026-06-11")` | Lista episódios gerados em uma data (padrão: hoje) |
-| `replay_episodio("12-15_not")` | Replay de episódio por prefixo parcial da pasta (hoje) |
+| `listar_episodios("2026-06-11")` | Lista episódios de uma data (padrão: hoje) com duração total |
+| `ler_episodio("noticias")` | Lê o roteiro completo e metadados de um episódio por prefixo |
+| `replay_episodio("12-15_not")` | Replay de episódio por prefixo parcial da pasta |
 | `replay_episodio("12-15", "2026-06-03")` | Replay de episódio de uma data específica |
-| `status_historico()` | Mostra quantos itens já foram veiculados |
+
+**Fontes disponíveis:**
+`youtube` · `noticias` · `noticias-locais` · `tecnologia` · `horoscopo` · `utilidades` · `loteria` · `copa` · `brasileirao` · `champions` · `efemerides` · `quiz` · `reddit` · `receitas` · `filmes` · `filmes-cartaz` · `musica` · `musica-local` · `concursos` · `biblia`
+
+#### Histórico
+
+| Ferramenta | Descrição |
+|-----------|-----------|
+| `status_historico()` | Mostra quantos itens e episódios já foram veiculados |
 | `limpar_historico()` | Reseta o histórico — todos os conteúdos ficam elegíveis novamente |
 
-**Fontes disponíveis em `gerar_episodios`:**
-`youtube` · `noticias` · `noticias-locais` · `tecnologia` · `horoscopo` · `utilidades` · `loteria` · `copa` · `brasileirao` · `champions` · `efemerides` · `quiz` · `reddit` · `receitas` · `filmes` · `filmes-cartaz` · `musica` · `musica-local`
+#### Grade e configuração
+
+| Ferramenta | Descrição |
+|-----------|-----------|
+| `ver_grade()` | Exibe a grade completa com status de execução do dia e próximo horário |
+| `ler_config("radio")` | Lê uma seção do `config.yaml` como JSON (`sources`, `narrators`, `llm`, `radio`, `vinheta`, `schedule`, `tts`) |
+| `configurar_fonte("musica", "enabled", "true")` | Habilita, desabilita ou altera um campo de qualquer fonte |
+| `atualizar_config("radio.name", "Minha Rádio")` | Altera qualquer valor do config via notação de ponto |
+| `adicionar_grade("16:00", ["noticias"], "Tarde")` | Adiciona entrada na grade (diária ou pontual, com suporte a `slot_id`/`replay_of`/`days`) |
+| `remover_grade("16:00", "Tarde")` | Remove entrada da grade por horário e label |
+
+> **Atenção:** ferramentas que salvam o `config.yaml` reformatam o arquivo YAML e perdem os comentários originais. O conteúdo e os valores são preservados.
+
+#### Sistema e manutenção
+
+| Ferramenta | Descrição |
+|-----------|-----------|
+| `status_sistema()` | Status do scheduler, player web, API keys configuradas e uso de disco |
+| `limpar_output(dias_manter=7)` | Lista ou remove episódios antigos para liberar espaço (padrão: preview seguro) |
+| `testar_tts("Bem-vindos!")` | Gera `output/tts_test.mp3` para testar o TTS sem gerar episódio |
 
 ### Configurar no Claude Code (`~/.claude/claude_desktop_config.json`)
 
@@ -925,7 +953,12 @@ python mcp_server.py
 }
 ```
 
-Após configurar, você pode pedir ao Claude: *"Gera um episódio de notícias e copa do mundo"* e ele executa diretamente.
+Após configurar, você pode pedir ao Claude:
+- *"Gera um episódio de notícias e copa do mundo"*
+- *"Habilita a fonte de música e adiciona um bloco musical às 12h"*
+- *"Qual o status do sistema? O scheduler está rodando?"*
+- *"Mostra o roteiro do episódio de YouTube das 9h"*
+- *"Remove episódios mais antigos que 14 dias"*
 
 ---
 
