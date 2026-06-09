@@ -1232,9 +1232,18 @@ def api_announcement():
 
     if not sched_bytes:
         threading.Thread(target=_warm_announcement, daemon=True).start()
+        # Mesmo sem grade, toca o clip de hora se disponível
+        try:
+            from src.time_clips import get_time_clip
+            now = _dt.now()
+            time_bytes = get_time_clip(now.hour, now.minute)
+            if time_bytes:
+                return _Resp(time_bytes, mimetype='audio/mpeg', headers={'Cache-Control': 'no-cache'})
+        except Exception:
+            pass
         return '', 204
 
-    # Tenta prepender o clip de hora atual
+    # Tenta prepender o clip de hora atual ao anúncio de grade
     try:
         from src.time_clips import get_time_clip
         from pydub import AudioSegment
