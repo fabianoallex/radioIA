@@ -40,6 +40,11 @@ def _load_config() -> dict:
 
 def _save_config(config: dict) -> None:
     """Salva config.yaml. Observacao: comentarios no arquivo serao perdidos apos salvar."""
+    # Garante que campos 'time' sejam strings — PyYAML parseia '10:30' como int 630 (sexagesimal)
+    for entry in config.get('schedule', []):
+        t = entry.get('time')
+        if isinstance(t, int):
+            entry['time'] = f"{t // 60:02d}:{t % 60:02d}"
     config_path = os.path.join(PROJECT_DIR, 'config.yaml')
     with open(config_path, 'w', encoding='utf-8') as f:
         yaml.dump(config, f, allow_unicode=True, default_flow_style=False,
@@ -202,15 +207,22 @@ def gerar_episodios(fontes: list[str]) -> str:
         fontes: Lista de IDs de fontes a gerar. Exemplos:
                 ["youtube"] — so o feed do YouTube
                 ["utilidades", "youtube", "noticias"] — grade completa
-                ["musica:1"] — 1 musica
-                ["musica:3"] — 3 musicas
-                ["url:https://exemplo.com/artigo"] — episodio a partir de URL avulsa
+                ["musica:3"] — bloco musical com 3 faixas
+                ["url:https://exemplo.com/artigo"] — episodio a partir de URL
+                ["url:https://youtu.be/ID"] — episodio de video do YouTube (usa transcricao)
+                ["url:https://a.com,https://b.com"] — episodio comparando duas URLs
+                ["url:https://a.com|foca nos impactos economicos"] — URL com instrucao de foco
+                ["url:https://a.com,https://b.com|compare as abordagens"] — multi-URL com contexto
+
+    URLs suportadas:
+        - Qualquer pagina web: extrai texto via trafilatura, usa nome real do site e data de publicacao
+        - YouTube (youtube.com/watch, youtu.be, youtube.com/shorts): usa transcricao automatica
+        - Multiplas URLs separadas por virgula: gera um episodio unico integrando todas
+        - Contexto apos | orienta o roteirista: tom, foco, angulo desejado
 
     Fontes disponiveis: youtube, noticias, noticias-locais, tecnologia, horoscopo,
     utilidades, loteria, copa, brasileirao, champions, efemerides, quiz, reddit,
     receitas, filmes, filmes-cartaz, musica, musica-local, concursos, biblia.
-    Para musica, use musica:N onde N e o numero de faixas (ex: musica:3).
-    Para URL avulsa, use url:https://... — nao requer configuracao previa.
     """
     config      = _load_config()
     all_sources = config.get('sources', [])
@@ -226,10 +238,11 @@ def gerar_episodios(fontes: list[str]) -> str:
 
         # Fonte de URL avulsa: sintética, sem entrada no config
         if source_id == 'url' and param:
+            url_part, _, ctx = param.partition('|')
             source_cfg = {
                 'id': 'url', 'type': 'url',
                 'name': 'Conteudo da Web',
-                'settings': {'url': param},
+                'settings': {'url': url_part.strip(), 'context': ctx.strip()},
             }
         # Clipping: tópico passado como parâmetro, mescla com config se existir
         elif source_id == 'clipping' and param:
@@ -960,12 +973,16 @@ def controlar_scheduler(acao: str) -> str:
                 'mensagem': 'Scheduler ja esta ativo. Use controlar_scheduler("stop") para encerrar antes de reiniciar.',
             }, ensure_ascii=False, indent=2)
 
+        # Remove PID file residual para que _acquire_pid_lock() no scheduler parta limpo
+        if os.path.exists(_PID_FILE):
+            os.remove(_PID_FILE)
+
         log_path = os.path.join(PROJECT_DIR, 'scheduler.log')
         log_file = open(log_path, 'a', encoding='utf-8')
 
         if sys.platform == 'win32':
             import subprocess as _sp
-            proc = _sp.Popen(
+            _sp.Popen(
                 [sys.executable, os.path.join(PROJECT_DIR, 'scheduler.py')],
                 stdout=log_file,
                 stderr=log_file,
@@ -974,7 +991,7 @@ def controlar_scheduler(acao: str) -> str:
             )
         else:
             import subprocess as _sp
-            proc = _sp.Popen(
+            _sp.Popen(
                 [sys.executable, os.path.join(PROJECT_DIR, 'scheduler.py')],
                 stdout=log_file,
                 stderr=log_file,
@@ -982,15 +999,21 @@ def controlar_scheduler(acao: str) -> str:
                 start_new_session=True,
             )
 
-        with open(_PID_FILE, 'w') as f:
-            f.write(str(proc.pid))
+        # Aguarda o scheduler escrever o próprio PID via _acquire_pid_lock()
+        import time as _time
+        for _ in range(20):
+            _time.sleep(0.25)
+            if os.path.exists(_PID_FILE):
+                break
 
+        pid = _scheduler_pid()
         return json.dumps({
             'acao':     'start',
-            'status':   'iniciado',
-            'pid':      proc.pid,
+            'status':   'iniciado' if pid else 'iniciado_sem_pid',
+            'pid':      pid,
             'log':      log_path,
-            'mensagem': f'Scheduler iniciado (PID {proc.pid}). Logs em scheduler.log.',
+            'mensagem': f'Scheduler iniciado (PID {pid}). Logs em scheduler.log.' if pid
+                        else 'Scheduler iniciado mas PID nao confirmado ainda — verifique scheduler.log.',
         }, ensure_ascii=False, indent=2)
 
     if acao == 'stop':

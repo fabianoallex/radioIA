@@ -449,7 +449,8 @@ def _build_lines(weather_list: list[dict], forecast: list[dict], finance: list[d
                                'text': f"{code} a R$ {bid:.2f}, {pct}."})
 
     if lottery:
-        lines.append({'locutor': A, 'text': "Agora os resultados das loterias."})
+        if weather_list or finance or ibovespa or football:
+            lines.append({'locutor': A, 'text': "Agora os resultados das loterias."})
         for lot in lottery:
             lines.append({
                 'locutor': A,

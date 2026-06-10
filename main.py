@@ -13,7 +13,7 @@ from src.audio_mixer import mix_episode, save_episode_metadata
 from src.vinheta import generate_vinhetas
 from src.history import load_seen_ids, save_episode_to_history
 
-load_dotenv()
+load_dotenv(override=True)
 
 
 def _load_plugins() -> dict:
@@ -437,7 +437,8 @@ def main():
     # Extrai replay: direto do argv para suportar múltiplos (replay:X replay:Y)
     replay_targets = [a.split(':', 1)[1] for a in sys.argv[1:] if a.startswith('replay:')]
     # Extrai URLs avulsas: url:https://... → fonte sintética, sem precisar de config
-    url_targets     = [v for k, v in cli.items() if k == 'url' and v]
+    # Usa cli_args diretamente (não dict) para suportar múltiplos url: no mesmo comando
+    url_targets = [a.split(':', 1)[1] for a in cli_args if a.startswith('url:')]
     # Extrai clippings: clipping:tema → fonte sintética, sem precisar de config
     clipping_targets = [v for k, v in cli.items() if k == 'clipping' and v]
     cli_clean   = {k: v for k, v in cli.items() if k not in ('url', 'replay', 'clipping')}
@@ -458,13 +459,14 @@ def main():
     else:
         sources = []
 
-    for target_url in url_targets:
+    for raw in url_targets:
+        url_part, _, ctx = raw.partition('|')
         sources.append({
             'id':       'url',
             'type':     'url',
             'name':     'Conteúdo da Web',
             'enabled':  True,
-            'settings': {'url': target_url},
+            'settings': {'url': url_part.strip(), 'context': ctx.strip()},
         })
 
     followup = '--followup' in sys.argv

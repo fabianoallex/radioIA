@@ -48,9 +48,18 @@ DAYS_MAP = {'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4, 'sat': 5, 'sun': 6
 
 # ── Config & State ────────────────────────────────────────────────────────────
 
+def _fix_schedule_times(config: dict) -> dict:
+    """PyYAML parseia '10:30' como inteiro 630 (sexagesimal). Normaliza de volta para HH:MM."""
+    for entry in (config or {}).get('schedule', []):
+        t = entry.get('time')
+        if isinstance(t, int):
+            entry['time'] = f"{t // 60:02d}:{t % 60:02d}"
+    return config
+
+
 def load_config() -> dict:
     with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-        return yaml.safe_load(f)
+        return _fix_schedule_times(yaml.safe_load(f))
 
 
 def load_state() -> dict:
@@ -86,17 +95,27 @@ def _entry_active_today(entry: dict) -> bool:
 
 # ── Execution ─────────────────────────────────────────────────────────────────
 
+_SCHEDULER_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
 def _run(sources: list[str], label: str = ''):
+    import subprocess
     tag = f"[{label}] " if label else ''
     ts  = datetime.now().strftime('%H:%M:%S')
     src = ' '.join(sources)
-    print(f"\n{'='*50}")
-    print(f"[{ts}] {tag}python main.py {src}")
-    print(f"{'='*50}")
-    import subprocess
-    result = subprocess.run([sys.executable, 'main.py'] + sources)
+    print(f"\n{'='*50}", flush=True)
+    print(f"[{ts}] {tag}python main.py {src}", flush=True)
+    print(f"{'='*50}", flush=True)
+    creation_flags = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+    result = subprocess.run(
+        [sys.executable, os.path.join(_SCHEDULER_DIR, 'main.py')] + sources,
+        cwd=_SCHEDULER_DIR,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        creationflags=creation_flags,
+    )
     status = 'Concluido' if result.returncode == 0 else f'Erro (code {result.returncode})'
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] {tag}{status}\n")
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {tag}{status}\n", flush=True)
 
 
 def _find_latest_episode(source_id: str, today: str) -> str | None:
@@ -247,20 +266,33 @@ def print_schedule(entries: list[dict]):
 def run_loop():
     config  = load_config()
     radio_name = config.get('radio', {}).get('name', 'RadioIA')
-    print(f"{radio_name} Scheduler iniciado — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f"{radio_name} Scheduler iniciado — {datetime.now().strftime('%Y-%m-%d %H:%M')}", flush=True)
     entries = config.get('schedule', [])
-    print(f"\nGrade ({len(entries)} entrada(s)):")
+    print(f"\nGrade ({len(entries)} entrada(s)):", flush=True)
     print_schedule(entries)
+    sys.stdout.flush()
     _print_next(entries)
+    sys.stdout.flush()
 
     while True:
         now          = datetime.now()
         today        = date.today().isoformat()
         current_time = now.strftime('%H:%M')
 
-        config  = load_config()  # recarrega a cada tick (permite editar sem reiniciar)
-        entries = config.get('schedule', [])
-        state   = load_state()
+        try:
+            config = load_config()  # recarrega a cada tick (permite editar sem reiniciar)
+        except Exception as e:
+            print(f"[scheduler] Erro ao ler config.yaml: {e} — aguardando proximo tick")
+            time.sleep(30)
+            continue
+
+        entries = config.get('schedule', []) if isinstance(config, dict) else []
+
+        try:
+            state = load_state()
+        except Exception as e:
+            print(f"[scheduler] Erro ao ler scheduler_state.json: {e} — usando estado vazio")
+            state = {}
 
         completed_once  = set(state.get('completed_once', []))
         completed_today = {k: v for k, v in state.get('completed_today', {}).items()

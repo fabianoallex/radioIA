@@ -1322,6 +1322,46 @@ Consulte o guia completo com contrato, exemplos e boas práticas:
 
 ---
 
+## Testes
+
+### Instalar dependências de desenvolvimento
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+### Rodar todos os testes
+
+```bash
+python -m pytest tests/ -v
+```
+
+### O que é testado
+
+| Arquivo | O que cobre |
+|---------|-------------|
+| `tests/test_tts_generator.py` | Parser de roteiro (`parse_script`) — formatos, sanitização, casos de borda |
+| `tests/test_text_utils.py` | Normalização de texto para TTS (`normalize_for_tts`) — valores monetários |
+| `tests/test_history.py` | Deduplicação de conteúdo (`load_seen_ids`, `save_episode_to_history`) |
+| `tests/test_scheduler.py` | Lógica do scheduler (`_entry_key`, `_entry_active_today`) — dias da semana, replay |
+| `tests/test_plugin_contract.py` | Contrato de plugins — estrutura do retorno de `fetch()` |
+
+### Validar um novo plugin
+
+O arquivo `tests/test_plugin_contract.py` exporta um helper que qualquer contribuidor pode usar para verificar se o plugin está correto antes de submeter:
+
+```python
+from tests.test_plugin_contract import assert_valid_plugin_items
+from plugins.meu_plugin import fetch
+
+items = fetch({'name': 'Teste', 'type': 'meu_plugin', 'settings': {}})
+assert_valid_plugin_items(items)
+```
+
+Os campos obrigatórios que o helper verifica são: `id`, `title`, `url`, `text`, `source_name`, `source_type`, `published_at`. Campos opcionais (`views`, `comments`, `channel`) são verificados apenas se presentes.
+
+---
+
 ## Modo Streamer (opcional)
 
 Para transmitir o RadioIA como uma rádio ao vivo usando Icecast2 + Liquidsoap, consulte o guia:

@@ -137,7 +137,8 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
 .playlist { width: 240px; border-right: 1px solid #374151; overflow: hidden; flex-shrink: 0; display: flex; flex-direction: column; }
 #playlist  { flex: 1; overflow-y: auto; }
 .section-header { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: .05em;
-                  padding: 14px 16px 8px; position: sticky; top: 0; background: #111827; }
+                  padding: 10px 16px 8px; position: sticky; top: 0; background: #111827;
+                  display: flex; justify-content: space-between; align-items: center; }
 .ep-item { padding: 12px 16px; cursor: pointer; display: flex; align-items: center;
            gap: 10px; border-left: 3px solid transparent; transition: background .15s; }
 .ep-item:hover { background: #1f2937; }
@@ -245,17 +246,12 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
 
 /* ── Downloads ──────────────────────────────────────────────────────────────── */
 .ep-check {
-  flex-shrink: 0; accent-color: #6366f1;
+  display: none; flex-shrink: 0; accent-color: #6366f1;
   width: 15px; height: 15px; cursor: pointer; margin-right: 2px;
 }
-.ep-actions { display: flex; gap: 4px; flex-shrink: 0; margin-left: 4px; }
-.ep-action-btn {
-  background: transparent; border: 1px solid #374151; color: #6b7280;
-  width: 26px; height: 26px; border-radius: 5px; font-size: 12px;
-  cursor: pointer; padding: 0; display: flex; align-items: center;
-  justify-content: center; transition: background .15s, color .15s; flex-shrink: 0;
-}
-.ep-action-btn:hover { background: #374151; color: #e5e7eb; }
+.dl-mode .ep-check { display: inline-block; }
+.ep-dl-link { color: #4b5563; cursor: pointer; transition: color .15s; }
+.ep-dl-link:hover { color: #9ca3af; text-decoration: underline; }
 
 .dl-toolbar {
   flex-shrink: 0; background: #1a2235; border-top: 1px solid #374151;
@@ -273,6 +269,23 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
 }
 .dl-day-btn:hover:not(:disabled) { background: #4b5563; }
 .dl-day-btn:disabled { opacity: .4; cursor: default; }
+
+.dl-toggle-btn {
+  background: transparent; border: 1px solid #374151; color: #6b7280;
+  padding: 3px 8px; border-radius: 4px; font-size: 10px; font-family: inherit;
+  text-transform: uppercase; letter-spacing: .05em; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s; white-space: nowrap;
+}
+.dl-toggle-btn:hover  { background: #374151; color: #e5e7eb; }
+.dl-toggle-btn.active { background: #064e3b; border-color: #10b981; color: #6ee7b7; }
+
+.dl-cancel-btn {
+  background: transparent; border: 1px solid #374151; color: #6b7280;
+  width: 26px; height: 26px; border-radius: 5px; font-size: 13px; line-height: 1;
+  cursor: pointer; padding: 0; flex-shrink: 0; display: flex;
+  align-items: center; justify-content: center; transition: background .15s, color .15s;
+}
+.dl-cancel-btn:hover { background: #374151; color: #e5e7eb; }
 </style>
 </head>
 <body>
@@ -308,7 +321,12 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
     <div id="days"></div>
   </div>
   <div class="playlist">
-    <div class="section-header">Playlist</div>
+    <div class="section-header">
+      Playlist
+      {% if dl_concatenated or dl_zip %}
+      <button class="dl-toggle-btn" id="dl-toggle-btn" onclick="toggleDlMode()" title="Baixar episódios do dia">↓ Baixar</button>
+      {% endif %}
+    </div>
     <div id="playlist"></div>
     {% if dl_concatenated or dl_zip %}
     <div class="dl-toolbar" id="dl-toolbar">
@@ -316,8 +334,9 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
         <input type="checkbox" id="sel-all" onchange="onSelectAllChange(this)">
         <span id="dl-sel-count">0 sel.</span>
       </label>
-      {% if dl_concatenated %}<button class="dl-day-btn" id="dl-concat-btn" onclick="downloadDayConcat()" disabled title="MP3 único com os episódios selecionados">⬇ MP3</button>{% endif %}
-      {% if dl_zip %}<button class="dl-day-btn" id="dl-zip-btn" onclick="downloadDayZip()" disabled title="ZIP com os episódios selecionados na estrutura original">⬇ ZIP</button>{% endif %}
+      {% if dl_concatenated %}<button class="dl-day-btn" id="dl-concat-btn" onclick="downloadDayConcat()" disabled title="MP3 único com os episódios selecionados">↓ MP3</button>{% endif %}
+      {% if dl_zip %}<button class="dl-day-btn" id="dl-zip-btn" onclick="downloadDayZip()" disabled title="ZIP com os episódios selecionados na estrutura original">↓ ZIP</button>{% endif %}
+      <button class="dl-cancel-btn" onclick="exitDlMode()" title="Cancelar">✕</button>
     </div>
     {% endif %}
   </div>
@@ -355,7 +374,10 @@ let fallbackIdx   = 0;
 let _fallbackTrackCount      = 0;
 let _episodeTransitionCount  = 0;
 let _playingAnnouncement     = false;   // suprime ended global durante qualquer break
-let selectedEpIds = new Set();
+let selectedEpIds  = new Set();
+let dlModeActive   = false;
+let _dlModeTimer   = null;
+const DL_MODE_TIMEOUT_MS = 30000;
 
 const S_EP   = 'radioIA_ep';
 const S_TIME = 'radioIA_time';
@@ -513,17 +535,36 @@ function markNewEpisodes(ids) {
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 let toastTimer = null;
-function showToast(msg, showBtn) {
+function showToast(msg, showBtn, btnLabel, btnAction) {
   const toast = document.getElementById('toast');
+  const btn   = document.getElementById('toast-btn');
   document.getElementById('toast-msg').textContent = msg;
-  document.getElementById('toast-btn').style.display = showBtn ? 'block' : 'none';
+  btn.style.display = showBtn ? 'block' : 'none';
+  btn.textContent   = btnLabel || 'Ouvir agora';
+  btn.onclick       = btnAction || onToastAction;
   toast.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('show'), showBtn ? 8000 : 4000);
+  toastTimer = setTimeout(() => {
+    toast.classList.remove('show');
+    btn.textContent = 'Ouvir agora';
+    btn.onclick     = onToastAction;
+  }, showBtn ? 8000 : 4000);
 }
 
 function onToastAction() {
   document.getElementById('toast').classList.remove('show');
+}
+
+async function _offerShare(blob, fname) {
+  if (!navigator.canShare) return;
+  try {
+    const file = new File([blob], fname, { type: blob.type });
+    if (!navigator.canShare({ files: [file] })) return;
+    showToast('Baixado.', true, 'Compartilhar', async () => {
+      document.getElementById('toast').classList.remove('show');
+      try { await navigator.share({ title: fname, files: [file] }); } catch (_) {}
+    });
+  } catch (_) {}
 }
 
 // ── Fallback music ─────────────────────────────────────────────────────────────
@@ -815,6 +856,7 @@ function appendNextScheduled() {
 }
 
 function selectDate(date, autoplay = true) {
+  exitDlMode();
   currentDate = date;
   fallbackMode = false;
   document.querySelectorAll('.day-item').forEach(el =>
@@ -837,7 +879,7 @@ function renderPlaylist(eps) {
     const name = ep.source_name || ep.source_id;
     const dur  = fmtDur(ep.duration);
     const cnt  = ep.videos_covered ? ep.videos_covered + ' itens' : '';
-    const meta = [ep.time, dur, cnt].filter(Boolean).join(' · ');
+    const metaLine1 = [ep.time, dur].filter(Boolean).join(' · ');
     const eid  = ep.id.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const enam = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const checkHtml = showCheck
@@ -845,22 +887,19 @@ function renderPlaylist(eps) {
            onclick="event.stopPropagation();toggleEpSelect('${eid}')"
            ${selectedEpIds.has(ep.id) ? 'checked' : ''} />`
       : '';
-    const dlHtml = DL_INDIVIDUAL
-      ? `<div class="ep-actions">
-           <button class="ep-action-btn" title="Baixar"
-             onclick="event.stopPropagation();downloadEp('${eid}')">⬇</button>
-           <button class="ep-action-btn" title="Compartilhar"
-             onclick="event.stopPropagation();shareEp('${eid}','${enam}')">↗</button>
-         </div>`
+    const dlLinks = DL_INDIVIDUAL
+      ? `<span class="ep-dl-link" onclick="event.stopPropagation();downloadEp('${eid}')">baixar</span>` +
+        ` · <span class="ep-dl-link" onclick="event.stopPropagation();shareEp('${eid}','${enam}')">compartilhar</span>`
       : '';
+    const metaLine2 = [cnt, dlLinks].filter(Boolean).join(' · ');
     return `<div class="ep-item" data-id="${ep.id}" onclick="onEpClick('${eid}')">
       ${checkHtml}
       <div class="ep-dot"></div>
       <div style="min-width:0;flex:1">
         <div class="ep-label">${name}</div>
-        <div class="ep-meta">${meta}</div>
+        ${metaLine1 ? `<div class="ep-meta">${metaLine1}</div>` : ''}
+        ${metaLine2 ? `<div class="ep-meta">${metaLine2}</div>` : ''}
       </div>
-      ${dlHtml}
     </div>`;
   }).join('');
   if (currentEp) {
@@ -936,10 +975,45 @@ function renderNotes(ep) {
 }
 
 // ── Downloads ─────────────────────────────────────────────────────────────────
+function toggleDlMode() {
+  if (dlModeActive) exitDlMode();
+  else enterDlMode();
+}
+
+function enterDlMode() {
+  const eps = groupByDate(allEpisodes)[currentDate] || [];
+  if (!eps.length) return;
+  dlModeActive = true;
+  document.querySelector('.playlist').classList.add('dl-mode');
+  const tb  = document.getElementById('dl-toolbar');
+  const btn = document.getElementById('dl-toggle-btn');
+  if (tb)  tb.style.display  = 'flex';
+  if (btn) btn.classList.add('active');
+  updateDownloadToolbar();
+  _resetDlTimer();
+}
+
+function exitDlMode() {
+  dlModeActive = false;
+  document.querySelector('.playlist').classList.remove('dl-mode');
+  const tb  = document.getElementById('dl-toolbar');
+  const btn = document.getElementById('dl-toggle-btn');
+  if (tb)  tb.style.display = 'none';
+  if (btn) btn.classList.remove('active');
+  clearTimeout(_dlModeTimer);
+  _dlModeTimer = null;
+}
+
+function _resetDlTimer() {
+  clearTimeout(_dlModeTimer);
+  _dlModeTimer = setTimeout(exitDlMode, DL_MODE_TIMEOUT_MS);
+}
+
 function toggleEpSelect(epId) {
   if (selectedEpIds.has(epId)) selectedEpIds.delete(epId);
   else selectedEpIds.add(epId);
   updateDownloadToolbar();
+  _resetDlTimer();
 }
 
 function onSelectAllChange(cb) {
@@ -953,10 +1027,7 @@ function onSelectAllChange(cb) {
 }
 
 function renderDownloadToolbar(eps) {
-  const tb = document.getElementById('dl-toolbar');
-  if (!tb) return;
-  tb.style.display = eps.length ? 'flex' : 'none';
-  updateDownloadToolbar();
+  if (dlModeActive) updateDownloadToolbar();
 }
 
 function updateDownloadToolbar() {
@@ -980,7 +1051,25 @@ function downloadEp(epId) {
   document.body.removeChild(a);
 }
 
-function shareEp(epId, name) {
+async function shareEp(epId, name) {
+  // Tenta Web Share API nível 2 — compartilha o arquivo MP3 diretamente
+  if (navigator.canShare) {
+    try {
+      showToast('Preparando...', false);
+      const res = await fetch('/download/episode/' + epId);
+      if (res.ok) {
+        const blob = await res.blob();
+        const cd   = res.headers.get('Content-Disposition') || '';
+        const m    = cd.match(/filename="([^"]+)"/);
+        const file = new File([blob], m ? m[1] : name + '.mp3', { type: 'audio/mpeg' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ title: name, files: [file] });
+          return;
+        }
+      }
+    } catch (_) {}
+  }
+  // Fallback — compartilha link ou copia para clipboard
   const url = location.origin + '/audio/' + epId;
   if (navigator.share) {
     navigator.share({ title: name, url }).catch(() => {});
@@ -994,6 +1083,7 @@ function shareEp(epId, name) {
 async function downloadDayConcat() {
   const ids = [...selectedEpIds];
   if (!ids.length) return;
+  _resetDlTimer();
   const btn  = document.getElementById('dl-concat-btn');
   const orig = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
@@ -1005,14 +1095,16 @@ async function downloadDayConcat() {
       body: JSON.stringify({episode_ids: ids}),
     });
     if (!res.ok) { showToast('Erro ao gerar MP3', false); return; }
-    const blob = await res.blob();
-    const cd   = res.headers.get('Content-Disposition') || '';
-    const m    = cd.match(/filename="([^"]+)"/);
-    const a    = document.createElement('a');
-    a.href     = URL.createObjectURL(blob);
-    a.download = m ? m[1] : currentDate + '.mp3';
+    const blob  = await res.blob();
+    const cd    = res.headers.get('Content-Disposition') || '';
+    const m     = cd.match(/filename="([^"]+)"/);
+    const fname = m ? m[1] : currentDate + '.mp3';
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl; a.download = fname;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(a.href);
+    URL.revokeObjectURL(objUrl);
+    await _offerShare(blob, fname);
   } catch (_) {
     showToast('Erro ao gerar MP3', false);
   } finally {
@@ -1023,6 +1115,7 @@ async function downloadDayConcat() {
 async function downloadDayZip() {
   const ids = [...selectedEpIds];
   if (!ids.length) return;
+  _resetDlTimer();
   const btn  = document.getElementById('dl-zip-btn');
   const orig = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
@@ -1034,14 +1127,16 @@ async function downloadDayZip() {
       body: JSON.stringify({episode_ids: ids}),
     });
     if (!res.ok) { showToast('Erro ao gerar ZIP', false); return; }
-    const blob = await res.blob();
-    const cd   = res.headers.get('Content-Disposition') || '';
-    const m    = cd.match(/filename="([^"]+)"/);
-    const a    = document.createElement('a');
-    a.href     = URL.createObjectURL(blob);
-    a.download = m ? m[1] : currentDate + '.zip';
+    const blob  = await res.blob();
+    const cd    = res.headers.get('Content-Disposition') || '';
+    const m     = cd.match(/filename="([^"]+)"/);
+    const fname = m ? m[1] : currentDate + '.zip';
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl; a.download = fname;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(a.href);
+    URL.revokeObjectURL(objUrl);
+    await _offerShare(blob, fname);
   } catch (_) {
     showToast('Erro ao gerar ZIP', false);
   } finally {
