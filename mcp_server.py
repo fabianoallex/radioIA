@@ -172,6 +172,39 @@ def _set_nested(d: dict, keys: list[str], value):
 # ── Tools — Geração de conteúdo ───────────────────────────────────────────────
 
 @mcp.tool()
+def listar_modelos() -> str:
+    """
+    Lista os modelos LLM disponiveis para uso nesta instalacao do RadioIA.
+    Os modelos sao definidos em llm.modelos no config.yaml pelo administrador.
+
+    Use esta ferramenta antes de chamar gerar_episodios() ou gerar_clipping()
+    com um model especifico para garantir que o modelo esta disponivel e
+    entender quando usar cada um (ver campo 'descricao').
+
+    Se llm.modelos nao estiver configurado, retorna apenas o modelo padrao atual.
+    """
+    config  = _load_config()
+    llm_cfg = config.get('llm', {})
+    default = llm_cfg.get('model', 'claude-sonnet-4-6')
+    modelos = llm_cfg.get('modelos', [])
+
+    if not modelos:
+        return json.dumps({
+            'modelo_padrao': default,
+            'modelos':       [{'id': default, 'descricao': 'modelo padrao (llm.modelos nao configurado)'}],
+            'aviso':         'Configure llm.modelos no config.yaml para restringir e documentar os modelos disponiveis.',
+        }, ensure_ascii=False, indent=2)
+
+    ids = [m['id'] for m in modelos]
+    return json.dumps({
+        'modelo_padrao': default,
+        'modelos':       modelos,
+        'ids':           ids,
+        'dica':          'Passe model="<id>" em gerar_episodios() ou gerar_clipping() para usar um modelo especifico.',
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
 def listar_fontes() -> str:
     """
     Lista todas as fontes de conteudo configuradas no RadioIA.
@@ -245,6 +278,19 @@ def gerar_episodios(fontes: list[str], model: str = '') -> str:
     seen_ids    = load_seen_ids()
     credentials = radio_main._get_oauth_credentials()
     first_of_day = not radio_main._has_episodes_today()
+
+    # Valida model contra llm.modelos (se configurado)
+    if model:
+        modelos_cfg = config.get('llm', {}).get('modelos', [])
+        if modelos_cfg:
+            ids_permitidos = [m['id'] for m in modelos_cfg]
+            if model not in ids_permitidos:
+                return json.dumps({
+                    'status':  'erro',
+                    'mensagem': f"Modelo '{model}' nao esta na lista de modelos permitidos.",
+                    'modelos_permitidos': modelos_cfg,
+                    'dica':    'Use listar_modelos() para ver as opcoes disponiveis.',
+                }, ensure_ascii=False, indent=2)
 
     results  = []
     logs_all = []
@@ -1353,6 +1399,19 @@ def gerar_clipping(topico: str, followup: bool = False, model: str = '') -> str:
     seen_ids    = load_seen_ids()
     credentials = radio_main._get_oauth_credentials()
     first_of_day = not radio_main._has_episodes_today()
+
+    # Valida model contra llm.modelos (se configurado)
+    if model:
+        modelos_cfg = config.get('llm', {}).get('modelos', [])
+        if modelos_cfg:
+            ids_permitidos = [m['id'] for m in modelos_cfg]
+            if model not in ids_permitidos:
+                return json.dumps({
+                    'status':  'erro',
+                    'mensagem': f"Modelo '{model}' nao esta na lista de modelos permitidos.",
+                    'modelos_permitidos': modelos_cfg,
+                    'dica':    'Use listar_modelos() para ver as opcoes disponiveis.',
+                }, ensure_ascii=False, indent=2)
 
     base = next((s for s in all_sources if s['id'] == 'clipping'), {})
     source_cfg = {

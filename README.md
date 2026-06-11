@@ -344,13 +344,22 @@ TMDB_API_KEY=sua_chave_aqui
 
 ### URL (`type: url`)
 
-Gera um episódio a partir de qualquer URL — notícia, artigo, produto, curiosidade, piada, etc. O Claude identifica o tipo de conteúdo e adapta o tom automaticamente.
+Gera um episódio a partir de qualquer URL — notícia, artigo, produto, curiosidade, piada, vídeo do YouTube, etc. O Claude identifica o tipo de conteúdo e adapta o tom automaticamente.
 
 Não requer configuração no `config.yaml`. Use diretamente pelo CLI ou via MCP:
 
 ```bash
-# CLI
+# URL simples
 python main.py "url:https://exemplo.com/artigo"
+
+# Vídeo do YouTube (usa transcrição automática)
+python main.py "url:https://youtu.be/VIDEO_ID"
+
+# Múltiplas URLs — gera um episódio integrado comparando as fontes
+python main.py "url:https://a.com/artigo,https://b.com/artigo"
+
+# Com instrução de foco para o roteirista
+python main.py "url:https://exemplo.com/artigo|foca nos aspectos econômicos"
 
 # Combinado com outras fontes
 python main.py noticias "url:https://exemplo.com/artigo"
@@ -358,7 +367,7 @@ python main.py noticias "url:https://exemplo.com/artigo"
 
 > **Nota:** URLs com `&` no PowerShell precisam de aspas duplas ao redor do argumento inteiro.
 
-Sites que bloqueiam scrapers (alguns portais internacionais) podem não funcionar. A maioria dos portais brasileiros é compatível.
+Sites renderizados via JavaScript (SPAs) podem não funcionar — trafilatura não executa JS. A maioria dos portais de notícias brasileiros é compatível.
 
 ---
 
@@ -564,6 +573,30 @@ llm:
   api_base: "http://localhost:11434"   # padrão do Ollama
 ```
 
+### Contexto adicional por source (`context`)
+
+Qualquer source aceita um campo `context` para orientar o roteirista — tom, foco temático, público-alvo. É uma instrução livre que não filtra o conteúdo buscado, apenas guia a narrativa gerada.
+
+```yaml
+sources:
+  - id: noticias
+    type: rss
+    context: "destaque os impactos econômicos para o Brasil"
+
+  - id: tecnologia
+    type: rss
+    context: "público jovem universitário, linguagem informal"
+```
+
+Via CLI ou MCP, use o sufixo `|contexto` para instrução pontual (sobrescreve o `context` do config):
+
+```bash
+python main.py "noticias|ignore esportes, foca em política"
+python main.py "url:https://exemplo.com|extraia os pontos técnicos"
+```
+
+No MCP: `gerar_episodios(["youtube|foca em lançamentos desta semana"])`
+
 ### Override por fonte
 
 Qualquer source pode usar um modelo diferente adicionando o campo `model`:
@@ -575,6 +608,27 @@ Qualquer source pode usar um modelo diferente adicionando o campo `model`:
 ```
 
 A resolução segue a ordem: **`model` da fonte → `llm.model` global → `claude-sonnet-4-6`**.
+
+### Modelos disponíveis para o agente MCP (`llm.modelos`)
+
+O campo `llm.modelos` define quais modelos o agente operador (MCP) pode usar. Serve tanto para **descoberta** — o agente chama `listar_modelos()` para ver as opções — quanto para **restrição** — se configurado, `gerar_episodios()` e `gerar_clipping()` rejeitam qualquer modelo fora da lista.
+
+```yaml
+llm:
+  model: "claude-sonnet-4-6"
+  modelos:
+    - id: "claude-haiku-4-5-20251001"
+      descricao: "rapido e economico — fontes simples, volume alto"
+    - id: "claude-sonnet-4-6"
+      descricao: "qualidade padrao — uso geral (padrao do sistema)"
+    - id: "claude-opus-4-8"
+      descricao: "maxima qualidade — conteudo complexo ou criativo"
+    # Adicione outros provedores conforme as chaves configuradas no .env:
+    # - id: "gpt-4o-mini"
+    #   descricao: "OpenAI — alternativa economica"
+```
+
+Se `llm.modelos` for omitido, qualquer modelo é aceito (sem restrição).
 
 ### Quando usar cada modelo (Anthropic)
 
@@ -941,12 +995,16 @@ python mcp_server.py
 | Ferramenta | Descrição |
 |-----------|-----------|
 | `listar_fontes()` | Lista todas as fontes configuradas com tipo, status e histórico |
+| `listar_modelos()` | Lista os modelos LLM disponíveis nesta instalação (definidos em `llm.modelos`) |
 | `gerar_episodios(["noticias", "copa"])` | Gera episódios para as fontes especificadas |
 | `gerar_episodios(["musica:3"])` | Gera bloco musical com N faixas |
-| `gerar_episodios(["url:https://..."])` | Gera episódio a partir de uma URL avulsa |
-| `gerar_episodios(["clipping:tema"])` | Gera clipping sobre um tema (alternativa compacta) |
-| `gerar_clipping("reforma tributária 2026")` | Gera clipping de mídia sobre um tema — como diferentes veículos estão cobrindo o assunto |
-| `gerar_clipping("copa", followup=True)` | Clipping de acompanhamento — busca só artigos recentes sobre tema já coberto |
+| `gerar_episodios(["url:https://..."])` | Gera episódio a partir de URL (web ou YouTube) |
+| `gerar_episodios(["url:https://a.com,https://b.com"])` | Episódio integrando múltiplas URLs |
+| `gerar_episodios(["noticias\|foca em economia"])` | Qualquer fonte com instrução de foco para o roteirista |
+| `gerar_episodios(["noticias"], model="claude-haiku-4-5-20251001")` | Override de modelo para a chamada (sem alterar config) |
+| `gerar_clipping("reforma tributária 2026")` | Panorama de como a mídia está cobrindo um tema |
+| `gerar_clipping("copa", followup=True)` | Clipping de acompanhamento — só artigos recentes |
+| `gerar_clipping("tema", model="claude-opus-4-8")` | Clipping com modelo específico |
 | `listar_episodios("2026-06-11")` | Lista episódios de uma data (padrão: hoje) com duração total |
 | `ler_episodio("noticias")` | Lê o roteiro completo e metadados de um episódio por prefixo |
 | `deletar_episodio("09-30_youtube")` | Remove a pasta de um episódio específico do output |

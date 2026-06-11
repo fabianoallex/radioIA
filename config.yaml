@@ -489,6 +489,18 @@ llm:
   model: "claude-sonnet-4-6"
   # api_base: "http://localhost:11434"   # necessário apenas para Ollama
 
+  # Modelos disponíveis para o agente operador via MCP.
+  # O agente usa listar_modelos() para descobrir estas opções e escolher
+  # o modelo adequado para cada geração. Remova ou adicione conforme as
+  # chaves de API configuradas no .env.
+  modelos:
+    - id: "claude-haiku-4-5-20251001"
+      descricao: "rapido e economico — fontes simples, volume alto"
+    - id: "claude-sonnet-4-6"
+      descricao: "qualidade padrao — uso geral (padrao do sistema)"
+    - id: "claude-opus-4-8"
+      descricao: "maxima qualidade — conteudo complexo ou criativo"
+
 vinheta:
   voice: "pt-BR-FranciscaNeural"
   rate: "+20%"
