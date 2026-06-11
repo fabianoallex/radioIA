@@ -200,7 +200,7 @@ def listar_fontes() -> str:
 
 
 @mcp.tool()
-def gerar_episodios(fontes: list[str]) -> str:
+def gerar_episodios(fontes: list[str], model: str = '') -> str:
     """
     Gera episodios de audio para as fontes especificadas.
 
@@ -227,6 +227,9 @@ def gerar_episodios(fontes: list[str]) -> str:
                 ["url:https://a.com,https://b.com"] — episodio comparando duas URLs
                 ["url:https://a.com|foca nos impactos economicos"] — URL com contexto
                 ["url:https://a.com,https://b.com|compare as abordagens"] — multi-URL com contexto
+        model:  Modelo LLM para esta geracao (ex: "claude-haiku-4-5-20251001").
+                Sobrescreve o modelo de cada fonte apenas para esta chamada — sem alterar config.yaml.
+                Se vazio, usa o modelo configurado em cada fonte ou em llm.model.
 
     URLs suportadas:
         - Qualquer pagina web: extrai texto via trafilatura, usa nome real do site e data de publicacao
@@ -277,6 +280,10 @@ def gerar_episodios(fontes: list[str]) -> str:
         # Injeta contexto (|contexto no arg sobrescreve o do config.yaml)
         if ctx:
             source_cfg = {**source_cfg, 'context': ctx}
+
+        # Override de modelo para esta chamada (sem alterar config.yaml)
+        if model:
+            source_cfg = {**source_cfg, 'model': model}
 
         source_type = source_cfg.get('type')
 
@@ -1318,7 +1325,7 @@ def testar_tts(texto: str, voz: str = '') -> str:
 # ── Tools — Clipping ─────────────────────────────────────────────────────────
 
 @mcp.tool()
-def gerar_clipping(topico: str, followup: bool = False) -> str:
+def gerar_clipping(topico: str, followup: bool = False, model: str = '') -> str:
     """
     Gera um episodio de clipping — panorama de como a midia esta cobrindo um tema.
     Busca no Google News como diferentes veiculos abordam o topico e narra as
@@ -1327,14 +1334,17 @@ def gerar_clipping(topico: str, followup: bool = False) -> str:
     Nao requer configuracao previa no config.yaml.
 
     Args:
-        topico:  Tema a pesquisar. Pode ser qualquer assunto atual. Exemplos:
-                 "queda de aviao da empresa xyz"
-                 "reforma tributaria 2026"
-                 "copa do mundo abertura"
-                 "novo iphone lancamento"
+        topico:   Tema a pesquisar. Pode ser qualquer assunto atual. Exemplos:
+                  "queda de aviao da empresa xyz"
+                  "reforma tributaria 2026"
+                  "copa do mundo abertura"
+                  "novo iphone lancamento"
         followup: Se True, busca apenas artigos mais recentes sobre o tema
                   (util para acompanhar um assunto que ja foi clippado antes).
                   Default: False.
+        model:    Modelo LLM para esta geracao (ex: "claude-haiku-4-5-20251001").
+                  Sobrescreve o modelo configurado em llm.model apenas para esta chamada.
+                  Se vazio, usa o modelo padrao do config.
 
     Equivalente CLI: python main.py "clipping:tema"  (ou com --followup)
     """
@@ -1353,6 +1363,9 @@ def gerar_clipping(topico: str, followup: bool = False) -> str:
         'enabled': True,
         'settings': {**(base.get('settings') or {}), 'topic': topico, 'followup': followup},
     }
+
+    if model:
+        source_cfg = {**source_cfg, 'model': model}
 
     path, log, err = _capture(
         radio_main._run_source, source_cfg, config, credentials, seen_ids, first_of_day
