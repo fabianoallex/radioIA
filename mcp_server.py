@@ -172,6 +172,74 @@ def _set_nested(d: dict, keys: list[str], value):
 # ── Tools — Geração de conteúdo ───────────────────────────────────────────────
 
 @mcp.tool()
+def status_geracao() -> str:
+    """
+    Retorna o estado atual da geracao de episodios.
+
+    Util para monitorar episodios iniciados pelo scheduler em background —
+    principalmente durante a janela entre o disparo de um horario agendado
+    e o aparecimento do episodio finalizado no player.
+
+    O arquivo geracao_status.json e atualizado pelo gerador a cada etapa.
+    Se nao existe, nenhuma geracao foi registrada nesta sessao.
+
+    Etapas possiveis:
+        buscando   — buscando conteudo na fonte
+        llm        — gerando roteiro com o LLM
+        tts        — sintetizando audio (TTS)
+        mixando    — mixando audio final
+        finalizando — salvando metadados
+        concluido  — episodio pronto (ativo: false)
+        erro       — falha durante a geracao (ativo: false)
+
+    Quando ativo=false e etapa=concluido, use listar_episodios() para
+    confirmar que o episodio esta disponivel no player.
+
+    Se ativo=true e o campo 'aviso' aparecer, o processo pode ter encerrado
+    sem registrar conclusao — verifique o scheduler.log.
+    """
+    status_path = os.path.join(PROJECT_DIR, 'geracao_status.json')
+
+    if not os.path.exists(status_path):
+        return json.dumps({
+            'ativo':     False,
+            'mensagem':  'Nenhuma geracao registrada nesta sessao.',
+        }, ensure_ascii=False, indent=2)
+
+    try:
+        with open(status_path, 'r', encoding='utf-8') as f:
+            status = json.load(f)
+    except Exception as e:
+        return json.dumps({'ativo': False, 'erro': str(e)}, ensure_ascii=False, indent=2)
+
+    if status.get('ativo'):
+        # Verifica staleness: se nao atualizado ha mais de 15 min, provavelmente travou
+        try:
+            from datetime import datetime as _dt
+            updated_str = status.get('atualizado', '')
+            if updated_str:
+                now = _dt.now()
+                upd = _dt.strptime(updated_str, '%H:%M:%S').replace(
+                    year=now.year, month=now.month, day=now.day)
+                age_min = (now - upd).total_seconds() / 60
+                if age_min > 15:
+                    status['aviso'] = (
+                        f'Status sem atualizacao ha {int(age_min)} minutos — '
+                        'o processo pode ter encerrado sem registrar conclusao. '
+                        'Verifique o scheduler.log.'
+                    )
+        except Exception:
+            pass
+        status['dica'] = 'Geracao em andamento. Chame novamente em alguns segundos para acompanhar.'
+    elif status.get('etapa') == 'concluido':
+        status['dica'] = 'Episodio concluido. Use listar_episodios() para ver os detalhes.'
+    elif status.get('etapa') == 'erro':
+        status['dica'] = 'Houve um erro. Verifique o campo erro e o scheduler.log para detalhes.'
+
+    return json.dumps(status, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
 def listar_modelos() -> str:
     """
     Lista os modelos LLM disponiveis para uso nesta instalacao do RadioIA.

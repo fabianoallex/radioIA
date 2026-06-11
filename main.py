@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import shutil
@@ -14,6 +15,26 @@ from src.vinheta import generate_vinhetas
 from src.history import load_seen_ids, save_episode_to_history
 
 load_dotenv(override=True)
+
+_STATUS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'geracao_status.json')
+
+
+def _write_status(source_id: str, source_name: str, etapa: str,
+                  progresso: str = '', inicio: str = '', ativo: bool = True, erro: str = None):
+    try:
+        with open(_STATUS_FILE, 'w', encoding='utf-8') as _f:
+            json.dump({
+                'ativo':      ativo,
+                'fonte':      source_id,
+                'fonte_nome': source_name,
+                'etapa':      etapa,
+                'progresso':  progresso,
+                'inicio':     inicio,
+                'atualizado': datetime.now().strftime('%H:%M:%S'),
+                'erro':       erro,
+            }, _f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
 
 def _load_plugins() -> dict:
@@ -262,6 +283,8 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
     print(f"\n{'='*50}")
     print(f"Fonte: {source_name} ({source_type})")
     print(f"{'='*50}")
+    _inicio = datetime.now().strftime('%H:%M:%S')
+    _write_status(source_id, source_name, 'buscando', inicio=_inicio)
 
     # Inject API key for YouTube source
     if source_type == 'youtube':
@@ -307,9 +330,13 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
 
     if not items:
         print("  Nenhum conteudo novo encontrado.")
+        _write_status(source_id, source_name, 'concluido',
+                      progresso='sem conteudo novo', ativo=False, inicio=_inicio)
         return None
 
     print(f"  {len(items)} item(s) novo(s).\n")
+    _write_status(source_id, source_name, 'llm',
+                  progresso=f'{len(items)} itens', inicio=_inicio)
 
     narrators = config['narrators'][:3]
     radio_name = config.get('radio', {}).get('name', 'RadioIA')
@@ -329,7 +356,11 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
     if not lines:
         print("  Roteiro sem falas no formato esperado.")
         print(script[:400])
+        _write_status(source_id, source_name, 'erro',
+                      progresso='roteiro sem falas', ativo=False, inicio=_inicio)
         return None
+    _write_status(source_id, source_name, 'tts',
+                  progresso=f'{len(lines)} falas', inicio=_inicio)
 
     locutor_keys = ['LOCUTOR_A', 'LOCUTOR_B', 'LOCUTOR_C']
     voices = {locutor_keys[i]: n['voice'] for i, n in enumerate(narrators)}
@@ -341,6 +372,7 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
     print(f"  {len(lines)} falas + vinhetas geradas.\n")
 
     print("Montando episodio...")
+    _write_status(source_id, source_name, 'mixando', inicio=_inicio)
     episode_path = os.path.join(output_dir, 'episode.mp3')
     links_text = ' | '.join(f"[{i}] {v['title']} {v['url']}" for i, v in enumerate(items, 1))
 
@@ -354,9 +386,11 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
         station_name=radio_name,
     )
 
+    _write_status(source_id, source_name, 'finalizando', inicio=_inicio)
     save_episode_metadata(items, script, output_dir, duration, source_name=source_name)
     save_episode_to_history(episode_id, items)
     shutil.rmtree(temp_dir)
+    _write_status(source_id, source_name, 'concluido', ativo=False, inicio=_inicio)
 
     mins, secs = int(duration // 60), int(duration % 60)
     print(f"\nEpisodio pronto: {episode_path}")

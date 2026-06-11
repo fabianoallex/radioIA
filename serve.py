@@ -286,6 +286,13 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
   align-items: center; justify-content: center; transition: background .15s, color .15s;
 }
 .dl-cancel-btn:hover { background: #374151; color: #e5e7eb; }
+
+/* Generating status item */
+.ep-generating { cursor: default; border-left-color: #f59e0b !important; background: #1c1507 !important; }
+.ep-generating:hover { background: #1c1507 !important; }
+.ep-generating .ep-dot { background: #f59e0b; animation: gen-pulse 1.2s ease-in-out infinite; }
+.ep-gen-etapa { font-size: 10px; color: #d97706; text-transform: uppercase; letter-spacing: .06em; }
+@keyframes gen-pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
 </style>
 </head>
 <body>
@@ -475,12 +482,47 @@ async function init() {
 
   if (isMobile()) setTab('playlist');
   startPolling();
+  pollGenerating();
 }
 
 // ── Polling ───────────────────────────────────────────────────────────────────
 function startPolling() {
   document.getElementById('live-dot').classList.add('active');
   setInterval(pollEpisodes, POLL_MS);
+  setInterval(pollGenerating, 5000);
+}
+
+// ── Generation status ─────────────────────────────────────────────────────────
+async function pollGenerating() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (currentDate !== today) return;
+  try {
+    const res = await fetch('/api/geracao_status');
+    updateGeneratingItem(await res.json());
+  } catch (_) {}
+}
+
+function updateGeneratingItem(status) {
+  document.querySelectorAll('#playlist .ep-generating').forEach(el => el.remove());
+  const today = new Date().toISOString().slice(0, 10);
+  if (!status || !status.ativo || currentDate !== today) return;
+  const etapaLabels = {
+    buscando: 'buscando conteúdo', llm: 'gerando roteiro',
+    tts: 'sintetizando voz', mixando: 'mixando áudio', finalizando: 'finalizando',
+  };
+  const etapaText = etapaLabels[status.etapa] || status.etapa || '';
+  const prog = status.progresso ? ' · ' + status.progresso : '';
+  const el = document.createElement('div');
+  el.className = 'ep-item ep-generating';
+  el.innerHTML =
+    '<div class="ep-dot"></div>' +
+    '<div style="min-width:0">' +
+      '<div class="ep-label">⏳ ' + (status.fonte_nome || status.fonte) + '</div>' +
+      '<div class="ep-meta ep-gen-etapa">' + etapaText + prog + '</div>' +
+    '</div>';
+  const nextEl = document.querySelector('#playlist .ep-next');
+  const pl = document.getElementById('playlist');
+  if (nextEl) pl.insertBefore(el, nextEl); else pl.appendChild(el);
 }
 
 async function pollEpisodes() {
@@ -1500,6 +1542,18 @@ def index():
         dl_concatenated=dl['concatenated'],
         dl_zip=dl['zip'],
     )
+
+@app.route('/api/geracao_status')
+def api_geracao_status():
+    status_path = 'geracao_status.json'
+    if not os.path.exists(status_path):
+        return jsonify({'ativo': False})
+    try:
+        with open(status_path, 'r', encoding='utf-8') as f:
+            return jsonify(json.load(f))
+    except Exception:
+        return jsonify({'ativo': False})
+
 
 @app.route('/api/episodes')
 def api_episodes():
