@@ -154,10 +154,9 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
         cards = [_build_filmes_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _filmes_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
     elif source_type == 'url':
-        cards   = [_build_url_card(i, item) for i, item in enumerate(items, 1)]
-        context = (source_config.get('settings') or {}).get('context', '')
-        prompt  = _url_prompt(active, names, source_name, '\n\n'.join(cards),
-                              is_first_of_day, station_name, context, len(items))
+        cards  = [_build_url_card(i, item) for i, item in enumerate(items, 1)]
+        prompt = _url_prompt(active, names, source_name, '\n\n'.join(cards),
+                             is_first_of_day, station_name, len(items))
     elif source_type == 'receitas':
         cards = [_build_receita_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _receitas_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
@@ -176,6 +175,10 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
     else:
         cards = [_build_video_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _radio_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
+
+    context = source_config.get('context', '')
+    if context and prompt.endswith('Roteiro:'):
+        prompt = prompt[:-len('Roteiro:')] + f"INSTRUCAO DO PRODUTOR: {context}\n\nRoteiro:"
 
     kwargs = {'api_base': api_base} if api_base else {}
     response = litellm.completion(
@@ -914,7 +917,7 @@ def _build_url_card(i: int, item: dict) -> str:
 def _url_prompt(narrators: list[dict], names: list[str], source_name: str,
                 content: str, is_first_of_day: bool = True,
                 station_name: str = 'RadioIA',
-                context: str = '', num_items: int = 1) -> str:
+                num_items: int = 1) -> str:
     n = len(narrators)
     narrator_block = _narrator_block(narrators)
     format_block   = _format_block(narrators)
@@ -942,8 +945,6 @@ def _url_prompt(narrators: list[dict], names: list[str], source_name: str,
             "   - Outros: adapte naturalmente"
         )
 
-    context_block = f"\nINSTRUCAO DO PRODUTOR: {context}\n" if context else ''
-
     if is_first_of_day:
         abertura = f"1. ABERTURA: {names_str} dao bom dia, dizem que estao na {station_name} e apresentam o que vem por ai (2 falas)"
         encerramento = "4. Encerramento convidando o ouvinte a continuar na programacao (1-2 falas)"
@@ -957,7 +958,7 @@ Receberá conteudo extraido de uma ou mais paginas web.
 TAREFA:
 {task}
 Crie um segmento de radio envolvente, como se fosse um quadro da programacao.
-{context_block}
+
 APRESENTADORES:
 {narrator_block}
 

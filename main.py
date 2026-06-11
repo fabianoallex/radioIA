@@ -432,6 +432,18 @@ def main():
 
     # Filtra flags (--flag) antes de parsear — não são IDs de fonte
     cli_args = [a for a in sys.argv[1:] if not a.startswith('--')]
+
+    # Extrai |contexto de args não-especiais (ex: "youtube|foca em tecnologia")
+    _cli_contexts: dict[str, str] = {}
+    for _arg in cli_args:
+        if _arg.startswith(('url:', 'replay:', 'clipping:')):
+            continue
+        _base, _, _ctx = _arg.partition('|')
+        if _ctx:
+            _cli_contexts[_base.split(':', 1)[0]] = _ctx
+    # Remove sufixo |contexto dos args para que _parse_cli leia só o source_id[:param]
+    cli_args = [a.partition('|')[0] if '|' in a and not a.startswith('url:') else a for a in cli_args]
+
     cli = _parse_cli(cli_args) if cli_args else {}
 
     # Extrai replay: direto do argv para suportar múltiplos (replay:X replay:Y)
@@ -466,7 +478,8 @@ def main():
             'type':     'url',
             'name':     'Conteúdo da Web',
             'enabled':  True,
-            'settings': {'url': url_part.strip(), 'context': ctx.strip()},
+            'settings': {'url': url_part.strip()},
+            'context':  ctx.strip(),
         })
 
     followup = '--followup' in sys.argv
@@ -503,6 +516,10 @@ def main():
         # Injeta _param para que qualquer plugin possa acessar o parâmetro CLI
         if param is not None:
             source_config = {**source_config, '_param': param}
+
+        # Injeta contexto CLI (|contexto) — sobrescreve config.yaml se informado
+        if source_config['id'] in _cli_contexts:
+            source_config = {**source_config, 'context': _cli_contexts[source_config['id']]}
 
         if param is not None and source_config.get('type') == 'music':
             try:

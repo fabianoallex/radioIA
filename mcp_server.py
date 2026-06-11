@@ -65,12 +65,13 @@ def _capture(func, *args, **kwargs):
     return result, buf.getvalue(), error
 
 
-def _parse_fonte(arg: str) -> tuple[str, str | None]:
-    """'musica:3' -> ('musica', '3') | 'youtube' -> ('youtube', None)"""
-    if ':' in arg:
-        sid, param = arg.split(':', 1)
-        return sid.strip(), param.strip()
-    return arg.strip(), None
+def _parse_fonte(arg: str) -> tuple[str, str | None, str]:
+    """'musica:3|contexto' -> ('musica', '3', 'contexto') | 'youtube' -> ('youtube', None, '')"""
+    base, _, ctx = arg.partition('|')
+    if ':' in base:
+        sid, param = base.split(':', 1)
+        return sid.strip(), param.strip(), ctx.strip()
+    return base.strip(), None, ctx.strip()
 
 
 def _fonte_info(s: dict, seen_ids: set) -> dict:
@@ -203,6 +204,19 @@ def gerar_episodios(fontes: list[str]) -> str:
     """
     Gera episodios de audio para as fontes especificadas.
 
+    CONTEXTO ADICIONAL — instruindo o roteirista:
+        Qualquer fonte aceita o sufixo |contexto para orientar o roteirista (tom, foco, angulo).
+        O contexto e uma instrucao livre — nao filtra o conteudo buscado, apenas guia a narrativa.
+
+        Exemplos:
+            ["youtube|foca nos lancamentos de tecnologia desta semana"]
+            ["noticias|destaque apenas noticias economicas, ignore esportes"]
+            ["noticias", "tecnologia|publico jovem universitario, linguagem informal"]
+            ["url:https://a.com|extraia os pontos tecnicos"]
+
+        Alternativa persistente: campo context: na definicao da fonte em config.yaml.
+        O contexto passado aqui sobrescreve o do config.yaml para aquela chamada.
+
     Args:
         fontes: Lista de IDs de fontes a gerar. Exemplos:
                 ["youtube"] — so o feed do YouTube
@@ -211,14 +225,13 @@ def gerar_episodios(fontes: list[str]) -> str:
                 ["url:https://exemplo.com/artigo"] — episodio a partir de URL
                 ["url:https://youtu.be/ID"] — episodio de video do YouTube (usa transcricao)
                 ["url:https://a.com,https://b.com"] — episodio comparando duas URLs
-                ["url:https://a.com|foca nos impactos economicos"] — URL com instrucao de foco
+                ["url:https://a.com|foca nos impactos economicos"] — URL com contexto
                 ["url:https://a.com,https://b.com|compare as abordagens"] — multi-URL com contexto
 
     URLs suportadas:
         - Qualquer pagina web: extrai texto via trafilatura, usa nome real do site e data de publicacao
         - YouTube (youtube.com/watch, youtu.be, youtube.com/shorts): usa transcricao automatica
         - Multiplas URLs separadas por virgula: gera um episodio unico integrando todas
-        - Contexto apos | orienta o roteirista: tom, foco, angulo desejado
 
     Fontes disponiveis: youtube, noticias, noticias-locais, tecnologia, horoscopo,
     utilidades, loteria, copa, brasileirao, champions, efemerides, quiz, reddit,
@@ -234,15 +247,15 @@ def gerar_episodios(fontes: list[str]) -> str:
     logs_all = []
 
     for arg in fontes:
-        source_id, param = _parse_fonte(arg)
+        source_id, param, ctx = _parse_fonte(arg)
 
         # Fonte de URL avulsa: sintética, sem entrada no config
         if source_id == 'url' and param:
-            url_part, _, ctx = param.partition('|')
             source_cfg = {
                 'id': 'url', 'type': 'url',
                 'name': 'Conteudo da Web',
-                'settings': {'url': url_part.strip(), 'context': ctx.strip()},
+                'settings': {'url': param.strip()},
+                'context': ctx,
             }
         # Clipping: tópico passado como parâmetro, mescla com config se existir
         elif source_id == 'clipping' and param:
@@ -260,6 +273,10 @@ def gerar_episodios(fontes: list[str]) -> str:
             if not source_cfg:
                 results.append({'fonte': source_id, 'status': 'erro', 'mensagem': f"Fonte '{source_id}' nao encontrada."})
                 continue
+
+        # Injeta contexto (|contexto no arg sobrescreve o do config.yaml)
+        if ctx:
+            source_cfg = {**source_cfg, 'context': ctx}
 
         source_type = source_cfg.get('type')
 
