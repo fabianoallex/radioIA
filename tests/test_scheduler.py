@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from scheduler import _entry_key, _entry_active_today
+from scheduler import _entry_key, _entry_active_today, _fix_schedule_times
 
 
 class TestEntryKey:
@@ -84,3 +84,51 @@ class TestEntryActiveToday:
         mock_dt.now.return_value.weekday.return_value = 5  # sábado
         monkeypatch.setattr('scheduler.datetime', mock_dt)
         assert _entry_active_today({'days': ['mon', 'tue', 'wed', 'thu', 'fri']}) is False
+
+
+class TestFixScheduleTimes:
+    """PyYAML parseia times >= 10:00 sem aspas como inteiros (ex: 10:30 -> 630).
+    _fix_schedule_times normaliza de volta para HH:MM."""
+
+    def test_integer_time_converted_to_hhmm(self):
+        config = {'schedule': [{'time': 630, 'sources': ['noticias']}]}
+        result = _fix_schedule_times(config)
+        assert result['schedule'][0]['time'] == '10:30'
+
+    def test_midnight_zero(self):
+        config = {'schedule': [{'time': 0, 'sources': ['noticias']}]}
+        result = _fix_schedule_times(config)
+        assert result['schedule'][0]['time'] == '00:00'
+
+    def test_hour_boundary(self):
+        # 9:00 -> 540
+        config = {'schedule': [{'time': 540, 'sources': ['s']}]}
+        assert _fix_schedule_times(config)['schedule'][0]['time'] == '09:00'
+
+    def test_string_time_unchanged(self):
+        config = {'schedule': [{'time': '08:30', 'sources': ['s']}]}
+        result = _fix_schedule_times(config)
+        assert result['schedule'][0]['time'] == '08:30'
+
+    def test_mixed_entries(self):
+        config = {'schedule': [
+            {'time': 630, 'sources': ['a']},   # 10:30
+            {'time': '09:00', 'sources': ['b']},
+            {'time': 450, 'sources': ['c']},   # 07:30
+        ]}
+        times = [e['time'] for e in _fix_schedule_times(config)['schedule']]
+        assert times == ['10:30', '09:00', '07:30']
+
+    def test_empty_schedule(self):
+        config = {'schedule': []}
+        assert _fix_schedule_times(config) == {'schedule': []}
+
+    def test_no_schedule_key(self):
+        config = {'radio': {'name': 'Test'}}
+        result = _fix_schedule_times(config)
+        assert result == {'radio': {'name': 'Test'}}
+
+    def test_none_time_field_ignored(self):
+        config = {'schedule': [{'sources': ['s']}]}  # sem campo time
+        result = _fix_schedule_times(config)
+        assert 'time' not in result['schedule'][0]
