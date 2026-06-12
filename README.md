@@ -79,6 +79,7 @@ Toda a configuração da rádio está no `config.yaml`. Ele é dividido em:
 - **`narrators`** — narradores e personalidades
 - **`vinheta`** — vinheta da rádio
 - **`radio`** — nome da rádio e configurações de mixagem
+- **`welcome_intro`** — intro de boas-vindas tocada na primeira abertura do player no dia
 - **`llm`** — modelo de linguagem e provedor usado na geração de roteiros
 - **`announcements`** — avisos de grade intercalados entre músicas no modo fallback
 - **`spots`** — pool de spots (propagandas/comunicados) com rotação ponderada
@@ -766,6 +767,7 @@ Abre automaticamente em `http://localhost:5000`. O player:
 - Entra em modo musical (músicas da pasta `music/`) quando não há episódios novos, com aviso de voz
 - No modo musical, intercala avisos de voz com os próximos itens da grade entre as músicas
 - Mantém a tela ativa enquanto o áudio toca (Wake Lock API — Chrome Android e Safari iOS 16.4+)
+- **Intro de boas-vindas**: toca um áudio de apresentação na primeira abertura do dia, antes da programação; configurável em `welcome_intro` no `config.yaml`
 - **Responsivo para mobile**: navegação por abas (Dias / Playlist / Fontes) na parte inferior
 
 ### Avisos de grade (breaks musicais)
@@ -1005,6 +1007,7 @@ python mcp_server.py
 | `gerar_clipping("reforma tributária 2026")` | Panorama de como a mídia está cobrindo um tema |
 | `gerar_clipping("copa", followup=True)` | Clipping de acompanhamento — só artigos recentes |
 | `gerar_clipping("tema", model="claude-opus-4-8")` | Clipping com modelo específico |
+| `gerar_clipping("tema", agregadores=["bing_news"])` | Clipping usando apenas um agregador específico |
 | `listar_episodios("2026-06-11")` | Lista episódios de uma data (padrão: hoje) com duração total |
 | `ler_episodio("noticias")` | Lê o roteiro completo e metadados de um episódio por prefixo |
 | `deletar_episodio("09-30_youtube")` | Remove a pasta de um episódio específico do output |
@@ -1031,6 +1034,9 @@ python mcp_server.py
 | `atualizar_config("radio.name", "Minha Rádio")` | Altera qualquer valor do config via notação de ponto |
 | `adicionar_grade("16:00", ["noticias"], "Tarde")` | Adiciona entrada na grade (diária ou pontual, com suporte a `slot_id`/`replay_of`/`days`) |
 | `remover_grade("16:00", "Tarde")` | Remove entrada da grade por horário e label |
+| `ver_intro_boas_vindas()` | Mostra as frases configuradas, a voz e o status do áudio gerado |
+| `configurar_intro_boas_vindas(falas=[...])` | Atualiza as frases e/ou a voz da intro; regera o áudio automaticamente |
+| `regenerar_intro_boas_vindas()` | Apaga o áudio atual e regera com a configuração corrente (sorteia uma fala diferente) |
 
 > **Atenção:** ferramentas que salvam o `config.yaml` reformatam o arquivo YAML e perdem os comentários originais. O conteúdo e os valores são preservados.
 
@@ -1054,6 +1060,9 @@ O scheduler protege contra instâncias duplicadas: tentar iniciar uma segunda in
 | `listar_zips_wp()` | Lista arquivos ZIP de exportação do WhatsApp por fonte configurada (nome, tamanho, data) |
 | `limpar_output(dias_manter=7)` | Lista ou remove episódios antigos para liberar espaço (padrão: preview seguro) |
 | `testar_tts("Bem-vindos!")` | Gera `output/tts_test.mp3` para testar o TTS sem gerar episódio |
+| `ver_cache_jamendo()` | Status do cache local: faixas catalogadas, tamanho em disco e fontes configuradas |
+| `baixar_musicas_jamendo(id_fonte?)` | Baixa novas faixas do Jamendo para o cache; omitir `id_fonte` para baixar de todas as fontes |
+| `limpar_cache_jamendo(confirmar)` | Remove todos os arquivos e o catálogo do cache Jamendo (requer `confirmar=True`) |
 
 #### Exportação
 
@@ -1372,7 +1381,12 @@ O episódio compara os ângulos de cada veículo ("O G1 destaca...", "Segundo a 
     days_lookback: 1        # só artigos dos últimos N dias (padrão: 1)
     fetch_content: true     # extrai texto completo via trafilatura (padrão: true)
     max_content_chars: 2000 # limite de caracteres por artigo (padrão: 2000)
+    agregadores:            # ordem não implica prioridade — seleção é balanceada
+      - google_news         # sem chave de API
+      - bing_news           # sem chave de API
 ```
+
+Por padrão ambos os agregadores são usados. A seleção final é feita em **round-robin** entre eles — nenhum tem prioridade. Se um agregador retornar poucos resultados para o tema buscado, os slots restantes são preenchidos pelo outro. Artigos do mesmo veículo são deduplicados independente de qual agregador os retornou.
 
 Consulte o guia completo com contrato, exemplos e boas práticas:
 

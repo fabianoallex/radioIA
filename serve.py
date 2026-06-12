@@ -17,6 +17,43 @@ FALLBACK_INTRO_PATH  = os.path.join('output', '_fallback_intro.mp3')
 FALLBACK_INTRO_TEXT  = 'Enquanto aguardamos novos episódios, fiquem com algumas músicas selecionadas para você.'
 FALLBACK_INTRO_VOICE = 'pt-BR-ThalitaMultilingualNeural'
 
+WELCOME_INTRO_PATH = os.path.join('output', '_welcome_intro.mp3')
+
+
+def _generate_welcome_intro(radio_name: str):
+    if os.path.exists(WELCOME_INTRO_PATH):
+        return
+    try:
+        import yaml
+        with open('config.yaml', 'r', encoding='utf-8') as f:
+            cfg = yaml.safe_load(f)
+        wi    = cfg.get('welcome_intro', {})
+        falas = wi.get('falas') or []
+        voice = wi.get('voice') or cfg.get('vinheta', {}).get('voice', FALLBACK_INTRO_VOICE)
+    except Exception:
+        falas, voice = [], FALLBACK_INTRO_VOICE
+    import random
+    if falas:
+        text = random.choice(falas).replace('{radio_name}', radio_name)
+    else:
+        text = (
+            f'Bom dia! Bem-vindo à {radio_name}. '
+            f'É um prazer ter você conosco. '
+            f'Fique à vontade para aproveitar a programação de hoje!'
+        )
+    try:
+        import asyncio
+        import edge_tts
+        os.makedirs('output', exist_ok=True)
+        if sys.platform == 'win32':
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        async def _gen():
+            await edge_tts.Communicate(text, voice).save(WELCOME_INTRO_PATH)
+        asyncio.run(_gen())
+        print('Intro de boas-vindas gerada.')
+    except Exception as e:
+        print(f'[aviso] Intro de boas-vindas nao gerada: {e}')
+
 
 def _jamendo_cache_empty() -> bool:
     catalog_path = os.path.join('music', 'cache', 'jamendo', 'catalog.json')
@@ -118,6 +155,7 @@ header h1 { font-size: 18px; font-weight: 700; color: #f9fafb; }
 .badge-music   { background: #064e3b; color: #6ee7b7; }
 .badge-news    { background: #431407; color: #fdba74; }
 .badge-fallback{ background: #1c1917; color: #a8a29e; }
+.badge-welcome { background: #1e3a5f; color: #93c5fd; }
 .player-name   { font-size: 16px; font-weight: 600; color: #f9fafb; margin-bottom: 2px; }
 .player-track  { font-size: 12px; color: #6b7280; margin-bottom: 10px; min-height: 16px; }
 audio { width: 100%; height: 36px; accent-color: #6366f1; }
@@ -292,6 +330,14 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
 .ep-generating:hover { background: #1c1507 !important; }
 .ep-generating .ep-dot { background: #f59e0b; animation: gen-pulse 1.2s ease-in-out infinite; }
 .ep-gen-etapa { font-size: 10px; color: #d97706; text-transform: uppercase; letter-spacing: .06em; }
+.ep-gen-done { border-left-color: #10b981 !important; background: #052e16 !important; }
+.ep-gen-done:hover { background: #052e16 !important; }
+.ep-gen-done .ep-dot { background: #10b981; animation: none; }
+.ep-gen-done .ep-gen-etapa { color: #6ee7b7; }
+.ep-gen-error { border-left-color: #ef4444 !important; background: #1c0505 !important; }
+.ep-gen-error:hover { background: #1c0505 !important; }
+.ep-gen-error .ep-dot { background: #ef4444; animation: none; }
+.ep-gen-error .ep-gen-etapa { color: #fca5a5; }
 
 /* Schedule grid (notes area) */
 .grade-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
@@ -402,9 +448,10 @@ let dlModeActive   = false;
 let _dlModeTimer   = null;
 const DL_MODE_TIMEOUT_MS = 30000;
 
-const S_EP   = 'radioIA_ep';
-const S_TIME = 'radioIA_time';
-const S_VOL  = 'radioIA_vol';
+const S_EP           = 'radioIA_ep';
+const S_TIME         = 'radioIA_time';
+const S_VOL          = 'radioIA_vol';
+const S_WELCOME_DATE = 'radioIA_welcome_date';
 
 // Salva posição a cada 5 segundos enquanto toca
 let _lastSave = 0;
@@ -464,6 +511,27 @@ function setTab(tab) {
   document.getElementById('tab-fontes').classList.toggle('active', tab === 'fontes');
 }
 
+// ── Welcome intro ─────────────────────────────────────────────────────────────
+async function playWelcomeIntro() {
+  try {
+    const res = await fetch('/api/welcome-intro', { method: 'HEAD' });
+    if (!res.ok) return;
+    const badge = document.getElementById('player-badge');
+    badge.className = 'player-badge badge-welcome';
+    badge.textContent = '👋 Boas-vindas';
+    document.getElementById('player-name').textContent = document.title;
+    document.getElementById('player-track').textContent = '';
+    const audio = document.getElementById('audio');
+    audio.src = '/api/welcome-intro';
+    await new Promise(resolve => {
+      const done = () => { audio.onended = null; audio.onerror = null; resolve(); };
+      audio.onended = done;
+      audio.onerror = done;
+      audio.play().catch(() => resolve());
+    });
+  } catch (_) {}
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   const [epsRes, musRes] = await Promise.all([
@@ -476,6 +544,12 @@ async function init() {
   renderDays();
 
   const today     = new Date().toISOString().slice(0, 10);
+
+  if (localStorage.getItem(S_WELCOME_DATE) !== today) {
+    localStorage.setItem(S_WELCOME_DATE, today);
+    await playWelcomeIntro();
+  }
+
   const savedId   = localStorage.getItem(S_EP);
   const savedTime = parseFloat(localStorage.getItem(S_TIME) || '0');
   const savedEp   = savedId && allEpisodes.find(e => e.id === savedId);
@@ -566,19 +640,37 @@ async function pollGenerating() {
 function updateGeneratingItem(status) {
   document.querySelectorAll('#playlist .ep-generating').forEach(el => el.remove());
   const today = new Date().toISOString().slice(0, 10);
-  if (!status || !status.ativo || currentDate !== today) return;
+  if (!status || currentDate !== today) return;
+
+  const isDone  = !status.ativo && status.etapa === 'concluido';
+  const isError = !status.ativo && status.etapa === 'erro';
+  const semConteudo = isDone && (status.progresso || '').includes('sem conteudo');
+
+  // Sem episódio chegando: não mantém item
+  if (semConteudo) return;
+  // Geração inativa sem estado terminal relevante: remove
+  if (!status.ativo && !isDone && !isError) return;
+
   const etapaLabels = {
-    buscando: 'buscando conteúdo', llm: 'gerando roteiro',
-    tts: 'sintetizando voz', mixando: 'mixando áudio', finalizando: 'finalizando',
+    buscando:    'buscando conteúdo',
+    llm:         'gerando roteiro',
+    tts:         'sintetizando voz',
+    mixando:     'mixando áudio',
+    finalizando: 'finalizando',
+    concluido:   'episódio pronto — carregando...',
+    erro:        status.erro || 'erro na geração',
   };
   const etapaText = etapaLabels[status.etapa] || status.etapa || '';
-  const prog = status.progresso ? ' · ' + status.progresso : '';
+  const prog = (status.ativo && status.progresso) ? ' · ' + status.progresso : '';
+  const icon = isDone ? '✓' : isError ? '✗' : '⏳';
+  const mod  = isDone ? ' ep-gen-done' : isError ? ' ep-gen-error' : '';
+
   const el = document.createElement('div');
-  el.className = 'ep-item ep-generating';
+  el.className = 'ep-item ep-generating' + mod;
   el.innerHTML =
     '<div class="ep-dot"></div>' +
     '<div style="min-width:0">' +
-      '<div class="ep-label">⏳ ' + (status.fonte_nome || status.fonte) + '</div>' +
+      '<div class="ep-label">' + icon + ' ' + (status.fonte_nome || status.fonte) + '</div>' +
       '<div class="ep-meta ep-gen-etapa">' + etapaText + prog + '</div>' +
     '</div>';
   const nextEl = document.querySelector('#playlist .ep-next');
@@ -1873,6 +1965,13 @@ def api_fallback_intro():
     return '', 404
 
 
+@app.route('/api/welcome-intro')
+def api_welcome_intro():
+    if os.path.exists(WELCOME_INTRO_PATH):
+        return send_from_directory('output', '_welcome_intro.mp3', mimetype='audio/mpeg')
+    return '', 404
+
+
 @app.route('/download/episode/<path:episode_id>')
 def download_episode(episode_id):
     audio_path = _resolve_audio_path(episode_id)
@@ -1992,7 +2091,9 @@ if __name__ == '__main__':
 
     from src.time_clips import generate_atomic_clips as _gen_clips
     from src.spots import warmup as _warm_spots
+    _rn = _cfg.get('radio', {}).get('name', 'RadioIA')
     threading.Thread(target=_generate_fallback_intro, daemon=True).start()
+    threading.Thread(target=lambda: _generate_welcome_intro(_rn), daemon=True).start()
     threading.Thread(target=lambda: _gen_clips(_tc_voice, _tc_rate), daemon=True).start()
     threading.Thread(target=_warm_announcement, daemon=True).start()
     threading.Thread(target=_warm_spots, daemon=True).start()

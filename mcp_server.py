@@ -1439,26 +1439,32 @@ def testar_tts(texto: str, voz: str = '') -> str:
 # ── Tools — Clipping ─────────────────────────────────────────────────────────
 
 @mcp.tool()
-def gerar_clipping(topico: str, followup: bool = False, model: str = '') -> str:
+def gerar_clipping(topico: str, followup: bool = False, model: str = '',
+                   agregadores: list = None) -> str:
     """
     Gera um episodio de clipping — panorama de como a midia esta cobrindo um tema.
-    Busca no Google News como diferentes veiculos abordam o topico e narra as
-    convergencias e divergencias entre eles.
+    Busca em multiplos agregadores de noticias, seleciona veiculos de forma balanceada
+    (round-robin) e narra as convergencias e divergencias entre eles.
 
     Nao requer configuracao previa no config.yaml.
 
     Args:
-        topico:   Tema a pesquisar. Pode ser qualquer assunto atual. Exemplos:
-                  "queda de aviao da empresa xyz"
-                  "reforma tributaria 2026"
-                  "copa do mundo abertura"
-                  "novo iphone lancamento"
-        followup: Se True, busca apenas artigos mais recentes sobre o tema
-                  (util para acompanhar um assunto que ja foi clippado antes).
-                  Default: False.
-        model:    Modelo LLM para esta geracao (ex: "claude-haiku-4-5-20251001").
-                  Sobrescreve o modelo configurado em llm.model apenas para esta chamada.
-                  Se vazio, usa o modelo padrao do config.
+        topico:      Tema a pesquisar. Pode ser qualquer assunto atual. Exemplos:
+                     "queda de aviao da empresa xyz"
+                     "reforma tributaria 2026"
+                     "copa do mundo abertura"
+                     "novo iphone lancamento"
+        followup:    Se True, busca apenas artigos mais recentes sobre o tema
+                     (util para acompanhar um assunto que ja foi clippado antes).
+                     Default: False.
+        model:       Modelo LLM para esta geracao (ex: "claude-haiku-4-5-20251001").
+                     Sobrescreve o modelo configurado em llm.model apenas para esta chamada.
+                     Se vazio, usa o modelo padrao do config.
+        agregadores: Lista de agregadores a usar nesta chamada. Sobrescreve o valor do
+                     config.yaml apenas para esta execucao. Opcoes disponiveis:
+                     ["google_news", "bing_news"]
+                     Se omitido, usa o configurado em clipping.settings.agregadores
+                     (padrao: ambos).
 
     Equivalente CLI: python main.py "clipping:tema"  (ou com --followup)
     """
@@ -1482,13 +1488,16 @@ def gerar_clipping(topico: str, followup: bool = False, model: str = '') -> str:
                 }, ensure_ascii=False, indent=2)
 
     base = next((s for s in all_sources if s['id'] == 'clipping'), {})
+    extra_settings = {'topic': topico, 'followup': followup}
+    if agregadores is not None:
+        extra_settings['agregadores'] = list(agregadores)
     source_cfg = {
         **base,
         'id':      'clipping',
         'type':    'clipping',
         'name':    f"Clipping — {topico[:60]}",
         'enabled': True,
-        'settings': {**(base.get('settings') or {}), 'topic': topico, 'followup': followup},
+        'settings': {**(base.get('settings') or {}), **extra_settings},
     }
 
     if model:
@@ -2527,6 +2536,305 @@ def exportar_episodios(
         'status':   'erro',
         'mensagem': f"Formato '{formato}' invalido. Use: concat | zip | listar",
     }, ensure_ascii=False)
+
+
+# ── Tools — Intro de boas-vindas ──────────────────────────────────────────────
+
+_WELCOME_INTRO_PATH = os.path.join(PROJECT_DIR, 'output', '_welcome_intro.mp3')
+
+
+def _gerar_audio_welcome(config: dict) -> dict:
+    import asyncio
+    import random
+    import edge_tts
+
+    wi         = config.get('welcome_intro', {})
+    falas      = wi.get('falas') or []
+    radio_name = config.get('radio', {}).get('name', 'RadioIA')
+    voice      = wi.get('voice') or config.get('vinheta', {}).get('voice', 'pt-BR-FranciscaNeural')
+
+    if not falas:
+        return {'status': 'erro', 'mensagem': 'Nenhuma fala configurada em welcome_intro.falas.'}
+
+    fala = random.choice(falas).replace('{radio_name}', radio_name)
+    os.makedirs(os.path.join(PROJECT_DIR, 'output'), exist_ok=True)
+
+    async def _synth():
+        await edge_tts.Communicate(fala, voice).save(_WELCOME_INTRO_PATH)
+
+    try:
+        asyncio.run(_synth())
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        loop.run_until_complete(_synth())
+        loop.close()
+
+    if not os.path.exists(_WELCOME_INTRO_PATH):
+        return {'status': 'erro', 'mensagem': 'Arquivo não gerado.'}
+
+    return {
+        'status':      'ok',
+        'fala_usada':  fala,
+        'voice':       voice,
+        'arquivo':     _WELCOME_INTRO_PATH,
+        'tamanho_kb':  round(os.path.getsize(_WELCOME_INTRO_PATH) / 1024, 1),
+    }
+
+
+@mcp.tool()
+def ver_intro_boas_vindas() -> str:
+    """
+    Mostra a configuração atual da intro de boas-vindas e o status do áudio gerado.
+
+    Retorna:
+    - falas: lista de frases configuradas (use {radio_name} para inserir o nome da rádio)
+    - voice: voz usada (null = herda vinheta.voice)
+    - audio_gerado: se output/_welcome_intro.mp3 existe
+    - gerado_em, tamanho_kb: metadados do arquivo, se existir
+    """
+    config = _load_config()
+    wi     = config.get('welcome_intro', {})
+    exists = os.path.exists(_WELCOME_INTRO_PATH)
+    result = {
+        'falas':        wi.get('falas', []),
+        'voice':        wi.get('voice'),
+        'audio_gerado': exists,
+    }
+    if exists:
+        mtime = datetime.fromtimestamp(os.path.getmtime(_WELCOME_INTRO_PATH)).strftime('%Y-%m-%d %H:%M')
+        result['gerado_em']  = mtime
+        result['tamanho_kb'] = round(os.path.getsize(_WELCOME_INTRO_PATH) / 1024, 1)
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def configurar_intro_boas_vindas(
+    falas: list = None,
+    voice: str = None,
+    regenerar: bool = True,
+) -> str:
+    """
+    Configura as frases e/ou a voz da intro de boas-vindas e opcionalmente regera o áudio.
+
+    Parâmetros:
+    - falas: lista de frases; uma é sorteada a cada geração.
+             Use {radio_name} para inserir o nome da rádio. Exemplos:
+             ["Bom dia! Bem-vindo à {radio_name}. Aproveite a programação!"]
+             ["Olá! Você está na {radio_name}.", "Bom dia! A {radio_name} começa agora!"]
+    - voice: voz edge-tts (ex: "pt-BR-FranciscaNeural"). null = herda vinheta.voice
+    - regenerar: se True (padrão), apaga o áudio atual e regera imediatamente
+
+    Pelo menos um dos parâmetros falas ou voice deve ser informado.
+    """
+    if falas is None and voice is None:
+        return json.dumps({
+            'status':   'erro',
+            'mensagem': 'Informe ao menos falas ou voice.',
+        }, ensure_ascii=False)
+
+    config = _load_config()
+    if 'welcome_intro' not in config:
+        config['welcome_intro'] = {}
+
+    anterior = dict(config['welcome_intro'])
+
+    if falas is not None:
+        config['welcome_intro']['falas'] = list(falas)
+    if voice is not None:
+        config['welcome_intro']['voice'] = voice or None
+
+    _save_config(config)
+
+    result = {
+        'status':         'ok',
+        'valor_anterior': anterior,
+        'valor_novo':     config['welcome_intro'],
+        'aviso':          'config.yaml foi reformatado — comentários originais foram perdidos.',
+    }
+
+    if regenerar:
+        if os.path.exists(_WELCOME_INTRO_PATH):
+            os.remove(_WELCOME_INTRO_PATH)
+        result['geracao'] = _gerar_audio_welcome(config)
+
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def regenerar_intro_boas_vindas() -> str:
+    """
+    Apaga o áudio atual da intro de boas-vindas e gera um novo com a configuração atual.
+    Use após editar manualmente config.yaml ou para sortear uma fala diferente da lista.
+    """
+    config = _load_config()
+    wi = config.get('welcome_intro', {})
+    if not wi.get('falas'):
+        return json.dumps({
+            'status':   'erro',
+            'mensagem': 'Nenhuma fala configurada em welcome_intro.falas.',
+            'dica':     'Use configurar_intro_boas_vindas(falas=[...]) para definir as frases.',
+        }, ensure_ascii=False)
+
+    if os.path.exists(_WELCOME_INTRO_PATH):
+        os.remove(_WELCOME_INTRO_PATH)
+
+    return json.dumps(_gerar_audio_welcome(config), ensure_ascii=False, indent=2)
+
+
+# ── Tools — Cache Jamendo ─────────────────────────────────────────────────────
+
+@mcp.tool()
+def ver_cache_jamendo() -> str:
+    """
+    Mostra o status do cache local do Jamendo: faixas catalogadas, tamanho em disco
+    e fontes Jamendo configuradas no config.yaml.
+    """
+    from src.sources.music import CACHE_DIR, CATALOG_FILE
+
+    config = _load_config()
+    jamendo_sources = [
+        s for s in config.get('sources', [])
+        if s.get('type') == 'music'
+        and (s.get('settings') or {}).get('source') == 'jamendo'
+    ]
+
+    catalog = {}
+    if os.path.exists(CATALOG_FILE):
+        with open(CATALOG_FILE, 'r', encoding='utf-8') as f:
+            catalog = json.load(f)
+
+    total_bytes  = 0
+    faixas_ok    = 0
+    faixas_faltando = []
+    for tid, meta in catalog.items():
+        fpath = os.path.join(CACHE_DIR, meta['file'])
+        if os.path.exists(fpath):
+            total_bytes += os.path.getsize(fpath)
+            faixas_ok   += 1
+        else:
+            faixas_faltando.append(meta.get('title', tid))
+
+    amostra = [
+        {'titulo': m['title'], 'artista': m['artist']}
+        for m in list(catalog.values())[:5]
+    ]
+
+    return json.dumps({
+        'faixas_em_catalogo':  len(catalog),
+        'faixas_no_disco':     faixas_ok,
+        'faixas_faltando':     len(faixas_faltando),
+        'tamanho_mb':          round(total_bytes / 1024 / 1024, 1),
+        'fontes_configuradas': [
+            {
+                'id':         s['id'],
+                'name':       s.get('name', s['id']),
+                'enabled':    s.get('enabled', True),
+                'tags':       (s.get('settings') or {}).get('jamendo', {}).get('tags', 'lounge'),
+                'cache_size': (s.get('settings') or {}).get('cache_size', 50),
+            }
+            for s in jamendo_sources
+        ],
+        'amostra': amostra,
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def baixar_musicas_jamendo(id_fonte: str = None) -> str:
+    """
+    Baixa novas faixas do Jamendo para o cache local.
+
+    Parâmetros:
+    - id_fonte: ID da fonte music/jamendo a baixar. Omita para baixar de todas as
+                fontes Jamendo configuradas.
+
+    Requer JAMENDO_CLIENT_ID definido no .env.
+    Faixas já presentes no cache são ignoradas (não rebaixadas).
+    """
+    from src.sources import music as music_source
+
+    config = _load_config()
+    jamendo_sources = [
+        s for s in config.get('sources', [])
+        if s.get('type') == 'music'
+        and (s.get('settings') or {}).get('source') == 'jamendo'
+    ]
+
+    if not jamendo_sources:
+        return json.dumps({
+            'status':   'erro',
+            'mensagem': 'Nenhuma fonte do tipo music/jamendo configurada.',
+            'dica':     'Adicione uma fonte com type: music e settings.source: jamendo no config.yaml.',
+        }, ensure_ascii=False, indent=2)
+
+    if id_fonte:
+        fontes = [s for s in jamendo_sources if s['id'] == id_fonte]
+        if not fontes:
+            return json.dumps({
+                'status':      'erro',
+                'mensagem':    f"Fonte '{id_fonte}' não encontrada entre as fontes Jamendo.",
+                'disponiveis': [s['id'] for s in jamendo_sources],
+            }, ensure_ascii=False, indent=2)
+    else:
+        fontes = jamendo_sources
+
+    resultados = []
+    for src in fontes:
+        n = music_source.download_cache(src)
+        resultados.append({
+            'id':          src['id'],
+            'name':        src.get('name', src['id']),
+            'novas_faixas': n,
+        })
+
+    return json.dumps({
+        'status':      'ok',
+        'total_novas': sum(r['novas_faixas'] for r in resultados),
+        'por_fonte':   resultados,
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def limpar_cache_jamendo(confirmar: bool = False) -> str:
+    """
+    Apaga todos os arquivos de áudio e o catálogo do cache local do Jamendo.
+
+    Parâmetros:
+    - confirmar: deve ser True para executar (proteção contra apagamento acidental).
+                 Chame primeiro sem confirmar para ver o que seria removido.
+
+    Use baixar_musicas_jamendo() para repopular o cache após limpar.
+    """
+    from src.sources.music import CACHE_DIR
+
+    n_files     = 0
+    total_bytes = 0
+    if os.path.exists(CACHE_DIR):
+        for f in os.listdir(CACHE_DIR):
+            fpath = os.path.join(CACHE_DIR, f)
+            if os.path.isfile(fpath):
+                n_files     += 1
+                total_bytes += os.path.getsize(fpath)
+
+    if not confirmar:
+        return json.dumps({
+            'status':   'aguardando_confirmacao',
+            'mensagem': f'Isso removerá {n_files} arquivo(s) ({round(total_bytes/1024/1024, 1)} MB). '
+                        f'Chame novamente com confirmar=True para executar.',
+        }, ensure_ascii=False, indent=2)
+
+    removidos = 0
+    if os.path.exists(CACHE_DIR):
+        for f in os.listdir(CACHE_DIR):
+            fpath = os.path.join(CACHE_DIR, f)
+            if os.path.isfile(fpath):
+                os.remove(fpath)
+                removidos += 1
+
+    return json.dumps({
+        'status':             'ok',
+        'arquivos_removidos': removidos,
+        'espaco_liberado_mb': round(total_bytes / 1024 / 1024, 1),
+    }, ensure_ascii=False, indent=2)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
