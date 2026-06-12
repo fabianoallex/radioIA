@@ -292,6 +292,22 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
 .ep-generating:hover { background: #1c1507 !important; }
 .ep-generating .ep-dot { background: #f59e0b; animation: gen-pulse 1.2s ease-in-out infinite; }
 .ep-gen-etapa { font-size: 10px; color: #d97706; text-transform: uppercase; letter-spacing: .06em; }
+
+/* Schedule grid (notes area) */
+.grade-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
+.grade-card { background: #1f2937; border: 1px solid #374151; border-left: 3px solid #374151;
+              border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.grade-card.s-done { opacity: .35; }
+.grade-card.s-next { border-left-color: #6366f1; background: #1e1b4b; }
+.gc-time   { font-size: 12px; font-weight: 700; color: #818cf8; margin-bottom: 4px;
+             display: flex; align-items: center; gap: 5px; }
+.s-next .gc-time { color: #a5b4fc; }
+.gc-mark      { font-size: 10px; color: #10b981; }
+.gc-mark-next { font-size: 10px; color: #818cf8; }
+.gc-label  { font-size: 13px; font-weight: 600; color: #f9fafb; line-height: 1.3;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+.gc-fontes { font-size: 11px; color: #6b7280;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @keyframes gen-pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
 </style>
 </head>
@@ -466,12 +482,21 @@ async function init() {
   const todayEps  = groupByDate(allEpisodes)[today] || [];
 
   if (savedEp && savedEp.date === today) {
-    // Retoma episódio de hoje de onde parou
+    const nearEnd = savedEp.duration > 0 && savedTime >= savedEp.duration - 15;
     selectDate(today, false);
-    playEpisode(savedEp);
-    if (savedTime > 3) {
-      const audio = document.getElementById('audio');
-      audio.addEventListener('canplay', () => { audio.currentTime = savedTime; }, { once: true });
+    if (nearEnd) {
+      // Episódio quase no fim — avança para o próximo ou modo musical
+      const idx  = todayEps.findIndex(e => e.id === savedEp.id);
+      const next = idx >= 0 ? todayEps[idx + 1] : null;
+      if (next) playEpisode(next);
+      else enterFallback();
+    } else {
+      // Retoma episódio de hoje de onde parou
+      playEpisode(savedEp);
+      if (savedTime > 3) {
+        const audio = document.getElementById('audio');
+        audio.addEventListener('canplay', () => { audio.currentTime = savedTime; }, { once: true });
+      }
     }
   } else {
     // Novo dia ou sem histórico — abre hoje direto
@@ -490,6 +515,42 @@ function startPolling() {
   document.getElementById('live-dot').classList.add('active');
   setInterval(pollEpisodes, POLL_MS);
   setInterval(pollGenerating, 5000);
+}
+
+// ── Schedule panel ────────────────────────────────────────────────────────────
+async function showSchedule() {
+  try {
+    const res     = await fetch('/api/grade');
+    const entries = await res.json();
+    renderScheduleNotes(entries);
+    if (isMobile()) setTab('fontes');
+  } catch (_) {}
+}
+
+function renderScheduleNotes(entries) {
+  const el = document.getElementById('notes');
+  if (!entries || !entries.length) {
+    el.innerHTML = '<div class="empty">Nenhuma entrada na grade de hoje.</div>';
+    return;
+  }
+  const cards = entries.map(e => {
+    const cls  = e.executado ? 's-done' : (e.proximo ? 's-next' : '');
+    const mark = e.executado
+      ? '<span class="gc-mark">✓</span>'
+      : e.proximo ? '<span class="gc-mark gc-mark-next">▶</span>' : '';
+    const fontes = e.fontes
+      ? `<div class="gc-fontes">${e.fontes.join(' · ')}</div>`
+      : e.replay_de !== undefined
+        ? `<div class="gc-fontes">↩ slot ${e.replay_de}</div>`
+        : '';
+    return `<div class="grade-card ${cls}">
+      <div class="gc-time">${e.horario}${mark}</div>
+      <div class="gc-label">${e.label}</div>
+      ${fontes}
+    </div>`;
+  }).join('');
+  el.innerHTML = '<div class="notes-header">Grade de hoje</div>'
+               + '<div class="grade-grid">' + cards + '</div>';
 }
 
 // ── Generation status ─────────────────────────────────────────────────────────
@@ -869,11 +930,11 @@ function renderDays() {
 function appendNextScheduled() {
   const today = new Date().toISOString().slice(0, 10);
   if (currentDate !== today) return;
-  // Remove item anterior para evitar duplicatas ao atualizar estado do scheduler
-  document.querySelectorAll('#playlist .ep-next').forEach(el => el.remove());
   fetch('/api/next-scheduled')
     .then(r => r.json())
     .then(next => {
+      // Remove só depois do fetch — sem flicker
+      document.querySelectorAll('#playlist .ep-next').forEach(el => el.remove());
       if (!next) return;
       const el = document.createElement('div');
       el.className = 'ep-item ep-next';
@@ -885,11 +946,14 @@ function appendNextScheduled() {
             `<div class="ep-meta">scheduler inativo</div>` +
           `</div>`;
       } else {
+        el.style.cursor = 'pointer';
+        el.title = 'Ver grade completa do dia';
+        el.onclick = showSchedule;
         el.innerHTML =
           `<div class="ep-dot"></div>` +
           `<div style="min-width:0">` +
             `<div class="ep-label">${next.time_display} &mdash; ${next.label}</div>` +
-            `<div class="ep-meta">próximo na grade</div>` +
+            `<div class="ep-meta">próximo na grade · ver grade</div>` +
           `</div>`;
       }
       document.getElementById('playlist').appendChild(el);
@@ -1542,6 +1606,84 @@ def index():
         dl_concatenated=dl['concatenated'],
         dl_zip=dl['zip'],
     )
+
+@app.route('/api/grade')
+def api_grade():
+    _DAYS = {'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4, 'sat': 5, 'sun': 6}
+    try:
+        import yaml
+        from datetime import datetime as _dt
+        with open('config.yaml', 'r', encoding='utf-8') as f:
+            cfg = yaml.safe_load(f)
+    except Exception:
+        return jsonify([])
+
+    schedule  = cfg.get('schedule', [])
+    now       = _dt.now()
+    today     = now.strftime('%Y-%m-%d')
+    now_time  = now.strftime('%H:%M')
+    today_wd  = now.weekday()
+
+    state = {}
+    try:
+        with open('scheduler_state.json', 'r', encoding='utf-8') as f:
+            state = json.load(f)
+    except Exception:
+        pass
+
+    completed_today = set(state.get('completed_today', {}).keys())
+    completed_once  = set(state.get('completed_once',  []))
+
+    entries    = []
+    next_found = False
+
+    for entry in schedule:
+        entry_date = entry.get('date')
+        t = str(entry.get('time', ''))
+
+        # ignora pontual de outra data
+        if entry_date and str(entry_date) != today:
+            continue
+
+        # filtro por dia da semana
+        days = entry.get('days')
+        if days and not any(_DAYS.get(str(d).lower(), -1) == today_wd for d in days):
+            continue
+
+        label   = entry.get('label', '')
+        sources = entry.get('sources', [])
+        replay  = entry.get('replay_of')
+        if not label:
+            label = 'Replay' if replay is not None else ', '.join(str(s) for s in sources)
+
+        # chave idêntica à do scheduler
+        d_key    = str(entry_date) if entry_date else 'daily'
+        days_key = ','.join(sorted(str(x) for x in (days or [])))
+        s_key    = f"replay:{replay}" if replay is not None else '+'.join(sorted(str(x) for x in sources))
+        key      = f"{d_key}|{t}|{s_key}|{days_key}"
+        run_key  = f"{today}|{key}"
+
+        done    = (key in completed_once) if entry_date else (run_key in completed_today)
+        is_next = not done and t >= now_time and not next_found
+        if is_next:
+            next_found = True
+
+        e = {
+            'horario':  t,
+            'label':    label,
+            'tipo':     'pontual' if entry_date else 'diario',
+            'executado': done,
+            'proximo':  is_next,
+        }
+        if replay is not None:
+            e['replay_de'] = replay
+        elif sources:
+            e['fontes'] = [str(s) for s in sources]
+
+        entries.append(e)
+
+    return jsonify(entries)
+
 
 @app.route('/api/geracao_status')
 def api_geracao_status():

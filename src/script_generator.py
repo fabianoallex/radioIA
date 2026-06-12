@@ -125,11 +125,15 @@ def _build_trivia_card(i: int, item: dict) -> str:
 DEFAULT_MODEL = 'claude-sonnet-4-6'
 
 
+_TIME_AWARE_TYPES = {'rss', 'clipping', 'youtube', 'reddit'}
+
+
 def generate_script(items: list[dict], narrators: list[dict], source_config: dict,
                     is_first_of_day: bool = True,
                     station_name: str = 'RadioIA',
                     model: str = DEFAULT_MODEL,
-                    api_base: str | None = None) -> str:
+                    api_base: str | None = None,
+                    generation_time: str | None = None) -> str:
 
     n = min(len(narrators), 3)
     active = narrators[:n]
@@ -175,6 +179,23 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
     else:
         cards = [_build_video_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _radio_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
+
+    if generation_time and source_type in _TIME_AWARE_TYPES and prompt.endswith('Roteiro:'):
+        prompt = (
+            prompt[:-len('Roteiro:')] +
+            f"INSTRUCAO DE CONTEXTO TEMPORAL: Este episodio foi gerado as {generation_time}. "
+            f"No inicio do roteiro, mencione de forma natural e variada que as informacoes foram "
+            f"apuradas/levantadas as {generation_time}. Varie a forma — nao use sempre a mesma frase. "
+            f"Exemplos do estilo esperado: "
+            f'"Informacoes apuradas ate as {generation_time}", '
+            f'"Edicao das {generation_time}", '
+            f'"Com base no que levantamos as {generation_time}", '
+            f'"Nosso boletim das {generation_time} traz...", '
+            f'"O que apuramos ate agora, {generation_time}..." — '
+            f"e assim por diante, sempre variando. "
+            f"Deixe claro que e o horario de geracao do conteudo, nao a hora atual do ouvinte.\n\n"
+            f"Roteiro:"
+        )
 
     context = source_config.get('context', '')
     if context and prompt.endswith('Roteiro:'):

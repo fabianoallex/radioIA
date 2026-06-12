@@ -348,7 +348,8 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
     print(f"Gerando roteiro ({model})...")
     script = generate_script(items, narrators, source_config,
                              is_first_of_day=is_first_of_day, station_name=radio_name,
-                             model=model, api_base=api_base)
+                             model=model, api_base=api_base,
+                             generation_time=_inicio[:5])
     print(f"  {len(script.split())} palavras.\n")
 
     print("Gerando audio...")
