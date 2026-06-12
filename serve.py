@@ -440,7 +440,8 @@ const DL_ZIP          = {{ 'true' if dl_zip          else 'false' }};
 let currentEp     = null;
 let fallbackMode  = false;
 let fallbackIdx   = 0;
-let _genDoneEpIds = null;   // IDs capturados quando geração concluiu; null = episódio já carregou
+let _genDoneEpIds       = null;   // IDs capturados quando geração concluiu
+let _genDoneSuppressed  = false;  // true = episódio já carregou, suprimir item até nova geração
 let _fallbackTrackCount      = 0;
 let _episodeTransitionCount  = 0;
 let _playingAnnouncement     = false;   // suprime ended global durante qualquer break
@@ -647,19 +648,20 @@ function updateGeneratingItem(status) {
   const isError = !status.ativo && status.etapa === 'erro';
   const semConteudo = isDone && (status.progresso || '').includes('sem conteudo');
 
-  if (semConteudo) { _genDoneEpIds = null; return; }
-  if (!status.ativo && !isDone && !isError) { _genDoneEpIds = null; return; }
+  if (semConteudo) { _genDoneEpIds = null; _genDoneSuppressed = false; return; }
+  if (!status.ativo && !isDone && !isError) { _genDoneEpIds = null; _genDoneSuppressed = false; return; }
 
-  // Enquanto gera: reseta o rastreador (nova geração)
-  if (status.ativo) { _genDoneEpIds = null; }
+  // Nova geração iniciada: reseta rastreadores
+  if (status.ativo) { _genDoneEpIds = null; _genDoneSuppressed = false; }
 
-  // Quando concluído: guarda os IDs atuais na primeira detecção; nas seguintes,
-  // verifica se novos episódios chegaram — se sim, o item pode sumir
+  // Quando concluído: guarda IDs na primeira detecção e aguarda novo episódio.
+  // Uma vez suprimido, permanece oculto até nova geração começar.
   if (isDone) {
+    if (_genDoneSuppressed) return;
     if (!_genDoneEpIds) {
       _genDoneEpIds = new Set(allEpisodes.map(e => e.id));
     } else if (allEpisodes.some(e => !_genDoneEpIds.has(e.id))) {
-      _genDoneEpIds = null;
+      _genDoneSuppressed = true;
       return;
     }
   }
