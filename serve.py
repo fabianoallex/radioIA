@@ -654,10 +654,19 @@ function updateGeneratingItem(status) {
   // Nova geração iniciada: reseta rastreadores
   if (status.ativo) { _genDoneEpIds = null; _genDoneSuppressed = false; }
 
-  // Quando concluído: guarda IDs na primeira detecção e aguarda novo episódio.
-  // Uma vez suprimido, permanece oculto até nova geração começar.
+  // Quando concluído: verifica se o episódio desta geração já está na playlist.
+  // Cobre tanto o caso normal quanto reload de página (onde _genDoneSuppressed foi zerado).
   if (isDone) {
     if (_genDoneSuppressed) return;
+    // status.inicio = "HH:MM:SS"; e.time = "HHhMM" — converte para comparar
+    const inicioHHMM = (status.inicio || '').slice(0, 5).replace(':', 'h');
+    if (inicioHHMM) {
+      const loaded = allEpisodes.some(e =>
+        e.source_id === status.fonte && e.date === today && e.time >= inicioHHMM
+      );
+      if (loaded) { _genDoneSuppressed = true; return; }
+    }
+    // Episódio ainda não chegou: rastreia via IDs para detectar quando chegar
     if (!_genDoneEpIds) {
       _genDoneEpIds = new Set(allEpisodes.map(e => e.id));
     } else if (allEpisodes.some(e => !_genDoneEpIds.has(e.id))) {
