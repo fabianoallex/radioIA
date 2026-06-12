@@ -440,6 +440,7 @@ const DL_ZIP          = {{ 'true' if dl_zip          else 'false' }};
 let currentEp     = null;
 let fallbackMode  = false;
 let fallbackIdx   = 0;
+let _genDoneEpIds = null;   // IDs capturados quando geração concluiu; null = episódio já carregou
 let _fallbackTrackCount      = 0;
 let _episodeTransitionCount  = 0;
 let _playingAnnouncement     = false;   // suprime ended global durante qualquer break
@@ -640,16 +641,28 @@ async function pollGenerating() {
 function updateGeneratingItem(status) {
   document.querySelectorAll('#playlist .ep-generating').forEach(el => el.remove());
   const today = new Date().toISOString().slice(0, 10);
-  if (!status || currentDate !== today) return;
+  if (!status || currentDate !== today) { _genDoneEpIds = null; return; }
 
   const isDone  = !status.ativo && status.etapa === 'concluido';
   const isError = !status.ativo && status.etapa === 'erro';
   const semConteudo = isDone && (status.progresso || '').includes('sem conteudo');
 
-  // Sem episódio chegando: não mantém item
-  if (semConteudo) return;
-  // Geração inativa sem estado terminal relevante: remove
-  if (!status.ativo && !isDone && !isError) return;
+  if (semConteudo) { _genDoneEpIds = null; return; }
+  if (!status.ativo && !isDone && !isError) { _genDoneEpIds = null; return; }
+
+  // Enquanto gera: reseta o rastreador (nova geração)
+  if (status.ativo) { _genDoneEpIds = null; }
+
+  // Quando concluído: guarda os IDs atuais na primeira detecção; nas seguintes,
+  // verifica se novos episódios chegaram — se sim, o item pode sumir
+  if (isDone) {
+    if (!_genDoneEpIds) {
+      _genDoneEpIds = new Set(allEpisodes.map(e => e.id));
+    } else if (allEpisodes.some(e => !_genDoneEpIds.has(e.id))) {
+      _genDoneEpIds = null;
+      return;
+    }
+  }
 
   const etapaLabels = {
     buscando:    'buscando conteúdo',
