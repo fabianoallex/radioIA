@@ -2086,12 +2086,13 @@ if __name__ == '__main__':
         _vinheta = _cfg.get('vinheta', {})
         _tc_voice = _vinheta.get('voice', 'pt-BR-FranciscaNeural')
         _tc_rate  = _vinheta.get('rate', '+15%')
+        _rn = _cfg.get('radio', {}).get('name', 'RadioIA')
     except Exception:
         _tc_voice, _tc_rate = 'pt-BR-FranciscaNeural', '+15%'
+        _rn = 'RadioIA'
 
     from src.time_clips import generate_atomic_clips as _gen_clips
     from src.spots import warmup as _warm_spots
-    _rn = _cfg.get('radio', {}).get('name', 'RadioIA')
     threading.Thread(target=_generate_fallback_intro, daemon=True).start()
     threading.Thread(target=lambda: _generate_welcome_intro(_rn), daemon=True).start()
     threading.Thread(target=lambda: _gen_clips(_tc_voice, _tc_rate), daemon=True).start()
