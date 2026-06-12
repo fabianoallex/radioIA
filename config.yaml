@@ -362,6 +362,9 @@ sources:
   #     days_lookback: 1        # só artigos dos últimos N dias
   #     fetch_content: true     # extrai texto completo via trafilatura
   #     max_content_chars: 2000 # limite de caracteres por artigo
+  #     agregadores:            # ordem não implica prioridade — seleção é balanceada (round-robin)
+  #       - google_news         # padrão — sem chave de API
+  #       - bing_news           # padrão — sem chave de API
 
   # ── Plugin: WhatsApp (Exportação Manual) ─────────────────────────────────────
   # Exportar: WhatsApp → Grupo → ⋮ → Mais → Exportar conversa → Sem mídia
@@ -518,6 +521,17 @@ radio:
   name: "RadioIA"             # nome da rádio — mude aqui para personalizar toda a programação
   background_music: ""
   background_volume_db: -22
+
+# ── Intro de boas-vindas ───────────────────────────────────────────────────────
+# Toca uma vez por dia na primeira abertura do player, antes da programação.
+# Use {radio_name} para inserir o nome da rádio automaticamente.
+# Liste várias falas — uma será sorteada a cada geração do áudio.
+# Para aplicar mudanças: apague output/_welcome_intro.mp3 e reinicie o servidor,
+# ou use a tool MCP regenerar_intro_boas_vindas().
+welcome_intro:
+  falas:
+    - "Bom dia! Bem-vindo à {radio_name}. É um prazer ter você conosco. Fique à vontade para aproveitar a programação de hoje!"
+  # voice: null  # opcional — usa vinheta.voice por padrão; ex: "pt-BR-FranciscaNeural"
 
 # ── Downloads ─────────────────────────────────────────────────────────────────
 # Controla quais opções de download ficam disponíveis no player web.
