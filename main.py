@@ -215,13 +215,17 @@ def _run_spot_source(source_config: dict, config: dict, is_first_of_day: bool) -
 
 
 def _run_music_source(source_config: dict, config: dict, is_first_of_day: bool) -> str | None:
+    source_id   = source_config['id']
     source_name = source_config.get('name', 'Selecao Musical')
-    output_dir  = _episode_output_dir(source_config['id'])
+    output_dir  = _episode_output_dir(source_id)
     radio_name  = config.get('radio', {}).get('name', 'RadioIA')
 
     print(f"\n{'='*50}")
     print(f"Fonte: {source_name} (music)")
     print(f"{'='*50}")
+
+    _inicio = datetime.now().strftime('%H:%M:%S')
+    _write_status(source_id, source_name, 'mixando', inicio=_inicio)
 
     narrators = config['narrators'][:1]
     try:
@@ -230,7 +234,10 @@ def _run_music_source(source_config: dict, config: dict, is_first_of_day: bool) 
         )
     except FileNotFoundError as e:
         print(f"  Erro: {e}")
+        _write_status(source_id, source_name, 'erro', ativo=False, inicio=_inicio, erro=str(e))
         return None
+
+    _write_status(source_id, source_name, 'concluido', ativo=False, inicio=_inicio)
 
     episode_path = os.path.join(output_dir, 'episode.mp3')
     mins, secs = int(duration // 60), int(duration % 60)
@@ -240,13 +247,17 @@ def _run_music_source(source_config: dict, config: dict, is_first_of_day: bool) 
 
 
 def _run_utility_source(source_config: dict, config: dict, is_first_of_day: bool) -> str | None:
+    source_id   = source_config['id']
     source_name = source_config.get('name', 'Resumo do Dia')
-    output_dir  = _episode_output_dir(source_config['id'])
+    output_dir  = _episode_output_dir(source_id)
     radio_name  = config.get('radio', {}).get('name', 'RadioIA')
 
     print(f"\n{'='*50}")
     print(f"Fonte: {source_name} (utility)")
     print(f"{'='*50}")
+
+    _inicio = datetime.now().strftime('%H:%M:%S')
+    _write_status(source_id, source_name, 'buscando', inicio=_inicio)
 
     narrators = config['narrators'][:2]
     try:
@@ -255,7 +266,10 @@ def _run_utility_source(source_config: dict, config: dict, is_first_of_day: bool
         )
     except Exception as e:
         print(f"  Erro: {e}")
+        _write_status(source_id, source_name, 'erro', ativo=False, inicio=_inicio, erro=str(e))
         return None
+
+    _write_status(source_id, source_name, 'concluido', ativo=False, inicio=_inicio)
 
     episode_path = os.path.join(output_dir, 'episode.mp3')
     mins, secs = int(duration // 60), int(duration % 60)
