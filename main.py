@@ -30,6 +30,7 @@ def _write_status(source_id: str, source_name: str, etapa: str,
                 'etapa':      etapa,
                 'progresso':  progresso,
                 'inicio':     inicio,
+                'data':       datetime.now().strftime('%Y-%m-%d'),
                 'atualizado': datetime.now().strftime('%H:%M:%S'),
                 'erro':       erro,
             }, _f, ensure_ascii=False, indent=2)

@@ -643,6 +643,7 @@ function updateGeneratingItem(status) {
   document.querySelectorAll('#playlist .ep-generating').forEach(el => el.remove());
   const today = new Date().toISOString().slice(0, 10);
   if (!status || currentDate !== today) { _genDoneEpIds = null; return; }
+  if (status.data && status.data !== today) { _genDoneEpIds = null; _genDoneSuppressed = false; return; }
 
   const isDone  = !status.ativo && status.etapa === 'concluido';
   const isError = !status.ativo && status.etapa === 'erro';
