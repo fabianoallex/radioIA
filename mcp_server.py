@@ -140,7 +140,7 @@ def _schedule_entry_key(entry: dict) -> str:
 
 
 def _parse_value(s: str):
-    """Converte string para bool, int, float ou mantém como str."""
+    """Converte string para bool, int, float, list/dict (JSON) ou mantém como str."""
     if isinstance(s, bool):
         return s
     if not isinstance(s, str):
@@ -157,6 +157,11 @@ def _parse_value(s: str):
         return float(s)
     except ValueError:
         pass
+    if s.startswith(('[', '{')):
+        try:
+            return json.loads(s)
+        except (ValueError, TypeError):
+            pass
     return s
 
 
