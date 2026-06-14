@@ -1,16 +1,10 @@
-import asyncio
 import json
 import os
 import shutil
-import sys
 from datetime import datetime, timedelta, timezone
 
 import requests
-import edge_tts
 from pydub import AudioSegment
-
-PAUSE_SAME_MS = 150
-PAUSE_DIFF_MS = 500
 
 LOTTERY_NAMES = {
     'megasena':   'Mega-Sena',
@@ -162,13 +156,11 @@ def _fmt_pontos(value: float) -> str:
 
 def _get_ibovespa(top_n: int = 3) -> dict:
     try:
-        # Índice Ibovespa
         ibov_resp = requests.get(BRAPI_LIST, params={'search': 'ibovespa'}, timeout=10)
         ibov_resp.raise_for_status()
         ibov_stocks = ibov_resp.json().get('stocks', [])
         ibov = next((s for s in ibov_stocks if s['stock'] == 'IBOV11'), None)
 
-        # Top movers — filtra fracionárias (sufixo F) e volume baixo
         def _movers(order: str) -> list[dict]:
             r = requests.get(BRAPI_LIST, params={
                 'sortBy': 'change', 'sortOrder': order,
@@ -197,9 +189,9 @@ def _get_ibovespa(top_n: int = 3) -> dict:
         if result['pontos']:
             print(f"  Ibovespa: {result['pontos']:,} pts ({result['change']:+.2f}%)")
         for s in altas:
-            print(f"  Alta  {s['stock']:8} {s['change']:+.2f}%")
+            print(f"  Alta  {s['ticker']:8} {s['change']:+.2f}%")
         for s in baixas:
-            print(f"  Baixa {s['stock']:8} {s['change']:+.2f}%")
+            print(f"  Baixa {s['ticker']:8} {s['change']:+.2f}%")
 
         return result
 
@@ -346,196 +338,23 @@ def _get_football(competition: str, api_key: str) -> dict:
             'today': today_games, 'live': live}
 
 
-# ── Script builder ───────────────────────────────────────────────────────────
+# ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _pct(pct: float) -> str:
     if pct > 0.05:
-        return f"em alta de {pct:.1f} por cento"
+        return f"em alta de {pct:.1f}%"
     if pct < -0.05:
-        return f"em queda de {abs(pct):.1f} por cento"
-    return "estavel"
+        return f"em queda de {abs(pct):.1f}%"
+    return "estável"
 
 
-def _build_lines(weather_list: list[dict], forecast: list[dict], finance: list[dict],
-                 lottery: list[dict], football: dict, ibovespa: dict,
-                 narrators: list[dict], source_name: str, is_first_of_day: bool,
-                 sun: dict | None = None, station_name: str = 'RadioIA') -> list[dict]:
-    A = 'LOCUTOR_A'
-    B = 'LOCUTOR_B' if len(narrators) > 1 else 'LOCUTOR_A'
+# ── Data collection + LLM prompt formatting ──────────────────────────────────
 
-    lines = []
+def _collect_data(source_config: dict) -> dict:
+    settings = source_config.get('settings', {})
+    data = {'clima': [], 'previsao': [], 'sol': None,
+            'cambio': [], 'bolsa': {}, 'loterias': [], 'futebol': {}}
 
-    if is_first_of_day:
-        lines.append({'locutor': A, 'text': f"Bom dia! Agora o {source_name}."})
-    else:
-        lines.append({'locutor': A, 'text': f"Agora o {source_name} aqui na {station_name}."})
-
-    locutores = [A, B]
-    for i, weather in enumerate(weather_list):
-        loc = locutores[i % 2]
-        loc2 = locutores[(i + 1) % 2]
-        city  = weather['city']
-        desc  = weather['description']
-        temp  = weather['temp']
-        tmin  = weather['temp_min']
-        tmax  = weather['temp_max']
-        feels = weather['feels_like']
-        hum   = weather['humidity']
-        lines.append({'locutor': loc,
-                      'text': f"Clima em {city}: {desc}, {temp} graus, sensacao termica de {feels}."})
-        lines.append({'locutor': loc2,
-                      'text': f"Minima de {tmin}, maxima de {tmax} graus. Umidade em {hum} por cento."})
-
-    if forecast:
-        by_city: dict[str, list] = {}
-        for day in forecast:
-            by_city.setdefault(day['city'], []).append(day)
-        for city, days in by_city.items():
-            lines.append({'locutor': A, 'text': f"Previsão para {city}:"})
-            for i, day in enumerate(days):
-                rain_txt = f" Chance de chuva de {day['rain_prob']} por cento." if day['rain_prob'] >= 30 else ""
-                lines.append({
-                    'locutor': locutores[i % 2],
-                    'text': f"{day['label'].capitalize()}: {day['desc']}, "
-                            f"mínima de {day['temp_min']}, máxima de {day['temp_max']} graus.{rain_txt}",
-                })
-
-    if sun:
-        lines.append({'locutor': B,
-                      'text': f"O sol nasce às {sun['sunrise']} e se põe às {sun['sunset']}. "
-                              f"São {sun['day_length_h']} horas e {sun['day_length_m']} minutos de luz hoje."})
-
-    if ibovespa:
-        pontos = ibovespa.get('pontos')
-        change = ibovespa.get('change')
-        altas  = ibovespa.get('altas', [])
-        baixas = ibovespa.get('baixas', [])
-
-        if pontos:
-            direcao = 'em alta' if change >= 0 else 'em queda'
-            pct = f"{abs(change):.1f}".replace('.', ' vírgula ')
-            lines.append({'locutor': A,
-                          'text': f"Bolsa de valores. O Ibovespa opera {direcao}, "
-                                  f"aos {_fmt_pontos(pontos)}, variação de {pct} por cento."})
-        if altas:
-            tickers = ', '.join(s['ticker'] for s in altas)
-            pcts    = ', '.join(f"{s['change']:+.1f}%".replace('.', ',') for s in altas)
-            lines.append({'locutor': B,
-                          'text': f"Entre as maiores altas: {tickers}, com ganhos de {pcts}."})
-        if baixas:
-            tickers = ', '.join(s['ticker'] for s in baixas)
-            pcts    = ', '.join(f"{abs(s['change']):.1f}%".replace('.', ',') for s in baixas)
-            lines.append({'locutor': A,
-                          'text': f"Nas maiores baixas: {tickers}, com quedas de {pcts}."})
-
-    if finance:
-        lines.append({'locutor': B, 'text': "Agora as cotacoes do momento."})
-        for item in finance:
-            bid = item['bid']
-            pct = _pct(item['pct_change'])
-            code = item['code']
-            if code == 'USD':
-                lines.append({'locutor': A,
-                               'text': f"Dolar americano a R$ {bid:.2f}, {pct}."})
-            elif code == 'EUR':
-                lines.append({'locutor': B,
-                               'text': f"Euro a R$ {bid:.2f}, {pct}."})
-            elif code == 'BTC':
-                btc = bid / 1000
-                lines.append({'locutor': A,
-                               'text': f"Bitcoin cotado a R$ {btc:.1f} mil, {pct}."})
-            else:
-                lines.append({'locutor': B,
-                               'text': f"{code} a R$ {bid:.2f}, {pct}."})
-
-    if lottery:
-        if weather_list or finance or ibovespa or football:
-            lines.append({'locutor': A, 'text': "Agora os resultados das loterias."})
-        for lot in lottery:
-            lines.append({
-                'locutor': A,
-                'text': f"{lot['name']}, concurso {lot['numero']}, sorteio do dia {lot['data']}. "
-                        f"Dezenas: {lot['dezenas']}.",
-            })
-            if lot['acumulado'] or lot['ganhadores'] == 0:
-                prox = _fmt_prize(lot['proximo_valor'])
-                lines.append({
-                    'locutor': B,
-                    'text': f"Acumulou! Próximo sorteio no dia {lot['proxima_data']}, "
-                            f"com prêmio estimado de {prox}.",
-                })
-            else:
-                g = lot['ganhadores']
-                ganhador_txt = "Um apostador acertou" if g == 1 else f"{g} apostadores acertaram"
-                lines.append({
-                    'locutor': B,
-                    'text': f"{ganhador_txt} e cada ganhador levou {_fmt_prize(lot['valor_premio'])}.",
-                })
-                if lot['proximo_valor'] > 0:
-                    lines.append({
-                        'locutor': A,
-                        'text': f"Próximo sorteio no dia {lot['proxima_data']}, "
-                                f"prêmio estimado de {_fmt_prize(lot['proximo_valor'])}.",
-                    })
-
-    if football:
-        comp  = football.get('name', 'Copa do Mundo')
-        live  = football.get('live', [])
-        done  = football.get('finished', [])
-        today = football.get('today', [])
-
-        if live:
-            lines.append({'locutor': A, 'text': f"Atenção! Jogos ao vivo agora na {comp}!"})
-            for i, m in enumerate(live):
-                score = f"{m['home_score']} a {m['away_score']}" if m['home_score'] is not None else "em andamento"
-                lines.append({'locutor': locutores[i % 2],
-                              'text': f"{m['home']} e {m['away']}, {score}."})
-
-        if done:
-            lines.append({'locutor': A, 'text': f"Resultados de ontem na {comp}."})
-            for i, m in enumerate(done):
-                hs, as_ = m['home_score'], m['away_score']
-                if hs == as_:
-                    result = f"empate em {hs} a {as_}"
-                elif hs > as_:
-                    result = f"{m['home']} venceu por {hs} a {as_}"
-                else:
-                    result = f"{m['away']} venceu por {as_} a {hs}"
-                lines.append({'locutor': locutores[i % 2],
-                              'text': f"{m['home']} contra {m['away']}: {result}."})
-
-        if today:
-            lines.append({'locutor': B, 'text': f"Jogos de hoje na {comp}."})
-            for i, m in enumerate(today):
-                lines.append({'locutor': locutores[i % 2],
-                              'text': f"Às {m['time']}, {m['home']} enfrenta {m['away']}."})
-
-    lines.append({'locutor': B,
-                  'text': "Essas sao as informacoes do momento. Continuamos com mais programacao."})
-    return lines
-
-
-# ── Audio generation ─────────────────────────────────────────────────────────
-
-async def _generate_all(lines: list[dict], voices: dict, temp_dir: str) -> list[str]:
-    paths = [os.path.join(temp_dir, f"line_{i:04d}.mp3") for i in range(len(lines))]
-    for line, path in zip(lines, paths):
-        voice = voices.get(line['locutor'], next(iter(voices.values())))
-        communicate = edge_tts.Communicate(line['text'], voice)
-        await communicate.save(path)
-        await asyncio.sleep(0.1)
-    return paths
-
-
-def generate_episode(source_config: dict, output_dir: str,
-                     narrators: list[dict], is_first_of_day: bool = False,
-                     station_name: str = 'RadioIA') -> int:
-    settings    = source_config.get('settings', {})
-    source_name = source_config.get('name', 'Resumo do Dia')
-
-    # Weather + Forecast
-    weather_list  = []
-    forecast      = []
     wcfg = settings.get('weather', {})
     if wcfg.get('enabled', True):
         api_key       = os.getenv(wcfg.get('api_key_env', 'OPENWEATHER_API_KEY'), '')
@@ -545,139 +364,245 @@ def generate_episode(source_config: dict, output_dir: str,
             for city in cities:
                 w = _get_weather(city, api_key)
                 if w:
-                    weather_list.append(w)
+                    data['clima'].append(w)
                     print(f"  Clima {w['city']}: {w['description']}, {w['temp']}°C")
             if forecast_days > 0:
                 for city in cities:
-                    forecast.extend(_get_forecast(city, api_key, forecast_days))
+                    data['previsao'].extend(_get_forecast(city, api_key, forecast_days))
                     print(f"  Previsão {city}: {forecast_days} dia(s)")
         else:
-            print("  [clima] OPENWEATHER_API_KEY nao encontrada — pulando.")
+            print("  [clima] OPENWEATHER_API_KEY não encontrada — pulando.")
 
-    # Finance
-    finance = []
     fcfg = settings.get('finance', {})
     if fcfg.get('enabled', True):
-        pairs   = fcfg.get('pairs', ['USD-BRL', 'EUR-BRL', 'BTC-BRL'])
-        finance = _get_finance(pairs)
-        for item in finance:
+        pairs = fcfg.get('pairs', ['USD-BRL', 'EUR-BRL', 'BTC-BRL'])
+        data['cambio'] = _get_finance(pairs)
+        for item in data['cambio']:
             print(f"  {item['pair']}: R$ {item['bid']:.2f} ({_pct(item['pct_change'])})")
 
-    # Lottery
-    lottery = []
     lcfg = settings.get('lottery', {})
     if lcfg.get('enabled', False):
         games = lcfg.get('games', ['megasena', 'lotofacil'])
-        lottery = _get_lottery(games)
+        data['loterias'] = _get_lottery(games)
 
-    # Football
-    football = {}
     ftcfg = settings.get('football', {})
     if ftcfg.get('enabled', False):
         ft_key    = os.getenv(ftcfg.get('api_key_env', 'FOOTBALL_DATA_API_KEY'), '')
         comp_code = ftcfg.get('competition', 'WC')
         if ft_key:
-            football = _get_football(comp_code, ft_key)
+            data['futebol'] = _get_football(comp_code, ft_key)
         else:
-            print("  [futebol] FOOTBALL_DATA_API_KEY nao encontrada — pulando.")
+            print("  [futebol] FOOTBALL_DATA_API_KEY não encontrada — pulando.")
 
-    # Ibovespa
-    ibovespa = {}
     icfg = settings.get('ibovespa', {})
     if icfg.get('enabled', False):
-        top_n    = icfg.get('top_movers', 3)
-        ibovespa = _get_ibovespa(top_n)
+        top_n = icfg.get('top_movers', 3)
+        data['bolsa'] = _get_ibovespa(top_n)
 
-    # Nascer e pôr do sol
-    sun  = None
     scfg = settings.get('sun', {})
     if scfg.get('enabled', False):
         lat  = scfg.get('lat')
         lng  = scfg.get('lng')
         tzid = scfg.get('tzid', 'America/Sao_Paulo')
         if lat is not None and lng is not None:
-            sun = _get_sun_times(lat, lng, tzid)
+            data['sol'] = _get_sun_times(lat, lng, tzid)
         else:
-            print("  [sol] lat/lng nao configurados — pulando.")
+            print("  [sol] lat/lng não configurados — pulando.")
 
-    if not weather_list and not finance and not lottery and not football and not ibovespa and not sun:
-        raise RuntimeError("Nenhum dado disponivel para gerar o episodio.")
+    return data
 
-    active = narrators[:2]
-    lines  = _build_lines(weather_list, forecast, finance, lottery, football, ibovespa, active, source_name, is_first_of_day, sun, station_name)
 
+def _format_data_for_prompt(data: dict) -> str:
+    parts = []
+
+    if data.get('clima'):
+        parts.append('[CLIMA]')
+        for w in data['clima']:
+            parts.append(
+                f"{w['city']}: {w['description']}, {w['temp']}°C "
+                f"(mín {w['temp_min']}° / máx {w['temp_max']}°), "
+                f"sensação {w['feels_like']}°C, umidade {w['humidity']}%"
+            )
+
+    if data.get('previsao'):
+        parts.append('[PREVISÃO]')
+        for day in data['previsao']:
+            rain = f", chance de chuva {day['rain_prob']}%" if day['rain_prob'] >= 30 else ''
+            parts.append(
+                f"{day['city']} — {day['label'].capitalize()}: "
+                f"{day['desc']}, mín {day['temp_min']}° / máx {day['temp_max']}°{rain}"
+            )
+
+    if data.get('sol'):
+        s = data['sol']
+        parts.append('[SOL]')
+        parts.append(
+            f"Nascer: {s['sunrise']} | Pôr do sol: {s['sunset']} | "
+            f"Dia: {s['day_length_h']}h{s['day_length_m']:02d}min de luz"
+        )
+
+    if data.get('cambio'):
+        parts.append('[CÂMBIO]')
+        for item in data['cambio']:
+            parts.append(f"{item['pair']}: R$ {item['bid']:.2f} ({_pct(item['pct_change'])})")
+
+    if data.get('bolsa') and data['bolsa'].get('pontos'):
+        b = data['bolsa']
+        parts.append('[BOLSA — Ibovespa]')
+        parts.append(f"{b['pontos']:,} pontos | variação {b['change']:+.2f}%")
+        if b.get('altas'):
+            parts.append('Altas: ' + ', '.join(f"{s['ticker']} {s['change']:+.1f}%" for s in b['altas']))
+        if b.get('baixas'):
+            parts.append('Baixas: ' + ', '.join(f"{s['ticker']} {s['change']:+.1f}%" for s in b['baixas']))
+
+    if data.get('loterias'):
+        parts.append('[LOTERIAS]')
+        for lot in data['loterias']:
+            if lot['acumulado'] or lot['ganhadores'] == 0:
+                status = f"Acumulou! Próximo: {_fmt_prize(lot['proximo_valor'])} em {lot['proxima_data']}"
+            else:
+                status = f"{lot['ganhadores']} ganhador(es) — {_fmt_prize(lot['valor_premio'])} cada"
+            parts.append(
+                f"{lot['name']} (concurso {lot['numero']}, {lot['data']}): "
+                f"{lot['dezenas']} — {status}"
+            )
+
+    ft = data.get('futebol', {})
+    if ft and (ft.get('finished') or ft.get('today') or ft.get('live')):
+        parts.append(f"[FUTEBOL — {ft.get('name', 'Copa')}]")
+        for m in ft.get('live', []):
+            score = f"{m['home_score']}x{m['away_score']}" if m['home_score'] is not None else 'ao vivo'
+            parts.append(f"AO VIVO: {m['home']} {score} {m['away']}")
+        for m in ft.get('finished', []):
+            parts.append(f"Ontem: {m['home']} {m['home_score']}x{m['away_score']} {m['away']}")
+        for m in ft.get('today', []):
+            parts.append(f"Hoje às {m['time']}: {m['home']} x {m['away']}")
+
+    return '\n'.join(parts)
+
+
+# ── Episode generation ────────────────────────────────────────────────────────
+
+def generate_episode(source_config: dict, output_dir: str,
+                     narrators: list[dict], is_first_of_day: bool = False,
+                     station_name: str = 'RadioIA',
+                     llm_config: dict | None = None,
+                     tts_config: dict | None = None,
+                     status_callback=None) -> int:
+    from src.script_generator import generate_script
+    from src.tts_generator import parse_script, generate_audio_files
+
+    def _status(etapa: str, progresso: str = ''):
+        if status_callback:
+            status_callback(etapa, progresso)
+
+    source_name = source_config.get('name', 'Resumo do Dia')
+
+    data = _collect_data(source_config)
+
+    if not any([data['clima'], data['cambio'], data['loterias'],
+                data['futebol'], data['bolsa'], data['sol']]):
+        raise RuntimeError("Nenhum dado disponível para gerar o episódio.")
+
+    content = _format_data_for_prompt(data)
+    _status('llm')
+
+    llm_cfg  = llm_config or {}
+    model    = source_config.get('model') or llm_cfg.get('model', 'claude-sonnet-4-6')
+    api_base = llm_cfg.get('api_base')
+
+    narrators_active = narrators[:2]
+    items = [{
+        'id': 'utility', 'title': source_name, 'text': content,
+        'source_type': 'utility', 'source_name': source_name,
+        'url': '', 'views': 0, 'comments': [], 'channel': source_name, 'published_at': '',
+    }]
+
+    script = generate_script(
+        items, narrators_active,
+        {**source_config, 'type': 'utility'},
+        is_first_of_day=is_first_of_day,
+        station_name=station_name,
+        model=model,
+        api_base=api_base,
+    )
+    print(f"  {len(script.split())} palavras.\n")
+
+    lines = parse_script(script)
+    if not lines:
+        raise RuntimeError("LLM retornou roteiro sem falas no formato esperado.")
+
+    _status('tts', f'{len(lines)} falas')
     os.makedirs(output_dir, exist_ok=True)
     temp_dir = os.path.join(output_dir, 'temp')
-    os.makedirs(temp_dir, exist_ok=True)
-
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     keys   = ['LOCUTOR_A', 'LOCUTOR_B']
-    voices = {keys[i]: n['voice'] for i, n in enumerate(active)}
+    voices = {keys[i]: n['voice'] for i, n in enumerate(narrators_active)}
+    audio_files = generate_audio_files(lines, voices, temp_dir, tts_config or {})
 
-    audio_files = asyncio.run(_generate_all(lines, voices, temp_dir))
-
-    combined = AudioSegment.empty()
+    _status('mixando')
+    combined   = AudioSegment.empty()
+    PAUSE_SAME = 150
+    PAUSE_DIFF = 500
     for i, (path, line) in enumerate(zip(audio_files, lines)):
         combined += AudioSegment.from_mp3(path)
         if i < len(lines) - 1:
-            pause = PAUSE_DIFF_MS if lines[i+1]['locutor'] != line['locutor'] else PAUSE_SAME_MS
+            pause = PAUSE_DIFF if lines[i + 1]['locutor'] != line['locutor'] else PAUSE_SAME
             combined += AudioSegment.silent(pause)
 
     episode_path = os.path.join(output_dir, 'episode.mp3')
     combined.export(episode_path, format='mp3', bitrate='128k',
                     tags={'title': source_name, 'artist': station_name})
-
-    shutil.rmtree(temp_dir)
+    shutil.rmtree(temp_dir, ignore_errors=True)
     duration = round(len(combined) / 1000)
 
     # Notes for web player
     notes = []
-    if sun:
+    if data['sol']:
+        s = data['sol']
         notes.append({
-            'title':   f"Sol — nasce {sun['sunrise']} / se põe {sun['sunset']}",
-            'channel': f"{sun['day_length_h']}h{sun['day_length_m']:02d}min de luz",
+            'title':   f"Sol — nasce {s['sunrise']} / se põe {s['sunset']}",
+            'channel': f"{s['day_length_h']}h{s['day_length_m']:02d}min de luz",
             'url': 'https://sunrise-sunset.org', 'views': 0, 'published_at': '', 'top_comments': [],
         })
-    if weather_list:
-        for w in weather_list:
-            notes.append({
-                'title':   f"Clima em {w['city']}",
-                'channel': f"{w['description'].capitalize()} · {w['temp']}°C "
-                           f"(min {w['temp_min']}° / max {w['temp_max']}°) · "
-                           f"Umidade {w['humidity']}%",
-                'url': '', 'views': 0, 'published_at': '', 'top_comments': [],
-            })
-    for day in forecast:
-        rain_txt = f" · Chuva {day['rain_prob']}%" if day['rain_prob'] >= 30 else ""
+    for w in data['clima']:
+        notes.append({
+            'title':   f"Clima em {w['city']}",
+            'channel': f"{w['description'].capitalize()} · {w['temp']}°C "
+                       f"(min {w['temp_min']}° / max {w['temp_max']}°) · Umidade {w['humidity']}%",
+            'url': '', 'views': 0, 'published_at': '', 'top_comments': [],
+        })
+    for day in data['previsao']:
+        rain_txt = f" · Chuva {day['rain_prob']}%" if day['rain_prob'] >= 30 else ''
         notes.append({
             'title':   f"Previsão {day['city']} — {day['label'].capitalize()}",
             'channel': f"{day['desc'].capitalize()} · {day['temp_min']}°/{day['temp_max']}°{rain_txt}",
             'url': '', 'views': 0, 'published_at': '', 'top_comments': [],
         })
-    if ibovespa.get('pontos'):
-        pct = ibovespa.get('change', 0)
+    if data['bolsa'].get('pontos'):
+        b   = data['bolsa']
+        pct = b.get('change', 0)
         notes.append({
-            'title':   f"Ibovespa: {ibovespa['pontos']:,} pts",
+            'title':   f"Ibovespa: {b['pontos']:,} pts",
             'channel': f"{'Alta' if pct >= 0 else 'Baixa'} de {abs(pct):.2f}%",
             'url': '', 'views': 0, 'published_at': '', 'top_comments': [],
         })
-    for m in football.get('finished', []) + football.get('today', []) + football.get('live', []):
+    ft = data['futebol']
+    for m in ft.get('finished', []) + ft.get('today', []) + ft.get('live', []):
         hs, as_ = m.get('home_score'), m.get('away_score')
         score_txt = f"{hs} x {as_}" if hs is not None else 'a jogar'
         notes.append({
             'title':   f"{m['home']} x {m['away']}",
-            'channel': f"{football.get('name','Copa')} · {score_txt}",
+            'channel': f"{ft.get('name', 'Copa')} · {score_txt}",
             'url': '', 'views': 0, 'published_at': '', 'top_comments': [],
         })
-    for item in finance:
+    for item in data['cambio']:
         notes.append({
             'title':   f"{item['pair']}: R$ {item['bid']:.2f}",
             'channel': _pct(item['pct_change']).capitalize(),
             'url': '', 'views': 0, 'published_at': '', 'top_comments': [],
         })
-    for lot in lottery:
+    for lot in data['loterias']:
         status = 'Acumulou' if lot['acumulado'] else f"{lot['ganhadores']} ganhador(es)"
         notes.append({
             'title':   f"{lot['name']} — Concurso {lot['numero']}",

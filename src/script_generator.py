@@ -176,6 +176,12 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
     elif source_type == 'trivia':
         cards = [_build_trivia_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _trivia_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
+    elif source_type == 'utility':
+        content = items[0].get('text', '') if items else ''
+        prompt = _utility_prompt(active, names, source_name, content, is_first_of_day, station_name)
+    elif source_type == 'combined':
+        cards = [_build_combined_card(i, item) for i, item in enumerate(items, 1)]
+        prompt = _combined_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
     else:
         cards = [_build_video_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _radio_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
@@ -1073,6 +1079,145 @@ REGRAS:
 - NAO invente ingredientes ou passos que nao estejam na receita
 
 RECEITA:
+{content}
+
+Roteiro:"""
+
+
+def _utility_prompt(narrators: list[dict], names: list[str], source_name: str,
+                    content: str, is_first_of_day: bool = True,
+                    station_name: str = 'RadioIA') -> str:
+    n = len(narrators)
+    narrator_block = _narrator_block(narrators)
+    format_block   = _format_block(narrators)
+    names_str = ', '.join(names[:-1]) + f' e {names[-1]}' if n > 1 else names[0]
+
+    solo_note = (
+        "- Programa solo: use só [LOCUTOR_A], tom direto e informativo"
+        if n == 1 else
+        f"- Distribua as falas de forma equilibrada entre os {n} apresentadores"
+    )
+
+    if is_first_of_day:
+        abertura = (
+            f"1. ABERTURA: {names_str} dão bom dia, anunciam o \"{source_name}\" e "
+            f"antecipam com energia o que vem a seguir (2-3 falas)"
+        )
+        encerramento = "4. Encerramento: convide o ouvinte a continuar na programação do dia (1-2 falas)"
+    else:
+        abertura = (
+            f'1. ENTRADA: entre como continuação — "Hora do {source_name}!", '
+            f'"Vamos às informações do momento..." ou similar. SEM bom dia. (1-2 falas)'
+        )
+        encerramento = "4. Encerramento rápido sinalizando que a programação continua (1 fala)"
+
+    return f"""Você é um roteirista de bloco utilitário de rádio FM brasileira.
+Gere o roteiro do segmento "{source_name}" com os dados abaixo.
+
+APRESENTADORES:
+{narrator_block}
+
+{format_block}
+
+ATENÇÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem traçados, sem comentários fora do roteiro. Use português correto com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.).
+
+PERSONALIDADES: respeite o perfil de cada apresentador em todas as falas.
+
+ESTRUTURA:
+{abertura}
+2. Apresente os dados de forma natural e conectada — não leia uma lista, conte o que está acontecendo
+3. Faça conexões quando fizer sentido (ex: câmbio alto + viagem, tempo bom + fim de semana)
+{encerramento}
+
+REGRAS DE FORMATAÇÃO PARA VOZ:
+- Temperaturas: "trinta e quatro graus" em vez de "34°C"
+- Moedas: "cinco reais e vinte e três centavos" ou "cinco vírgula vinte e três reais" — nunca "R$ 5,23"
+- Porcentagens: "um vírgula cinco por cento" — nunca "1,5%"
+- Tickers de ações: soletre a sigla letra a letra (ex: "P-E-T-R-4") ou diga o nome da empresa se souber
+- Cada fala: máximo 2 sentenças
+{solo_note}
+- NÃO invente dados além dos fornecidos abaixo
+
+DADOS:
+{content}
+
+Roteiro:"""
+
+
+def _build_combined_card(i: int, item: dict) -> str:
+    source_type = item.get('source_type', '')
+    source_name = item.get('source_name', item.get('channel', ''))
+    age_str     = _format_age(item.get('published_at', ''))
+    meta        = ', '.join(filter(None, [source_name, age_str]))
+    context     = item.get('text', '')
+    context_hint = f"\nConteúdo: {context}" if context else ''
+    type_label = {
+        'rss': 'Notícia', 'youtube': 'Vídeo', 'clipping': 'Clipping',
+        'whatsapp': 'WhatsApp', 'efemerides': 'Efeméride',
+    }.get(source_type, 'Item')
+    return (
+        f"[{type_label} {i}]\n"
+        f"Título: {item['title']}\n"
+        f"Origem: {meta}"
+        f"{context_hint}"
+    )
+
+
+def _combined_prompt(narrators: list[dict], names: list[str], source_name: str,
+                     content: str, is_first_of_day: bool = True,
+                     station_name: str = 'RadioIA') -> str:
+    n = len(narrators)
+    narrator_block = _narrator_block(narrators)
+    format_block   = _format_block(narrators)
+    names_str = ', '.join(names[:-1]) + f' e {names[-1]}' if n > 1 else names[0]
+
+    solo_note = (
+        "- Programa solo: use só [LOCUTOR_A], tom envolvente e direto"
+        if n == 1 else
+        f"- Distribua as falas de forma equilibrada entre os {n} apresentadores"
+    )
+
+    if is_first_of_day:
+        abertura = (
+            f"1. ABERTURA DO DIA: {names_str} dão bom dia, se apresentam pelo nome, "
+            f'dizem que os ouvintes estão na {station_name}, '
+            f'apresentam o "{source_name}" e antecipam os destaques (3-4 falas)'
+        )
+        encerramento = "4. Encerramento: convide o ouvinte a continuar na programação (2 falas)"
+    else:
+        abertura = (
+            f'1. ENTRADA: entre como novo bloco — "{source_name}!", '
+            f'"Agora, {source_name}..." ou similar. SEM bom dia, SEM reapresentação. (1-2 falas)'
+        )
+        encerramento = "4. Encerramento rápido indicando que a programação segue (1-2 falas)"
+
+    return f"""Você é um roteirista de rádio FM brasileira.
+Crie o roteiro do segmento "{source_name}" com conteúdos de múltiplas fontes.
+
+APRESENTADORES:
+{narrator_block}
+
+{format_block}
+
+ATENÇÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem traçados, sem comentários fora do roteiro. Use português correto com todos os acentos.
+
+PERSONALIDADES: respeite o perfil de cada apresentador em todas as falas.
+
+ESTRUTURA:
+{abertura}
+2. Para cada item: 2-4 falas — o que é, de onde veio, por que importa ou interessa
+3. Transições naturais entre os itens ("Em outras frentes...", "Mudando de assunto...", "Falando em...")
+{encerramento}
+
+REGRAS:
+- Cada fala: máximo 2 sentenças
+- Mencione sempre a origem/fonte de cada conteúdo
+- Busque conexões entre itens de fontes diferentes quando fizer sentido narrativo
+- Tom: informativo mas leve — rádio é conversa, não leitura de boletim
+{solo_note}
+- NÃO invente informações
+
+CONTEÚDO:
 {content}
 
 Roteiro:"""

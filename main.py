@@ -256,13 +256,23 @@ def _run_utility_source(source_config: dict, config: dict, is_first_of_day: bool
     print(f"Fonte: {source_name} (utility)")
     print(f"{'='*50}")
 
-    _inicio = datetime.now().strftime('%H:%M:%S')
+    _inicio   = datetime.now().strftime('%H:%M:%S')
     _write_status(source_id, source_name, 'buscando', inicio=_inicio)
 
     narrators = config['narrators'][:2]
+    llm_cfg   = config.get('llm', config.get('claude', {}))
+    tts_cfg   = config.get('tts', {})
+
+    def _status(etapa: str, progresso: str = ''):
+        _write_status(source_id, source_name, etapa, progresso=progresso, inicio=_inicio)
+
     try:
         duration = utility_source.generate_episode(
-            source_config, output_dir, narrators, is_first_of_day, station_name=radio_name
+            source_config, output_dir, narrators, is_first_of_day,
+            station_name=radio_name,
+            llm_config=llm_cfg,
+            tts_config=tts_cfg,
+            status_callback=_status,
         )
     except Exception as e:
         print(f"  Erro: {e}")
@@ -275,6 +285,122 @@ def _run_utility_source(source_config: dict, config: dict, is_first_of_day: bool
     mins, secs = int(duration // 60), int(duration % 60)
     print(f"\nBloco de utilidades gerado: {episode_path}")
     print(f"Duracao: {mins}m {secs}s")
+    return episode_path
+
+
+def _run_combined_source(source_config: dict, config: dict, credentials,
+                         seen_ids: set, is_first_of_day: bool) -> str | None:
+    source_id   = source_config['id']
+    source_name = source_config['name']
+    sub_ids     = source_config.get('sources', [])
+    all_sources = config.get('sources', [])
+    output_dir  = _episode_output_dir(source_id)
+    temp_dir    = os.path.join(output_dir, 'temp')
+
+    print(f"\n{'='*50}")
+    print(f"Fonte: {source_name} (combined)")
+    print(f"{'='*50}")
+    _inicio = datetime.now().strftime('%H:%M:%S')
+    _write_status(source_id, source_name, 'buscando', inicio=_inicio)
+
+    items = []
+    for sub_id in sub_ids:
+        sub_cfg = next((s for s in all_sources if s['id'] == sub_id), None)
+        if not sub_cfg:
+            print(f"  [combined] sub-fonte '{sub_id}' nao encontrada — ignorando")
+            continue
+        sub_type = sub_cfg.get('type', '')
+        module   = SOURCE_MODULES.get(sub_type)
+        if not module or not hasattr(module, 'fetch'):
+            print(f"  [combined] tipo '{sub_type}' nao suporta fetch() — ignorando '{sub_id}'")
+            continue
+        try:
+            sub_items = module.fetch(sub_cfg, credentials) if sub_type == 'youtube' else module.fetch(sub_cfg)
+            valid = [v for v in sub_items if v.get('id')]
+            print(f"  [{sub_id}]: {len(valid)} item(s)")
+            items.extend(valid)
+        except Exception as e:
+            print(f"  [combined/{sub_id}] erro ao buscar: {e}")
+
+    before = len(items)
+    items  = [v for v in items if v['id'] not in seen_ids]
+    if before - len(items):
+        print(f"  {before - len(items)} item(s) ignorado(s) — ja citados.")
+
+    if not items:
+        print("  Nenhum conteudo novo encontrado.")
+        _write_status(source_id, source_name, 'concluido',
+                      progresso='sem conteudo novo', ativo=False, inicio=_inicio)
+        return None
+
+    print(f"  {len(items)} item(s) total.\n")
+    _write_status(source_id, source_name, 'llm', progresso=f'{len(items)} itens', inicio=_inicio)
+
+    narrators  = config['narrators'][:3]
+    radio_name = config.get('radio', {}).get('name', 'RadioIA')
+    llm_cfg    = config.get('llm', config.get('claude', {}))
+    model      = source_config.get('model') or llm_cfg.get('model', 'claude-sonnet-4-6')
+    api_base   = llm_cfg.get('api_base')
+
+    print(f"Gerando roteiro ({model})...")
+    script = generate_script(
+        items, narrators,
+        {**source_config, 'type': 'combined'},
+        is_first_of_day=is_first_of_day,
+        station_name=radio_name,
+        model=model,
+        api_base=api_base,
+        generation_time=_inicio[:5],
+    )
+    print(f"  {len(script.split())} palavras.\n")
+
+    print("Gerando audio...")
+    lines = parse_script(script)
+    if not lines:
+        print("  Roteiro sem falas no formato esperado.")
+        _write_status(source_id, source_name, 'erro',
+                      progresso='roteiro sem falas', ativo=False, inicio=_inicio)
+        return None
+
+    _write_status(source_id, source_name, 'tts', progresso=f'{len(lines)} falas', inicio=_inicio)
+    locutor_keys = ['LOCUTOR_A', 'LOCUTOR_B', 'LOCUTOR_C']
+    voices       = {locutor_keys[i]: n['voice'] for i, n in enumerate(narrators)}
+    tts_config   = config.get('tts', {})
+    audio_files  = generate_audio_files(lines, voices, temp_dir, tts_config)
+
+    vinheta_config = {**config.get('vinheta', {}), 'station_name': radio_name}
+    vinhetas = generate_vinhetas(vinheta_config, temp_dir, tts_config)
+    print(f"  {len(lines)} falas + vinhetas.\n")
+
+    print("Montando episodio...")
+    _write_status(source_id, source_name, 'mixando', inicio=_inicio)
+    os.makedirs(output_dir, exist_ok=True)
+    episode_path = os.path.join(output_dir, 'episode.mp3')
+    episode_id   = '/'.join(output_dir.replace('\\', '/').split('/')[-2:])
+    links_text   = ' | '.join(f"[{i}] {v['title']} {v['url']}" for i, v in enumerate(items, 1))
+
+    duration = mix_episode(
+        audio_files=audio_files,
+        lines=lines,
+        output_path=episode_path,
+        metadata={'title': f'{source_name} - {episode_id}', 'links_text': links_text},
+        radio_config=config.get('radio', {}),
+        vinhetas=vinhetas,
+        station_name=radio_name,
+    )
+
+    _write_status(source_id, source_name, 'finalizando', inicio=_inicio)
+    save_episode_metadata(items, script, output_dir, duration, source_name=source_name)
+    save_episode_to_history(episode_id, items)
+    shutil.rmtree(temp_dir, ignore_errors=True)
+    _write_status(source_id, source_name, 'concluido', ativo=False, inicio=_inicio)
+
+    mins, secs = int(duration // 60), int(duration % 60)
+    print(f"\nEpisodio combinado pronto: {episode_path}")
+    print(f"Duracao: {mins}m {secs}s | Itens: {len(items)}")
+    for i, item in enumerate(items, 1):
+        print(f"  [{i}] {item['title'][:60]}")
+        print(f"      {item.get('url', '')}")
     return episode_path
 
 
@@ -613,6 +739,14 @@ def main():
             if path:
                 generated.append(path)
                 first_of_day = False
+            continue
+
+        if source_config.get('type') == 'combined':
+            path = _run_combined_source(source_config, config, credentials, seen_ids, first_of_day)
+            if path:
+                generated.append(path)
+                first_of_day = False
+                seen_ids = load_seen_ids()
             continue
 
         path = _run_source(source_config, config, credentials, seen_ids,
