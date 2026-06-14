@@ -345,6 +345,7 @@ def gerar_episodios(fontes: list[str], model: str = '') -> str:
     Fontes disponiveis: youtube, noticias, noticias-locais, tecnologia, horoscopo,
     utilidades, loteria, copa, brasileirao, champions, efemerides, quiz, reddit,
     receitas, filmes, filmes-cartaz, musica, musica-local, concursos, biblia.
+    Fontes do tipo combined (ex: bom-dia) agregam multiplas sub-fontes em um unico episodio.
     """
     config      = _load_config()
     all_sources = config.get('sources', [])
@@ -415,7 +416,7 @@ def gerar_episodios(fontes: list[str], model: str = '') -> str:
                 pass
 
         # Injeta _param para plugins que o suportam (ex: podcast)
-        if param and source_type not in ('music', 'utility'):
+        if param and source_type not in ('music', 'utility', 'combined'):
             source_cfg = {**source_cfg, '_param': param}
 
         # Executar fonte com captura de stdout
@@ -423,6 +424,8 @@ def gerar_episodios(fontes: list[str], model: str = '') -> str:
             path, log, err = _capture(radio_main._run_music_source, source_cfg, config, first_of_day)
         elif source_type == 'utility':
             path, log, err = _capture(radio_main._run_utility_source, source_cfg, config, first_of_day)
+        elif source_type == 'combined':
+            path, log, err = _capture(radio_main._run_combined_source, source_cfg, config, credentials, seen_ids, first_of_day)
         else:
             path, log, err = _capture(radio_main._run_source, source_cfg, config, credentials, seen_ids, first_of_day)
 
