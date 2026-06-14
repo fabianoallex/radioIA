@@ -202,7 +202,7 @@ def _fetch_scrape_items(feed_config: dict, max_per_feed: int, cutoff: datetime) 
     if rss_url:
         items = _items_from_rss_url(rss_url, feed_name, max_per_feed, cutoff)
         if items:
-            print(f"  [{feed_name}] RSS auto-descoberto: {rss_url}")
+            print(f"  [{feed_name}] via RSS ({rss_url})")
             return items
 
     # 2. Fallback: extrai links do HTML e scrape artigo por artigo
