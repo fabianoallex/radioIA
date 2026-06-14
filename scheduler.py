@@ -58,8 +58,16 @@ def _fix_schedule_times(config: dict) -> dict:
 
 
 def load_config() -> dict:
+    import sys as _sys
+    from src.config_schema import validate_config, ConfigError
     with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-        return _fix_schedule_times(yaml.safe_load(f))
+        raw = _fix_schedule_times(yaml.safe_load(f))
+    try:
+        validate_config(raw)
+    except ConfigError as e:
+        print(e)
+        _sys.exit(1)
+    return raw
 
 
 def load_state() -> dict:

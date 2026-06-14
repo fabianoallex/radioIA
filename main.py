@@ -74,8 +74,15 @@ SOURCE_MODULES.update(_load_plugins())
 
 
 def load_config(path: str = 'config.yaml') -> dict:
+    from src.config_schema import validate_config, ConfigError
     with open(path, 'r', encoding='utf-8') as f:
-        return yaml.safe_load(f)
+        raw = yaml.safe_load(f)
+    try:
+        validate_config(raw)
+    except ConfigError as e:
+        print(e)
+        sys.exit(1)
+    return raw
 
 
 def _get_oauth_credentials():
