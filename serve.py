@@ -545,7 +545,7 @@ async function init() {
   shuffle(musicFiles);
   renderDays();
 
-  const today     = new Date().toISOString().slice(0, 10);
+  const today     = localDateISO();
 
   if (localStorage.getItem(S_WELCOME_DATE) !== today) {
     localStorage.setItem(S_WELCOME_DATE, today);
@@ -631,7 +631,7 @@ function renderScheduleNotes(entries) {
 
 // ── Generation status ─────────────────────────────────────────────────────────
 async function pollGenerating() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateISO();
   if (currentDate !== today) return;
   try {
     const res = await fetch('/api/geracao_status');
@@ -641,7 +641,7 @@ async function pollGenerating() {
 
 function updateGeneratingItem(status) {
   document.querySelectorAll('#playlist .ep-generating').forEach(el => el.remove());
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateISO();
   if (!status || currentDate !== today) { _genDoneEpIds = null; return; }
   if (status.data && status.data !== today) { _genDoneEpIds = null; _genDoneSuppressed = false; return; }
 
@@ -793,7 +793,7 @@ async function enterFallback() {
 
   // Navega ANTES de setar fallbackMode — selectDate() faz fallbackMode=false
   // e causaria dupla reprodução do intro se chamada depois
-  const today  = new Date().toISOString().slice(0, 10);
+  const today  = localDateISO();
   const groups = groupByDate(allEpisodes);
   const latest = Object.keys(groups).sort().reverse()[0];
   if (currentDate !== today && latest && latest !== currentDate) {
@@ -855,7 +855,7 @@ function _playTrack(track) {
 const S_SPOTS = 'radioIA_spots';
 
 function _spotsToday() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateISO();
   try {
     const d = JSON.parse(localStorage.getItem(S_SPOTS) || '{}');
     if (d.day !== today) return {day: today, counts: {}};
@@ -983,6 +983,13 @@ document.getElementById('audio').addEventListener('ended', () => {
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function localDateISO() {
+  const d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -1028,7 +1035,7 @@ function badgeLabel(type) {
 // ── Render ────────────────────────────────────────────────────────────────────
 function renderDays() {
   const groups = groupByDate(allEpisodes);
-  const today  = new Date().toISOString().slice(0, 10);
+  const today  = localDateISO();
   if (!groups[today]) groups[today] = [];
   const dates  = Object.keys(groups).sort().reverse().slice(0, 5);
   const html   = dates.map(d => {
@@ -1045,7 +1052,7 @@ function renderDays() {
 }
 
 function appendNextScheduled() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateISO();
   if (currentDate !== today) return;
   fetch('/api/next-scheduled')
     .then(r => r.json())
