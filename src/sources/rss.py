@@ -12,7 +12,15 @@ import trafilatura
 MAX_ARTICLE_CHARS = 1200
 MAX_SCRAPE_CANDIDATES = 20
 _HTTP_TIMEOUT = 10
-_HTTP_HEADERS = {'User-Agent': 'Mozilla/5.0 (compatible; RadioIA-scraper/1.0)'}
+_HTTP_HEADERS = {
+    'User-Agent': (
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) '
+        'Chrome/125.0.0.0 Safari/537.36'
+    ),
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+}
 
 
 def _parse_date(entry) -> datetime | None:
@@ -24,11 +32,19 @@ def _parse_date(entry) -> datetime | None:
 
 def _fetch_html(url: str) -> str | None:
     try:
-        r = _requests.get(url, timeout=_HTTP_TIMEOUT, headers=_HTTP_HEADERS)
-        r.raise_for_status()
-        return r.text
+        r = _requests.get(url, timeout=_HTTP_TIMEOUT, headers=_HTTP_HEADERS, verify=True)
+        if r.status_code < 400:
+            return r.text
+    except _requests.exceptions.SSLError:
+        try:
+            r = _requests.get(url, timeout=_HTTP_TIMEOUT, headers=_HTTP_HEADERS, verify=False)
+            if r.status_code < 400:
+                return r.text
+        except Exception:
+            pass
     except Exception:
-        return None
+        pass
+    return None
 
 
 def _extract_text(url: str) -> str:
@@ -77,8 +93,17 @@ def _extract_article(url: str) -> tuple[str, str, datetime | None]:
     return '', '', None
 
 
+def _looks_like_article(path: str) -> bool:
+    """Heurística: paths com 2+ segmentos têm mais chance de ser artigos que categorias."""
+    parts = [p for p in path.strip('/').split('/') if p]
+    return len(parts) >= 2
+
+
 def _scrape_page_links(page_url: str) -> list[str]:
-    """Extrai até MAX_SCRAPE_CANDIDATES URLs de artigos de uma página sem RSS nativo."""
+    """Extrai até MAX_SCRAPE_CANDIDATES URLs de artigos de uma página sem RSS nativo.
+
+    Prioriza links com 2+ segmentos de path (artigos) sobre links de categoria/navegação.
+    """
     downloaded = _fetch_html(page_url)
     if not downloaded:
         return []
@@ -86,18 +111,24 @@ def _scrape_page_links(page_url: str) -> list[str]:
         base = urlparse(page_url)
         tree = lxml_html.fromstring(downloaded)
         seen: set[str] = set()
-        links: list[str] = []
+        article_links: list[str] = []
+        fallback_links: list[str] = []
+
         for a in tree.xpath('//a[@href]'):
             href = urljoin(page_url, a.get('href', '').strip())
             parsed = urlparse(href)
-            if (parsed.netloc == base.netloc
-                    and parsed.path not in ('', '/')
-                    and href not in seen):
-                seen.add(href)
-                links.append(href)
-            if len(links) >= MAX_SCRAPE_CANDIDATES:
-                break
-        return links
+            if (parsed.netloc != base.netloc
+                    or parsed.path in ('', '/')
+                    or href in seen):
+                continue
+            seen.add(href)
+            if _looks_like_article(parsed.path):
+                article_links.append(href)
+            else:
+                fallback_links.append(href)
+
+        combined = article_links + fallback_links
+        return combined[:MAX_SCRAPE_CANDIDATES]
     except Exception:
         return []
 
@@ -105,11 +136,13 @@ def _scrape_page_links(page_url: str) -> list[str]:
 def _fetch_scrape_items(feed_config: dict, max_per_feed: int, cutoff: datetime) -> list[dict]:
     """Coleta itens de uma fonte com scrape: true (chamado em paralelo por fetch())."""
     feed_name = feed_config.get('name') or feed_config['url']
+    candidates = _scrape_page_links(feed_config['url'])
     items = []
-    count = 0
-    for link in _scrape_page_links(feed_config['url']):
-        if count >= max_per_feed:
+    tried = 0
+    for link in candidates:
+        if len(items) >= max_per_feed:
             break
+        tried += 1
         title, text, published = _extract_article(link)
         if not title or not text:
             continue
@@ -127,8 +160,10 @@ def _fetch_scrape_items(feed_config: dict, max_per_feed: int, cutoff: datetime) 
             'comments': [],
             'channel': feed_name,
         })
-        count += 1
         print(f"  [{feed_name}] {title[:70]}")
+    if not items:
+        status = f"{len(candidates)} candidatos, {tried} tentados" if candidates else "homepage inacessível"
+        print(f"  [{feed_name}] 0 itens ({status})")
     return items
 
 
