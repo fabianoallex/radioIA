@@ -158,9 +158,35 @@ Lê feeds RSS de qualquer site. O Claude gera um boletim de notícias a partir d
 
 ---
 
+### Combined (`type: combined`)
+
+Agrega o conteúdo de múltiplas fontes existentes em um único episódio gerado pelo LLM. Ideal para blocos matinais que misturam utilidades, notícias e vídeos em uma narrativa coesa.
+
+```yaml
+- id: bom-dia
+  type: combined
+  name: "Bom Dia MT"
+  enabled: true
+  sources:
+    - utilidades
+    - noticias
+    - youtube
+  model: "claude-haiku-4-5-20251001"
+  context: "tom animado e acolhedor, foco regional"
+```
+
+**Como funciona:** o sistema chama `fetch()` de cada sub-fonte listada em `sources`, junta todo o conteúdo e passa para o LLM com um prompt que incentiva conexões entre os temas. O resultado passa pelo pipeline completo: LLM → TTS → vinhetas → mixagem.
+
+**Restrições:**
+- Sub-fontes do tipo `utility`, `music` e `spot` são ignoradas (não têm `fetch()`)
+- Os IDs em `sources` devem ser fontes já existentes no `config.yaml`
+- Use `adicionar_fonte()` via MCP para criar sem editar o arquivo manualmente
+
+---
+
 ### Utilidades (`type: utility`)
 
-Fonte especial para dados estruturados. Cada seção é opcional e independente.
+Coleta dados estruturados de APIs públicas (clima, câmbio, loteria, futebol) e gera um roteiro narrativo com o LLM — no mesmo estilo conversacional dos outros episódios. Cada seção é opcional e independente.
 
 ```yaml
 - id: utilidades
@@ -1017,6 +1043,8 @@ python mcp_server.py
 **Fontes disponíveis em `gerar_episodios`:**
 `youtube` · `noticias` · `noticias-locais` · `tecnologia` · `horoscopo` · `utilidades` · `loteria` · `copa` · `brasileirao` · `champions` · `efemerides` · `quiz` · `reddit` · `receitas` · `filmes` · `filmes-cartaz` · `musica` · `musica-local` · `concursos` · `biblia`
 
+Fontes do tipo `combined` (ex: `bom-dia`) também são aceitas — use o id configurado no `config.yaml`. Para criar uma nova fonte combined, use `adicionar_fonte()`.
+
 #### Histórico
 
 | Ferramenta | Descrição |
@@ -1030,7 +1058,8 @@ python mcp_server.py
 |-----------|-----------|
 | `ver_grade()` | Exibe a grade completa com status de execução do dia e próximo horário |
 | `ler_config("radio")` | Lê uma seção do `config.yaml` como JSON (`sources`, `narrators`, `llm`, `radio`, `vinheta`, `schedule`, `tts`) |
-| `configurar_fonte("musica", "enabled", "true")` | Habilita, desabilita ou altera um campo de qualquer fonte |
+| `adicionar_fonte("bom-dia", "combined", "Bom Dia MT", '{"sources":["noticias","youtube"]}')` | Cria uma nova fonte no config.yaml com validação de tipo e campos obrigatórios |
+| `configurar_fonte("musica", "enabled", "true")` | Habilita, desabilita ou altera um campo de qualquer fonte existente |
 | `atualizar_config("radio.name", "Minha Rádio")` | Altera qualquer valor do config via notação de ponto |
 | `adicionar_grade("16:00", ["noticias"], "Tarde")` | Adiciona entrada na grade (diária ou pontual, com suporte a `slot_id`/`replay_of`/`days`) |
 | `remover_grade("16:00", "Tarde")` | Remove entrada da grade por horário e label |
@@ -1417,6 +1446,13 @@ python -m pytest tests/ -v
 | `tests/test_history.py` | Deduplicação de conteúdo (`load_seen_ids`, `save_episode_to_history`) |
 | `tests/test_scheduler.py` | Lógica do scheduler (`_entry_key`, `_entry_active_today`) — dias da semana, replay |
 | `tests/test_plugin_contract.py` | Contrato de plugins — estrutura do retorno de `fetch()` |
+| `tests/test_script_context.py` | Injeção de contexto nos prompts do `generate_script()` |
+| `tests/test_script_new_types.py` | Prompts dos tipos `utility` e `combined` — conteúdo, regras TTS, `_build_combined_card` |
+| `tests/test_utility_format.py` | `_format_data_for_prompt()` — cada seção (clima, câmbio, bolsa, loterias, futebol, sol) |
+| `tests/test_parse_value.py` | `_parse_value()` do MCP — bool, int, float, JSON lista/objeto, string |
+| `tests/test_mcp_parse_fonte.py` | `_parse_fonte()` do MCP — formatos `id`, `id:param`, `id\|ctx`, `url:...` |
+| `tests/test_adicionar_fonte.py` | `adicionar_fonte()` do MCP — validações e criação de fontes combined/rss |
+| `tests/test_url_plugin.py` | Plugin `url` — extração de conteúdo e estrutura do item retornado |
 
 ### Validar um novo plugin
 
