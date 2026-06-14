@@ -847,6 +847,109 @@ def configurar_fonte(id_fonte: str, campo: str, valor: str) -> str:
 
 
 @mcp.tool()
+def adicionar_fonte(id_fonte: str, tipo: str, nome: str, extras: str = '{}') -> str:
+    """
+    Adiciona uma nova fonte de conteudo ao config.yaml.
+
+    Args:
+        id_fonte: Identificador unico da fonte (ex: bom-dia, noticias-tech, minha-musica).
+                  Nao pode conflitar com fontes ja existentes.
+        tipo:     Tipo da fonte. Valores validos:
+                  "combined"  — agrega fetch() de multiplas sub-fontes em um episodio unico.
+                                Requer "sources" em extras: lista de IDs de fontes existentes.
+                                Sub-fontes incompativeis (utility, music, spot) sao ignoradas.
+                  "rss"       — leitor de feeds RSS. Requer "feeds" em extras.
+                  "youtube"   — canal(is) do YouTube. Requer "channels" em extras.
+                  "utility"   — clima, cambio, loterias, futebol (via LLM).
+                  "music"     — bloco musical (jamendo ou local).
+                  "clipping"  — agregador de noticias por topico.
+                  "horoscopo" — horoscopo diario.
+                  "podcast"   — feed de podcast.
+                  "efemerides", "quiz", "reddit", "receitas", "filmes", "filmes-cartaz",
+                  "concursos", "biblia", "whatsapp"
+        nome:     Nome exibido na programacao (ex: "Bom Dia MT", "Noticias de Tecnologia").
+        extras:   JSON com campos adicionais da fonte. Exemplos por tipo:
+
+                  combined:
+                    {"sources": ["utilidades", "noticias", "youtube"], "model": "claude-haiku-4-5-20251001", "context": "tom matinal, animado"}
+
+                  rss:
+                    {"feeds": [{"url": "https://g1.globo.com/rss/g1/", "name": "G1"}], "settings": {"max_items_total": 5}}
+
+                  youtube:
+                    {"channels": [{"id": "UCaGmdJSSiR7fkh2A-c6emsA", "name": "G1"}]}
+
+                  utility:
+                    {"settings": {"weather": {"enabled": true, "cities": ["Cuiaba"]}, "finance": {"enabled": true}, "lottery": {"enabled": false}}}
+
+                  music (jamendo):
+                    {"settings": {"num_tracks": 3, "source": "jamendo", "jamendo": {"api_key_env": "JAMENDO_CLIENT_ID", "tags": "jazz"}}}
+
+    Exemplos:
+        adicionar_fonte("bom-dia", "combined", "Bom Dia MT",
+                        '{"sources": ["utilidades", "noticias", "youtube"], "model": "claude-haiku-4-5-20251001"}')
+        adicionar_fonte("noticias-tech", "rss", "Tecnologia",
+                        '{"feeds": [{"url": "https://www.theverge.com/rss/index.xml", "name": "The Verge"}]}')
+    """
+    import json as _json
+
+    config  = _load_config()
+    sources = config.get('sources', [])
+
+    if any(s['id'] == id_fonte for s in sources):
+        return _json.dumps({
+            'status':   'erro',
+            'mensagem': f"Fonte '{id_fonte}' ja existe. Use configurar_fonte() para alterar campos.",
+        }, ensure_ascii=False, indent=2)
+
+    tipos_validos = {
+        'combined', 'rss', 'youtube', 'utility', 'music', 'clipping',
+        'horoscopo', 'podcast', 'efemerides', 'quiz', 'reddit', 'receitas',
+        'filmes', 'filmes-cartaz', 'concursos', 'biblia', 'whatsapp', 'url',
+    }
+    if tipo not in tipos_validos:
+        return _json.dumps({
+            'status':   'erro',
+            'mensagem': f"Tipo '{tipo}' invalido.",
+            'tipos_validos': sorted(tipos_validos),
+        }, ensure_ascii=False, indent=2)
+
+    try:
+        campos_extras = _json.loads(extras) if extras.strip() else {}
+    except _json.JSONDecodeError as e:
+        return _json.dumps({
+            'status':   'erro',
+            'mensagem': f"extras nao e um JSON valido: {e}",
+        }, ensure_ascii=False, indent=2)
+
+    if tipo == 'combined' and 'sources' not in campos_extras:
+        return _json.dumps({
+            'status':   'erro',
+            'mensagem': "Tipo 'combined' requer o campo 'sources' em extras: lista de IDs de sub-fontes.",
+            'exemplo':  '{"sources": ["utilidades", "noticias", "youtube"]}',
+        }, ensure_ascii=False, indent=2)
+
+    nova_fonte = {
+        'id':      id_fonte,
+        'type':    tipo,
+        'name':    nome,
+        'enabled': True,
+        **campos_extras,
+    }
+
+    sources.append(nova_fonte)
+    config['sources'] = sources
+    _save_config(config)
+
+    return _json.dumps({
+        'status':  'ok',
+        'mensagem': f"Fonte '{id_fonte}' adicionada com sucesso.",
+        'fonte':   nova_fonte,
+        'dica':    'Use configurar_fonte() para ajustar campos individuais depois, ou gerar_episodios(["' + id_fonte + '"]) para testar.',
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
 def atualizar_config(caminho: str, valor: str) -> str:
     """
     Atualiza qualquer valor no config.yaml usando notacao de ponto.
