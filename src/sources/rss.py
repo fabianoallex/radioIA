@@ -133,12 +133,82 @@ def _scrape_page_links(page_url: str) -> list[str]:
         return []
 
 
+def _find_rss_in_html(html: str, base_url: str) -> str | None:
+    """Procura feed RSS/Atom declarado no <head> da página via <link rel=alternate>."""
+    try:
+        tree = lxml_html.fromstring(html)
+        for link in tree.xpath('//link[@rel="alternate"]'):
+            mime = link.get('type', '')
+            if 'rss' in mime or 'atom' in mime:
+                href = link.get('href', '').strip()
+                if href:
+                    return urljoin(base_url, href)
+    except Exception:
+        pass
+    return None
+
+
+def _items_from_rss_url(rss_url: str, feed_name: str, max_per_feed: int, cutoff: datetime) -> list[dict]:
+    """Extrai itens de uma URL RSS (usado após auto-descoberta em sites com scrape: true)."""
+    try:
+        feed = feedparser.parse(rss_url)
+        items = []
+        for entry in feed.entries:
+            if len(items) >= max_per_feed:
+                break
+            published = _parse_date(entry)
+            if published and published < cutoff:
+                continue
+            url = entry.get('link', '')
+            title = entry.get('title', '').strip()
+            if not url or not title:
+                continue
+            summary = entry.get('summary', '')
+            text = _extract_text(url) or summary[:MAX_ARTICLE_CHARS]
+            items.append({
+                'id': url,
+                'title': title,
+                'url': url,
+                'text': text,
+                'source_name': feed_name,
+                'source_type': 'news',
+                'published_at': (published or datetime.now(timezone.utc)).isoformat(),
+                'views': 0,
+                'comments': [],
+                'channel': feed_name,
+            })
+            print(f"  [{feed_name}] {title[:70]}")
+        return items
+    except Exception:
+        return []
+
+
 def _fetch_scrape_items(feed_config: dict, max_per_feed: int, cutoff: datetime) -> list[dict]:
-    """Coleta itens de uma fonte com scrape: true (chamado em paralelo por fetch())."""
+    """Coleta itens de uma fonte com scrape: true (chamado em paralelo por fetch()).
+
+    Estratégia: tenta auto-descoberta de RSS no <head> primeiro; se falhar, faz
+    scraping de links HTML artigo por artigo.
+    """
     feed_name = feed_config.get('name') or feed_config['url']
-    candidates = _scrape_page_links(feed_config['url'])
-    items = []
+    page_url = feed_config['url']
+
+    html = _fetch_html(page_url)
+    if not html:
+        print(f"  [{feed_name}] 0 itens (homepage inacessível)")
+        return []
+
+    # 1. RSS auto-descoberta — muitos sites JS-rendered ainda publicam RSS no backend
+    rss_url = _find_rss_in_html(html, page_url)
+    if rss_url:
+        items = _items_from_rss_url(rss_url, feed_name, max_per_feed, cutoff)
+        if items:
+            print(f"  [{feed_name}] RSS auto-descoberto: {rss_url}")
+            return items
+
+    # 2. Fallback: extrai links do HTML e scrape artigo por artigo
+    candidates = _scrape_page_links(page_url)
     tried = 0
+    items = []
     for link in candidates:
         if len(items) >= max_per_feed:
             break
@@ -161,9 +231,11 @@ def _fetch_scrape_items(feed_config: dict, max_per_feed: int, cutoff: datetime) 
             'channel': feed_name,
         })
         print(f"  [{feed_name}] {title[:70]}")
+
     if not items:
-        status = f"{len(candidates)} candidatos, {tried} tentados" if candidates else "homepage inacessível"
-        print(f"  [{feed_name}] 0 itens ({status})")
+        detail = f"RSS descoberto mas sem itens novos: {rss_url}" if rss_url \
+            else f"{len(candidates)} candidatos, {tried} tentados"
+        print(f"  [{feed_name}] 0 itens ({detail})")
     return items
 
 

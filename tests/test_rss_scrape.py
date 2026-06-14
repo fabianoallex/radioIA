@@ -14,6 +14,9 @@ from src.sources.rss import _extract_article, _scrape_page_links, fetch
 class TestFetchScrape:
     """fetch() com feed_config contendo scrape: true."""
 
+    # HTML mínimo sem link RSS — garante que auto-descoberta de RSS retorne None
+    _HTML_VAZIO = '<html><head></head><body></body></html>'
+
     def _config(self, max_per_feed=3, max_total=10, days_lookback=1):
         return {
             'feeds': [{'url': 'https://portal.com/', 'name': 'Portal', 'scrape': True}],
@@ -24,7 +27,12 @@ class TestFetchScrape:
             },
         }
 
+    def _mock_base(self, monkeypatch):
+        """Mocks comuns: _fetch_html retorna HTML sem RSS; _scrape_page_links e _extract_article livres."""
+        monkeypatch.setattr('src.sources.rss._fetch_html', lambda url: self._HTML_VAZIO)
+
     def test_itens_coletados(self, monkeypatch):
+        self._mock_base(monkeypatch)
         monkeypatch.setattr('src.sources.rss._scrape_page_links',
                             lambda url: ['https://portal.com/art1'])
         monkeypatch.setattr('src.sources.rss._extract_article',
@@ -37,6 +45,7 @@ class TestFetchScrape:
         assert items[0]['source_name'] == 'Portal'
 
     def test_item_sem_titulo_descartado(self, monkeypatch):
+        self._mock_base(monkeypatch)
         monkeypatch.setattr('src.sources.rss._scrape_page_links',
                             lambda url: ['https://portal.com/art1'])
         monkeypatch.setattr('src.sources.rss._extract_article',
@@ -45,6 +54,7 @@ class TestFetchScrape:
         assert fetch(self._config()) == []
 
     def test_item_sem_texto_descartado(self, monkeypatch):
+        self._mock_base(monkeypatch)
         monkeypatch.setattr('src.sources.rss._scrape_page_links',
                             lambda url: ['https://portal.com/art1'])
         monkeypatch.setattr('src.sources.rss._extract_article',
@@ -53,6 +63,7 @@ class TestFetchScrape:
         assert fetch(self._config()) == []
 
     def test_max_items_per_feed_respeitado(self, monkeypatch):
+        self._mock_base(monkeypatch)
         monkeypatch.setattr('src.sources.rss._scrape_page_links',
                             lambda url: [f'https://portal.com/art{i}' for i in range(10)])
         monkeypatch.setattr('src.sources.rss._extract_article',
@@ -61,6 +72,7 @@ class TestFetchScrape:
         assert len(fetch(self._config(max_per_feed=2))) == 2
 
     def test_max_items_total_respeitado(self, monkeypatch):
+        self._mock_base(monkeypatch)
         config = {
             'feeds': [
                 {'url': 'https://a.com/', 'name': 'A', 'scrape': True},
@@ -76,6 +88,7 @@ class TestFetchScrape:
         assert len(fetch(config)) == 3
 
     def test_item_com_data_antiga_filtrado(self, monkeypatch):
+        self._mock_base(monkeypatch)
         data_antiga = datetime.now(timezone.utc) - timedelta(days=3)
         monkeypatch.setattr('src.sources.rss._scrape_page_links',
                             lambda url: ['https://portal.com/art1'])
@@ -86,6 +99,7 @@ class TestFetchScrape:
 
     def test_item_sem_data_nao_filtrado(self, monkeypatch):
         """Sem data disponível o item é incluído — página inicial pressupõe conteúdo recente."""
+        self._mock_base(monkeypatch)
         monkeypatch.setattr('src.sources.rss._scrape_page_links',
                             lambda url: ['https://portal.com/art1'])
         monkeypatch.setattr('src.sources.rss._extract_article',
@@ -94,6 +108,7 @@ class TestFetchScrape:
         assert len(fetch(self._config(days_lookback=1))) == 1
 
     def test_campos_obrigatorios_presentes(self, monkeypatch):
+        self._mock_base(monkeypatch)
         monkeypatch.setattr('src.sources.rss._scrape_page_links',
                             lambda url: ['https://portal.com/art1'])
         monkeypatch.setattr('src.sources.rss._extract_article',
@@ -102,6 +117,25 @@ class TestFetchScrape:
         item = fetch(self._config())[0]
         for campo in ('id', 'title', 'url', 'text', 'source_name', 'source_type', 'published_at'):
             assert campo in item
+
+    def test_rss_autodescoberto_usado_quando_disponivel(self, monkeypatch):
+        """Se a página declara RSS no <head>, usa feedparser em vez de scraping."""
+        html_com_rss = (
+            '<html><head>'
+            '<link rel="alternate" type="application/rss+xml" href="/feed.xml"/>'
+            '</head></html>'
+        )
+        monkeypatch.setattr('src.sources.rss._fetch_html', lambda url: html_com_rss)
+        monkeypatch.setattr('src.sources.rss._items_from_rss_url',
+                            lambda rss_url, name, mpf, cutoff: [
+                                {'id': 'x', 'title': 'Via RSS', 'url': 'x', 'text': 'T',
+                                 'source_name': name, 'source_type': 'news',
+                                 'published_at': '', 'views': 0, 'comments': [], 'channel': name}
+                            ])
+
+        items = fetch(self._config())
+        assert len(items) == 1
+        assert items[0]['title'] == 'Via RSS'
 
 
 class TestScrapePageLinks:
