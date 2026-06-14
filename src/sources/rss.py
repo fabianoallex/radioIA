@@ -30,6 +30,13 @@ def _parse_date(entry) -> datetime | None:
     return None
 
 
+def _sanitize_date(dt: datetime | None) -> datetime | None:
+    """Retorna None para datas claramente erradas (bug de migração de CMS: ano < 2020)."""
+    if dt is not None and dt.year < 2020:
+        return None
+    return dt
+
+
 def _fetch_html(url: str) -> str | None:
     try:
         r = _requests.get(url, timeout=_HTTP_TIMEOUT, headers=_HTTP_HEADERS, verify=True)
@@ -156,7 +163,7 @@ def _items_from_rss_url(rss_url: str, feed_name: str, max_per_feed: int, cutoff:
         for entry in feed.entries:
             if len(items) >= max_per_feed:
                 break
-            published = _parse_date(entry)
+            published = _sanitize_date(_parse_date(entry))
             if published and published < cutoff:
                 continue
             url = entry.get('link', '')
