@@ -119,43 +119,54 @@ class TestScrapePageLinks:
     """
 
     def test_links_internos_retornados(self, monkeypatch):
-        monkeypatch.setattr('src.sources.rss.trafilatura.fetch_url', lambda url: self._HTML)
+        monkeypatch.setattr('src.sources.rss._fetch_html', lambda url: self._HTML)
         links = _scrape_page_links('https://portal.com/')
         assert 'https://portal.com/noticia-1' in links
         assert 'https://portal.com/noticia-2' in links
 
     def test_links_externos_filtrados(self, monkeypatch):
-        monkeypatch.setattr('src.sources.rss.trafilatura.fetch_url', lambda url: self._HTML)
+        monkeypatch.setattr('src.sources.rss._fetch_html', lambda url: self._HTML)
         links = _scrape_page_links('https://portal.com/')
         assert not any('externo.com' in l for l in links)
 
     def test_path_raiz_filtrado(self, monkeypatch):
-        monkeypatch.setattr('src.sources.rss.trafilatura.fetch_url', lambda url: self._HTML)
+        monkeypatch.setattr('src.sources.rss._fetch_html', lambda url: self._HTML)
         links = _scrape_page_links('https://portal.com/')
         assert 'https://portal.com/' not in links
 
     def test_duplicatas_removidas(self, monkeypatch):
-        monkeypatch.setattr('src.sources.rss.trafilatura.fetch_url', lambda url: self._HTML)
+        monkeypatch.setattr('src.sources.rss._fetch_html', lambda url: self._HTML)
         links = _scrape_page_links('https://portal.com/')
         assert links.count('https://portal.com/noticia-1') == 1
 
     def test_retorna_lista_vazia_quando_fetch_falha(self, monkeypatch):
-        monkeypatch.setattr('src.sources.rss.trafilatura.fetch_url', lambda url: None)
+        monkeypatch.setattr('src.sources.rss._fetch_html', lambda url: None)
         assert _scrape_page_links('https://portal.com/') == []
+
+    def test_limita_candidatos(self, monkeypatch):
+        """Retorna no máximo MAX_SCRAPE_CANDIDATES links."""
+        from src.sources.rss import MAX_SCRAPE_CANDIDATES
+        muitos_links = ''.join(
+            f'<a href="https://portal.com/art{i}">Art {i}</a>' for i in range(100)
+        )
+        monkeypatch.setattr('src.sources.rss._fetch_html',
+                            lambda url: f'<html><body>{muitos_links}</body></html>')
+        links = _scrape_page_links('https://portal.com/')
+        assert len(links) <= MAX_SCRAPE_CANDIDATES
 
 
 class TestExtractArticle:
     """_extract_article(): parsing de JSON do trafilatura e falhas de rede."""
 
     def test_retorna_vazio_quando_fetch_falha(self, monkeypatch):
-        monkeypatch.setattr('src.sources.rss.trafilatura.fetch_url', lambda url: None)
+        monkeypatch.setattr('src.sources.rss._fetch_html', lambda url: None)
         title, text, date = _extract_article('https://portal.com/art1')
         assert title == ''
         assert text == ''
         assert date is None
 
     def test_retorna_vazio_quando_extract_retorna_none(self, monkeypatch):
-        monkeypatch.setattr('src.sources.rss.trafilatura.fetch_url', lambda url: '<html/>')
+        monkeypatch.setattr('src.sources.rss._fetch_html', lambda url: '<html/>')
         monkeypatch.setattr('src.sources.rss.trafilatura.extract', lambda *a, **kw: None)
         title, text, date = _extract_article('https://portal.com/art1')
         assert title == ''
@@ -164,7 +175,7 @@ class TestExtractArticle:
 
     def test_extrai_titulo_e_texto(self, monkeypatch):
         payload = json.dumps({'title': 'Meu Artigo', 'text': 'Conteúdo aqui.', 'date': None})
-        monkeypatch.setattr('src.sources.rss.trafilatura.fetch_url', lambda url: '<html/>')
+        monkeypatch.setattr('src.sources.rss._fetch_html', lambda url: '<html/>')
         monkeypatch.setattr('src.sources.rss.trafilatura.extract', lambda *a, **kw: payload)
         title, text, date = _extract_article('https://portal.com/art1')
         assert title == 'Meu Artigo'
@@ -173,7 +184,7 @@ class TestExtractArticle:
 
     def test_extrai_data_iso(self, monkeypatch):
         payload = json.dumps({'title': 'Art', 'text': 'Texto.', 'date': '2026-06-14'})
-        monkeypatch.setattr('src.sources.rss.trafilatura.fetch_url', lambda url: '<html/>')
+        monkeypatch.setattr('src.sources.rss._fetch_html', lambda url: '<html/>')
         monkeypatch.setattr('src.sources.rss.trafilatura.extract', lambda *a, **kw: payload)
         _, _, date = _extract_article('https://portal.com/art1')
         assert date is not None
@@ -183,7 +194,7 @@ class TestExtractArticle:
 
     def test_data_invalida_retorna_none(self, monkeypatch):
         payload = json.dumps({'title': 'Art', 'text': 'Texto.', 'date': 'nao-e-data'})
-        monkeypatch.setattr('src.sources.rss.trafilatura.fetch_url', lambda url: '<html/>')
+        monkeypatch.setattr('src.sources.rss._fetch_html', lambda url: '<html/>')
         monkeypatch.setattr('src.sources.rss.trafilatura.extract', lambda *a, **kw: payload)
         _, _, date = _extract_article('https://portal.com/art1')
         assert date is None
