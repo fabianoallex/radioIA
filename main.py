@@ -315,7 +315,11 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
             print(f"  [combined] tipo '{sub_type}' nao suporta fetch() — ignorando '{sub_id}'")
             continue
         try:
-            sub_items = module.fetch(sub_cfg, credentials) if sub_type == 'youtube' else module.fetch(sub_cfg)
+            if sub_type == 'youtube':
+                sub_cfg = {**sub_cfg, '_api_key': os.getenv('YOUTUBE_API_KEY')}
+                sub_items = module.fetch(sub_cfg, credentials)
+            else:
+                sub_items = module.fetch(sub_cfg)
             valid = [v for v in sub_items if v.get('id')]
             print(f"  [{sub_id}]: {len(valid)} item(s)")
             items.extend(valid)

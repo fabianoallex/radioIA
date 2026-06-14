@@ -48,7 +48,22 @@ BRT = timezone(timedelta(hours=-3))
 
 
 def fetch(source_config: dict, credentials=None) -> list[dict]:
-    return []  # bypasses normal pipeline
+    data = _collect_data(source_config)
+    text = _format_data_for_prompt(data)
+    if not text:
+        return []
+    return [{
+        'id':           f"utility-{source_config.get('id', 'utilidades')}-{datetime.now().strftime('%Y-%m-%d')}",
+        'title':        source_config.get('name', 'Resumo do Dia'),
+        'text':         text,
+        'url':          '',
+        'source_name':  source_config.get('name', 'Resumo do Dia'),
+        'source_type':  'utility',
+        'published_at': datetime.now().strftime('%Y-%m-%d'),
+        'views':        0,
+        'comments':     [],
+        'channel':      source_config.get('name', 'Resumo do Dia'),
+    }]
 
 
 # ── Data fetchers ────────────────────────────────────────────────────────────
