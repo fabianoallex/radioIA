@@ -139,6 +139,21 @@ Lê feeds RSS de qualquer site. O Claude gera um boletim de notícias a partir d
     days_lookback: 1         # ignora itens mais antigos que N dias
 ```
 
+#### Scraping de sites sem RSS nativo
+
+Sites que não oferecem feed RSS podem ser usados com o flag `scrape: true`. O sistema extrai os links da página inicial e usa o trafilatura para obter título, texto e data de cada artigo.
+
+```yaml
+  feeds:
+    - url: "https://g1.globo.com/rss/g1/"
+      name: "G1"                              # RSS nativo — caminho padrão
+    - url: "https://prefeitura.cidade.gov.br/noticias"
+      name: "Prefeitura"
+      scrape: true                            # sem RSS — extrai direto da página
+```
+
+> **Nota:** sem RSS, a data do artigo pode não estar disponível. Nesses casos o item é incluído sem filtrar por `days_lookback`, assumindo que a página inicial exibe conteúdo recente.
+
 **Feeds verificados e funcionando:**
 
 | Veículo | URL |
