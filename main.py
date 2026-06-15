@@ -2,6 +2,12 @@ import json
 import os
 import sys
 import shutil
+
+try:
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+    pass
 import importlib.util
 import yaml
 from datetime import datetime
