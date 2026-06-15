@@ -36,6 +36,9 @@ cd radioIA
 
 # Instale as dependências
 pip install -r requirements.txt
+
+# Configuração única por máquina — evita conflitos de git no config.yaml
+git config --global merge.ours.driver true
 ```
 
 > **Atualizando de uma versão anterior?** O `litellm` foi adicionado como dependência para suporte a múltiplos provedores de LLM. Se você já tinha o projeto instalado, rode `pip install -r requirements.txt` novamente para incluí-lo — ele é necessário mesmo usando apenas o Claude.

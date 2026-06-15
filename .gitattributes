@@ -1,0 +1,4 @@
+# Arquivos por-instância: em conflito, sempre mantém a versão local
+# Requer (uma vez por máquina): git config merge.ours.driver true
+config.yaml merge=ours
+OPERACAO.md merge=ours
