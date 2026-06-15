@@ -1,4 +1,4 @@
-"""Testa _parse_fonte() do mcp_server.py.
+"""Testa _parse_fonte() do mcp_tools._utils.
 
 A função mapeia strings de fonte para (source_id, param, context),
 suportando o formato  source_id[:param][|contexto].
@@ -6,11 +6,11 @@ suportando o formato  source_id[:param][|contexto].
 
 import pytest
 
-mcp_server = pytest.importorskip(
-    'mcp_server',
-    reason='mcp_server não importável (dependências MCP ausentes)',
+utils = pytest.importorskip(
+    'mcp_tools._utils',
+    reason='mcp_tools._utils não importável (dependências ausentes)',
 )
-_parse_fonte = mcp_server._parse_fonte
+_parse_fonte = utils._parse_fonte
 
 
 class TestParseFonte:

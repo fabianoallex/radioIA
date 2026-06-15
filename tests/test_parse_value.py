@@ -1,4 +1,4 @@
-"""Testa _parse_value() de mcp_server.py.
+"""Testa _parse_value() de mcp_tools._utils.
 
 Cobre os casos: bool, int, float, JSON (lista/objeto) e string literal.
 O fix que adiciona parse de JSON foi motivado pelo bug onde configurar_fonte()
@@ -7,11 +7,11 @@ gravava feeds como string JSON em vez de lista YAML.
 
 import pytest
 
-mcp_server = pytest.importorskip(
-    'mcp_server',
-    reason='mcp_server não importável (dependências MCP ausentes)',
+utils = pytest.importorskip(
+    'mcp_tools._utils',
+    reason='mcp_tools._utils não importável (dependências ausentes)',
 )
-_parse_value = mcp_server._parse_value
+_parse_value = utils._parse_value
 
 
 class TestParseValue:
