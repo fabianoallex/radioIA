@@ -182,52 +182,6 @@ def remover_spot(id_spot: str) -> str:
 
 
 @mcp.tool()
-def listar_spots() -> str:
-    """
-    Lista todos os spots configurados com tipo, peso, limite diario e status do cache de audio.
-    Util para saber quais spots estao prontos para tocar e quais precisam ser gerados.
-    """
-    config    = _load_config()
-    spots     = config.get('spots') or []
-    spots_cfg = config.get('spots_config', {})
-
-    if not spots:
-        return json.dumps({
-            'status':   'sem_spots',
-            'mensagem': 'Nenhum spot configurado em config.yaml.',
-            'dica':     'Adicione spots na secao "spots:" do config.yaml.',
-        }, ensure_ascii=False, indent=2)
-
-    resultado = []
-    for spot in spots:
-        entry = {
-            'id':          spot['id'],
-            'tipo':        spot.get('type', 'file'),
-            'peso':        spot.get('weight', 1),
-            'max_por_dia': spot.get('max_per_day', None),
-            'cache':       _spot_cache_info(spot),
-        }
-        if spot.get('type') == 'tts':
-            entry['texto'] = spot.get('text', '')[:120]
-        elif spot.get('type') == 'llm':
-            entry['topico']      = spot.get('topic', '')
-            entry['duracao_seg'] = spot.get('duration_seconds', 20)
-            entry['modelo']      = spot.get('model', config.get('llm', {}).get('model', ''))
-        elif spot.get('type') == 'file':
-            entry['path'] = spot.get('path', '')
-
-        resultado.append(entry)
-
-    return json.dumps({
-        'status':      'ok',
-        'total_spots': len(resultado),
-        'spots_config': spots_cfg,
-        'spots':       resultado,
-        'cache_dir':   _SPOTS_CACHE_DIR,
-    }, ensure_ascii=False, indent=2)
-
-
-@mcp.tool()
 def gerar_spot(id_spot: str, forcar: bool = False) -> str:
     """
     Gera ou atualiza o audio cacheado de um spot tts ou llm.

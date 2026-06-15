@@ -240,32 +240,6 @@ def _gerar_audio_welcome(config: dict) -> dict:
 
 
 @mcp.tool()
-def ver_intro_boas_vindas() -> str:
-    """
-    Mostra a configuração atual da intro de boas-vindas e o status do áudio gerado.
-
-    Retorna:
-    - falas: lista de frases configuradas (use {radio_name} para inserir o nome da rádio)
-    - voice: voz usada (null = herda vinheta.voice)
-    - audio_gerado: se output/_welcome_intro.mp3 existe
-    - gerado_em, tamanho_kb: metadados do arquivo, se existir
-    """
-    config = _load_config()
-    wi     = config.get('welcome_intro', {})
-    exists = os.path.exists(_WELCOME_INTRO_PATH)
-    result = {
-        'falas':        wi.get('falas', []),
-        'voice':        wi.get('voice'),
-        'audio_gerado': exists,
-    }
-    if exists:
-        mtime = datetime.fromtimestamp(os.path.getmtime(_WELCOME_INTRO_PATH)).strftime('%Y-%m-%d %H:%M')
-        result['gerado_em']  = mtime
-        result['tamanho_kb'] = round(os.path.getsize(_WELCOME_INTRO_PATH) / 1024, 1)
-    return json.dumps(result, ensure_ascii=False, indent=2)
-
-
-@mcp.tool()
 def configurar_intro_boas_vindas(
     falas: list = None,
     voice: str = None,
@@ -340,61 +314,6 @@ def regenerar_intro_boas_vindas() -> str:
 
 
 # ── Cache Jamendo ─────────────────────────────────────────────────────────────
-
-@mcp.tool()
-def ver_cache_jamendo() -> str:
-    """
-    Mostra o status do cache local do Jamendo: faixas catalogadas, tamanho em disco
-    e fontes Jamendo configuradas no config.yaml.
-    """
-    from src.sources.music import CACHE_DIR, CATALOG_FILE
-
-    config = _load_config()
-    jamendo_sources = [
-        s for s in config.get('sources', [])
-        if s.get('type') == 'music'
-        and (s.get('settings') or {}).get('source') == 'jamendo'
-    ]
-
-    catalog = {}
-    if os.path.exists(CATALOG_FILE):
-        with open(CATALOG_FILE, 'r', encoding='utf-8') as f:
-            catalog = json.load(f)
-
-    total_bytes     = 0
-    faixas_ok       = 0
-    faixas_faltando = []
-    for tid, meta in catalog.items():
-        fpath = os.path.join(CACHE_DIR, meta['file'])
-        if os.path.exists(fpath):
-            total_bytes += os.path.getsize(fpath)
-            faixas_ok   += 1
-        else:
-            faixas_faltando.append(meta.get('title', tid))
-
-    amostra = [
-        {'titulo': m['title'], 'artista': m['artist']}
-        for m in list(catalog.values())[:5]
-    ]
-
-    return json.dumps({
-        'faixas_em_catalogo':  len(catalog),
-        'faixas_no_disco':     faixas_ok,
-        'faixas_faltando':     len(faixas_faltando),
-        'tamanho_mb':          round(total_bytes / 1024 / 1024, 1),
-        'fontes_configuradas': [
-            {
-                'id':         s['id'],
-                'name':       s.get('name', s['id']),
-                'enabled':    s.get('enabled', True),
-                'tags':       (s.get('settings') or {}).get('jamendo', {}).get('tags', 'lounge'),
-                'cache_size': (s.get('settings') or {}).get('cache_size', 50),
-            }
-            for s in jamendo_sources
-        ],
-        'amostra': amostra,
-    }, ensure_ascii=False, indent=2)
-
 
 @mcp.tool()
 def baixar_musicas_jamendo(id_fonte: str = None) -> str:

@@ -1,119 +1,14 @@
 import json
 import os
-from datetime import datetime
 
 from mcp_tools._instance import mcp
 from mcp_tools._utils import (
     PROJECT_DIR,
     _load_config,
     _save_config,
-    _schedule_entry_key,
     _parse_value,
     _set_nested,
 )
-
-
-@mcp.tool()
-def ver_grade() -> str:
-    """
-    Exibe a grade completa de programacao da radio.
-    Mostra todos os horarios agendados, fontes, labels, slot_ids, replays e status de execucao.
-    Util para entender o que esta programado e planejar adicoes ou remocoes.
-    """
-    config  = _load_config()
-    entries = config.get('schedule', [])
-    today   = datetime.now().strftime('%Y-%m-%d')
-    now_time = datetime.now().strftime('%H:%M')
-
-    state_path = os.path.join(PROJECT_DIR, 'scheduler_state.json')
-    state = {}
-    if os.path.exists(state_path):
-        with open(state_path, 'r', encoding='utf-8') as f:
-            state = json.load(f)
-
-    completed_today = set(state.get('completed_today', {}).keys())
-    completed_once  = set(state.get('completed_once', []))
-
-    grade = []
-    proximo_idx = None
-
-    for i, entry in enumerate(entries):
-        e = {
-            'time':  entry.get('time', ''),
-            'label': entry.get('label', ''),
-            'tipo':  'pontual' if entry.get('date') else 'diario',
-        }
-
-        if entry.get('date'):
-            e['date'] = entry['date']
-
-        if entry.get('replay_of') is not None:
-            e['replay_of'] = entry['replay_of']
-        elif entry.get('sources'):
-            e['sources'] = entry['sources']
-
-        if entry.get('slot_id') is not None:
-            e['slot_id'] = entry['slot_id']
-
-        if entry.get('days'):
-            e['days'] = entry['days']
-
-        key = _schedule_entry_key(entry)
-        run_key = f"{today}|{key}"
-
-        if entry.get('date'):
-            e['executado'] = key in completed_once
-        else:
-            e['executado_hoje'] = run_key in completed_today
-
-        if (proximo_idx is None
-                and not entry.get('date')
-                and entry.get('time', '') >= now_time
-                and run_key not in completed_today):
-            e['proximo'] = True
-            proximo_idx = i
-
-        grade.append(e)
-
-    proximo_time = entries[proximo_idx].get('time') if proximo_idx is not None else None
-
-    return json.dumps({
-        'total_entradas':  len(grade),
-        'proximo_horario': proximo_time,
-        'hora_atual':      now_time,
-        'grade':           grade,
-        'dica':            'Use adicionar_grade() e remover_grade() para modificar a programacao.',
-    }, ensure_ascii=False, indent=2)
-
-
-@mcp.tool()
-def ler_config(secao: str = '') -> str:
-    """
-    Le uma secao do config.yaml e retorna como JSON.
-    Util para inspecionar configuracoes antes de alterar.
-
-    Args:
-        secao: Nome da secao a ler. Opcoes: sources, narrators, llm, radio,
-               vinheta, schedule, tts, spots, spots_config, announcements.
-               Se vazio, retorna o config completo (exceto schedule — use ver_grade() para a grade).
-    """
-    config = _load_config()
-
-    if secao:
-        if secao not in config:
-            return json.dumps({
-                'status':   'erro',
-                'mensagem': f"Secao '{secao}' nao encontrada.",
-                'secoes_disponiveis': list(config.keys()),
-            }, ensure_ascii=False, indent=2)
-        return json.dumps({
-            'secao':    secao,
-            'conteudo': config[secao],
-        }, ensure_ascii=False, indent=2)
-
-    resumo = {k: v for k, v in config.items() if k != 'schedule'}
-    resumo['schedule_entradas'] = len(config.get('schedule', []))
-    return json.dumps(resumo, ensure_ascii=False, indent=2)
 
 
 @mcp.tool()
