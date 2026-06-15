@@ -1025,6 +1025,8 @@ O estado das execuções é salvo em `scheduler_state.json`:
 
 O `mcp_server.py` expõe a RadioIA como um servidor [MCP (Model Context Protocol)](https://modelcontextprotocol.io), permitindo que agentes de IA operem a rádio completamente por conversa — gerando episódios, gerenciando a grade, alterando configurações e monitorando o sistema.
 
+As 40 ferramentas estão organizadas em módulos dentro de `mcp_tools/` por domínio — `content`, `config`, `system`, `spots`, `media`, `context`, `exports`. O `mcp_server.py` é apenas o ponto de entrada que carrega os módulos e inicia o servidor.
+
 ### Iniciar o servidor
 
 ```bash
@@ -1167,9 +1169,19 @@ radioIA/
 ├── main.py                      # ponto de entrada principal
 ├── serve.py                     # player web (Flask)
 ├── scheduler.py                 # agendador de episódios
-├── mcp_server.py                # servidor MCP para agentes de IA
+├── mcp_server.py                # ponto de entrada do servidor MCP
 ├── config.yaml                  # configuração completa
 ├── .env                         # chaves de API (não versionar)
+├── mcp_tools/                   # módulos de ferramentas MCP (40 ferramentas)
+│   ├── _instance.py             # instância FastMCP compartilhada
+│   ├── _utils.py                # helpers compartilhados (load_config, scan_day, etc.)
+│   ├── content.py               # geração de episódios, histórico, replay
+│   ├── config.py                # grade e config.yaml (fontes, schedule)
+│   ├── system.py                # scheduler, player, log, disco, manutenção
+│   ├── spots.py                 # spots (adicionar, gerar, cache)
+│   ├── media.py                 # clipping, podcast, jamendo, intro de boas-vindas
+│   ├── context.py               # briefing e notas operacionais
+│   └── exports.py               # exportação de episódios (concat/zip)
 ├── src/
 │   ├── script_generator.py      # geração de roteiros (LiteLLM — multi-provedor)
 │   ├── tts_generator.py         # síntese de voz (multi-provedor)
@@ -1464,9 +1476,9 @@ python -m pytest tests/ -v
 | `tests/test_script_context.py` | Injeção de contexto nos prompts do `generate_script()` |
 | `tests/test_script_new_types.py` | Prompts dos tipos `utility` e `combined` — conteúdo, regras TTS, `_build_combined_card` |
 | `tests/test_utility_format.py` | `_format_data_for_prompt()` — cada seção (clima, câmbio, bolsa, loterias, futebol, sol) |
-| `tests/test_parse_value.py` | `_parse_value()` do MCP — bool, int, float, JSON lista/objeto, string |
-| `tests/test_mcp_parse_fonte.py` | `_parse_fonte()` do MCP — formatos `id`, `id:param`, `id\|ctx`, `url:...` |
-| `tests/test_adicionar_fonte.py` | `adicionar_fonte()` do MCP — validações e criação de fontes combined/rss |
+| `tests/test_parse_value.py` | `_parse_value()` (`mcp_tools._utils`) — bool, int, float, JSON lista/objeto, string |
+| `tests/test_mcp_parse_fonte.py` | `_parse_fonte()` (`mcp_tools._utils`) — formatos `id`, `id:param`, `id\|ctx`, `url:...` |
+| `tests/test_adicionar_fonte.py` | `adicionar_fonte()` (`mcp_tools.config`) — validações e criação de fontes combined/rss |
 | `tests/test_url_plugin.py` | Plugin `url` — extração de conteúdo e estrutura do item retornado |
 
 ### Validar um novo plugin
