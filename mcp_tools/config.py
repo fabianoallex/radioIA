@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime
 
 from mcp_tools._instance import mcp
 from mcp_tools._utils import (
@@ -8,6 +9,7 @@ from mcp_tools._utils import (
     _save_config,
     _parse_value,
     _set_nested,
+    _schedule_entry_key,
 )
 
 
@@ -277,6 +279,80 @@ def adicionar_grade(
         'entrada':        entry,
         'total_entradas': len(schedule),
         'aviso':          'config.yaml foi reformatado — comentarios originais foram perdidos.',
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def ver_grade() -> str:
+    """
+    Lista a grade de programacao completa com status de execucao de cada entrada.
+
+    Retorna todos os horarios configurados indicando:
+    - sources ou replay_of de cada slot
+    - se ja foi executado hoje (entradas diarias) ou se ja rodou (entradas pontuais)
+    - qual e o proximo horario pendente
+    - dias da semana restritos (quando configurado)
+
+    Use adicionar_grade() e remover_grade() para modificar a programacao.
+    """
+    config   = _load_config()
+    entries  = config.get('schedule', [])
+    today    = datetime.now().strftime('%Y-%m-%d')
+    now_time = datetime.now().strftime('%H:%M')
+
+    state_path = os.path.join(PROJECT_DIR, 'scheduler_state.json')
+    state = {}
+    if os.path.exists(state_path):
+        with open(state_path, 'r', encoding='utf-8') as f:
+            state = json.load(f)
+
+    completed_today = set(state.get('completed_today', {}).keys())
+    completed_once  = set(state.get('completed_once', []))
+
+    grade       = []
+    proximo_idx = None
+
+    for i, entry in enumerate(entries):
+        e = {
+            'time':  entry.get('time', ''),
+            'label': entry.get('label', ''),
+            'tipo':  'pontual' if entry.get('date') else 'diario',
+        }
+        if entry.get('date'):
+            e['date'] = entry['date']
+        if entry.get('replay_of') is not None:
+            e['replay_of'] = entry['replay_of']
+        elif entry.get('sources'):
+            e['sources'] = entry['sources']
+        if entry.get('slot_id') is not None:
+            e['slot_id'] = entry['slot_id']
+        if entry.get('days'):
+            e['days'] = entry['days']
+
+        key     = _schedule_entry_key(entry)
+        run_key = f"{today}|{key}"
+
+        if entry.get('date'):
+            e['executado'] = key in completed_once
+        else:
+            e['executado_hoje'] = run_key in completed_today
+
+        if (proximo_idx is None
+                and not entry.get('date')
+                and entry.get('time', '') >= now_time
+                and run_key not in completed_today):
+            e['proximo'] = True
+            proximo_idx  = i
+
+        grade.append(e)
+
+    proximo_time = entries[proximo_idx].get('time') if proximo_idx is not None else None
+
+    return json.dumps({
+        'total_entradas':  len(grade),
+        'proximo_horario': proximo_time,
+        'hora_atual':      now_time,
+        'grade':           grade,
     }, ensure_ascii=False, indent=2)
 
 
