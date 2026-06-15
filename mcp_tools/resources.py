@@ -1,4 +1,4 @@
-"""MCP Resources — leitura somente, expostos como dados em vez de ferramentas."""
+"""Ferramentas de leitura — consulta de estado, configuracao e historico."""
 import json
 import os
 from datetime import datetime
@@ -22,9 +22,15 @@ _OPERACAO_FILE      = os.path.join(PROJECT_DIR, 'OPERACAO.md')
 
 # ── briefing ──────────────────────────────────────────────────────────────────
 
-@mcp.resource("radioia://briefing")
-def resource_briefing() -> str:
-    """Snapshot operacional completo: radio, scheduler, player, episodios de hoje, proximos agendamentos e notas."""
+@mcp.tool()
+def briefing() -> str:
+    """
+    Snapshot operacional completo da radio: nome, modelo LLM, TTS, narradores,
+    fontes ativas/inativas, spots, status do scheduler, player, API keys,
+    episodios de hoje, proximos agendamentos e notas operacionais.
+
+    Leia sempre ao iniciar uma sessao para entender o estado atual do sistema.
+    """
     resultado: dict = {}
 
     config = _load_config()
@@ -118,9 +124,13 @@ def resource_briefing() -> str:
 
 # ── fontes ────────────────────────────────────────────────────────────────────
 
-@mcp.resource("radioia://fontes")
-def resource_fontes() -> str:
-    """Lista todas as fontes de conteudo configuradas: id, nome, tipo, status e historico."""
+@mcp.tool()
+def listar_fontes() -> str:
+    """
+    Lista todas as fontes de conteudo configuradas no config.yaml.
+    Retorna id, nome, tipo, status (enabled/disabled) e quantos itens do historico
+    vieram de cada fonte.
+    """
     config   = _load_config()
     seen_ids = load_seen_ids()
     fontes   = [_fonte_info(s, seen_ids) for s in config.get('sources', [])]
@@ -144,9 +154,14 @@ def resource_fontes() -> str:
 
 # ── modelos ───────────────────────────────────────────────────────────────────
 
-@mcp.resource("radioia://modelos")
-def resource_modelos() -> str:
-    """Modelos LLM disponiveis e modelo padrao configurado em llm.modelos do config.yaml."""
+@mcp.tool()
+def listar_modelos() -> str:
+    """
+    Lista os modelos LLM disponiveis conforme configurado em llm.modelos no config.yaml,
+    e qual e o modelo padrao (llm.model).
+
+    Se llm.modelos nao estiver configurado, qualquer modelo e aceito.
+    """
     config  = _load_config()
     llm_cfg = config.get('llm', {})
     default = llm_cfg.get('model', 'claude-sonnet-4-6')
@@ -169,9 +184,12 @@ def resource_modelos() -> str:
 
 # ── historico ─────────────────────────────────────────────────────────────────
 
-@mcp.resource("radioia://historico")
-def resource_historico() -> str:
-    """Status do historico de episodios: itens vistos e total gerado."""
+@mcp.tool()
+def status_historico() -> str:
+    """
+    Exibe o status do historico de episodios: quantos itens ja foram citados
+    (evitando repeticao) e total de episodios gerados desde o inicio.
+    """
     history_path = os.path.join(PROJECT_DIR, 'history.json')
     if not os.path.exists(history_path):
         return json.dumps({'itens_vistos': 0, 'episodios': 0, 'mensagem': 'Historico vazio.'}, ensure_ascii=False)
@@ -192,9 +210,13 @@ def resource_historico() -> str:
 
 # ── geracao ───────────────────────────────────────────────────────────────────
 
-@mcp.resource("radioia://geracao")
-def resource_geracao() -> str:
-    """Estado atual da geracao de episodios (le geracao_status.json)."""
+@mcp.tool()
+def status_geracao() -> str:
+    """
+    Retorna o estado atual de uma geracao de episodio em andamento,
+    lendo o arquivo geracao_status.json atualizado pelo processo de geracao.
+    Util para acompanhar o progresso apos chamar gerar_episodios().
+    """
     status_path = os.path.join(PROJECT_DIR, 'geracao_status.json')
 
     if not os.path.exists(status_path):
@@ -227,24 +249,30 @@ def resource_geracao() -> str:
             pass
         status['dica'] = 'Geracao em andamento. Leia novamente em alguns segundos para acompanhar.'
     elif status.get('etapa') == 'concluido':
-        status['dica'] = 'Episodio concluido. Leia radioia://episodios para ver os detalhes.'
+        status['dica'] = 'Episodio concluido. Use listar_episodios() para ver os detalhes.'
     elif status.get('etapa') == 'erro':
-        status['dica'] = 'Houve um erro. Verifique o campo erro e leia radioia://log para detalhes.'
+        status['dica'] = 'Houve um erro. Verifique o campo erro e use ler_log() para detalhes.'
 
     return json.dumps(status, ensure_ascii=False, indent=2)
 
 
 # ── episodios ─────────────────────────────────────────────────────────────────
 
-@mcp.resource("radioia://episodios")
-def resource_episodios_hoje() -> str:
-    """Episodios gerados hoje."""
-    return _episodios_data(datetime.now().strftime('%Y-%m-%d'))
+@mcp.tool()
+def listar_episodios(data: str = '') -> str:
+    """
+    Lista os episodios gerados para uma data especifica.
+    Sem data (ou data vazia) = episodios de hoje.
 
+    Args:
+        data: Data no formato YYYY-MM-DD. Omitir ou deixar vazio = hoje.
 
-@mcp.resource("radioia://episodios/{data}")
-def resource_episodios(data: str) -> str:
-    """Episodios gerados para a data informada (YYYY-MM-DD)."""
+    Exemplos:
+        listar_episodios()               — episodios de hoje
+        listar_episodios("2026-06-10")   — episodios de um dia especifico
+    """
+    if not data:
+        data = datetime.now().strftime('%Y-%m-%d')
     return _episodios_data(data)
 
 
@@ -276,9 +304,21 @@ def _episodios_data(data: str) -> str:
     }, ensure_ascii=False, indent=2)
 
 
-@mcp.resource("radioia://episodio/{data}/{pasta}")
-def resource_episodio(data: str, pasta: str) -> str:
-    """Roteiro e metadados de um episodio. data=YYYY-MM-DD, pasta=nome ou prefixo parcial."""
+@mcp.tool()
+def ler_episodio(data: str, pasta: str) -> str:
+    """
+    Le o roteiro completo e os metadados de um episodio especifico.
+
+    Args:
+        data:  Data no formato YYYY-MM-DD.
+        pasta: Nome completo ou prefixo parcial da pasta do episodio
+               (ex: "09-00_noticias" ou apenas "noticias").
+               Se o prefixo bater com mais de uma pasta, retorna todos os matches.
+
+    Exemplo:
+        ler_episodio("2026-06-15", "noticias")
+        ler_episodio("2026-06-15", "09-00_noticias")
+    """
     day_dir = os.path.join(PROJECT_DIR, 'output', data)
     if not os.path.isdir(day_dir):
         return json.dumps({'status': 'erro', 'mensagem': f"Nenhum episodio encontrado para {data}."}, ensure_ascii=False)
@@ -335,106 +375,50 @@ def resource_episodio(data: str, pasta: str) -> str:
     }, ensure_ascii=False, indent=2)
 
 
-# ── grade ─────────────────────────────────────────────────────────────────────
-
-@mcp.resource("radioia://grade")
-def resource_grade() -> str:
-    """Grade completa de programacao: horarios, fontes, labels, slot_ids, replays e status de execucao."""
-    config   = _load_config()
-    entries  = config.get('schedule', [])
-    today    = datetime.now().strftime('%Y-%m-%d')
-    now_time = datetime.now().strftime('%H:%M')
-
-    state_path = os.path.join(PROJECT_DIR, 'scheduler_state.json')
-    state = {}
-    if os.path.exists(state_path):
-        with open(state_path, 'r', encoding='utf-8') as f:
-            state = json.load(f)
-
-    completed_today = set(state.get('completed_today', {}).keys())
-    completed_once  = set(state.get('completed_once', []))
-
-    grade       = []
-    proximo_idx = None
-
-    for i, entry in enumerate(entries):
-        e = {
-            'time':  entry.get('time', ''),
-            'label': entry.get('label', ''),
-            'tipo':  'pontual' if entry.get('date') else 'diario',
-        }
-
-        if entry.get('date'):
-            e['date'] = entry['date']
-
-        if entry.get('replay_of') is not None:
-            e['replay_of'] = entry['replay_of']
-        elif entry.get('sources'):
-            e['sources'] = entry['sources']
-
-        if entry.get('slot_id') is not None:
-            e['slot_id'] = entry['slot_id']
-
-        if entry.get('days'):
-            e['days'] = entry['days']
-
-        key     = _schedule_entry_key(entry)
-        run_key = f"{today}|{key}"
-
-        if entry.get('date'):
-            e['executado'] = key in completed_once
-        else:
-            e['executado_hoje'] = run_key in completed_today
-
-        if (proximo_idx is None
-                and not entry.get('date')
-                and entry.get('time', '') >= now_time
-                and run_key not in completed_today):
-            e['proximo'] = True
-            proximo_idx  = i
-
-        grade.append(e)
-
-    proximo_time = entries[proximo_idx].get('time') if proximo_idx is not None else None
-
-    return json.dumps({
-        'total_entradas':  len(grade),
-        'proximo_horario': proximo_time,
-        'hora_atual':      now_time,
-        'grade':           grade,
-        'dica':            'Use adicionar_grade() e remover_grade() para modificar a programacao.',
-    }, ensure_ascii=False, indent=2)
-
-
 # ── config ────────────────────────────────────────────────────────────────────
 
-@mcp.resource("radioia://config")
-def resource_config() -> str:
-    """Configuracao completa do RadioIA (exceto schedule — use radioia://grade para a grade)."""
-    config = _load_config()
-    resumo = {k: v for k, v in config.items() if k != 'schedule'}
-    resumo['schedule_entradas'] = len(config.get('schedule', []))
-    return json.dumps(resumo, ensure_ascii=False, indent=2)
+@mcp.tool()
+def ler_config(secao: str = '') -> str:
+    """
+    Le a configuracao do RadioIA (config.yaml).
+    Sem secao = configuracao completa (exceto schedule — use ver_grade() para a grade).
+    Com secao = apenas aquela secao.
 
+    Args:
+        secao: Nome da secao (sources, narrators, llm, radio, vinheta, tts, spots,
+               welcome_intro, announcements, spots_config, downloads).
+               Omitir ou deixar vazio = config completa.
 
-@mcp.resource("radioia://config/{secao}")
-def resource_config_secao(secao: str) -> str:
-    """Uma secao especifica do config.yaml. Secoes: sources, narrators, llm, radio, vinheta, tts, spots."""
+    Exemplos:
+        ler_config()           — config completa
+        ler_config("llm")      — so a secao de modelos
+        ler_config("sources")  — lista de fontes
+    """
     config = _load_config()
+
+    if not secao:
+        resumo = {k: v for k, v in config.items() if k != 'schedule'}
+        resumo['schedule_entradas'] = len(config.get('schedule', []))
+        return json.dumps(resumo, ensure_ascii=False, indent=2)
+
     if secao not in config:
         return json.dumps({
             'status':             'erro',
             'mensagem':           f"Secao '{secao}' nao encontrada.",
             'secoes_disponiveis': list(config.keys()),
         }, ensure_ascii=False, indent=2)
+
     return json.dumps({'secao': secao, 'conteudo': config[secao]}, ensure_ascii=False, indent=2)
 
 
 # ── sistema ───────────────────────────────────────────────────────────────────
 
-@mcp.resource("radioia://sistema")
-def resource_sistema() -> str:
-    """Status geral do sistema: scheduler, player, API keys, uso de disco e historico."""
+@mcp.tool()
+def status_sistema() -> str:
+    """
+    Status geral do sistema: scheduler (rodando/parado, PID), player web (ativo/inativo),
+    API keys configuradas, uso de disco em output/ e resumo do historico.
+    """
     resultado = {}
 
     resultado['scheduler'] = _scheduler_status()
@@ -517,9 +501,13 @@ def resource_sistema() -> str:
 
 # ── player ────────────────────────────────────────────────────────────────────
 
-@mcp.resource("radioia://player")
-def resource_player() -> str:
-    """Estado atual do player web: episodios de hoje, proximo agendado e estatisticas."""
+@mcp.tool()
+def status_player() -> str:
+    """
+    Estado atual do player web: episodios de hoje, proximo episodio agendado
+    e estatisticas de reproducao.
+    Requer o player rodando (python serve.py).
+    """
     import urllib.request
 
     base = 'http://localhost:5000'
@@ -576,20 +564,16 @@ def resource_player() -> str:
 
 # ── log ───────────────────────────────────────────────────────────────────────
 
-@mcp.resource("radioia://log")
-def resource_log() -> str:
-    """Ultimas 50 linhas do scheduler.log."""
-    return _log_linhas(50)
+@mcp.tool()
+def ler_log(linhas: int = 50) -> str:
+    """
+    Le as ultimas N linhas do scheduler.log.
 
-
-@mcp.resource("radioia://log/{linhas}")
-def resource_log_n(linhas: str) -> str:
-    """Ultimas N linhas do scheduler.log. Ex: radioia://log/200"""
-    try:
-        n = int(linhas)
-    except ValueError:
-        n = 50
-    return _log_linhas(n)
+    Args:
+        linhas: Numero de linhas a retornar (padrao: 50). Use valores maiores
+                (ex: 200) para diagnosticar problemas que ocorreram ha mais tempo.
+    """
+    return _log_linhas(linhas)
 
 
 def _log_linhas(linhas: int) -> str:
@@ -621,9 +605,12 @@ def _log_linhas(linhas: int) -> str:
 
 # ── zips WhatsApp ─────────────────────────────────────────────────────────────
 
-@mcp.resource("radioia://zips-wp")
-def resource_zips_wp() -> str:
-    """Arquivos ZIP de exportacao do WhatsApp configurados no projeto."""
+@mcp.tool()
+def listar_zips_wp() -> str:
+    """
+    Lista os arquivos ZIP de exportacao do WhatsApp configurados no projeto,
+    com status (encontrado/nao encontrado), tamanho e data de modificacao.
+    """
     config  = _load_config()
     sources = [s for s in config.get('sources', []) if s.get('type') == 'whatsapp']
 
@@ -667,7 +654,7 @@ def resource_zips_wp() -> str:
                 entry['status']   = 'ok'
                 entry['arquivos'] = []
                 for z in zips:
-                    zp   = os.path.join(path_cfg, z)
+                    zp    = os.path.join(path_cfg, z)
                     mtime = datetime.fromtimestamp(os.path.getmtime(zp)).strftime('%Y-%m-%d %H:%M')
                     dias  = (datetime.now() - datetime.fromtimestamp(os.path.getmtime(zp))).days
                     entry['arquivos'].append({
@@ -687,9 +674,12 @@ def resource_zips_wp() -> str:
 
 # ── spots ─────────────────────────────────────────────────────────────────────
 
-@mcp.resource("radioia://spots")
-def resource_spots() -> str:
-    """Spots configurados: tipo, peso, limite diario e status do cache de audio."""
+@mcp.tool()
+def listar_spots() -> str:
+    """
+    Lista os spots configurados: tipo (tts/llm/file), peso de rotacao,
+    limite diario e status do cache de audio de cada um.
+    """
     config    = _load_config()
     spots     = config.get('spots') or []
     spots_cfg = config.get('spots_config', {})
@@ -698,7 +688,7 @@ def resource_spots() -> str:
         return json.dumps({
             'status':   'sem_spots',
             'mensagem': 'Nenhum spot configurado em config.yaml.',
-            'dica':     'Adicione spots na secao "spots:" do config.yaml.',
+            'dica':     'Use adicionar_spot() para criar spots.',
         }, ensure_ascii=False, indent=2)
 
     resultado = []
@@ -731,9 +721,12 @@ def resource_spots() -> str:
 
 # ── jamendo ───────────────────────────────────────────────────────────────────
 
-@mcp.resource("radioia://jamendo")
-def resource_jamendo() -> str:
-    """Cache local do Jamendo: faixas catalogadas, tamanho em disco e fontes configuradas."""
+@mcp.tool()
+def ver_cache_jamendo() -> str:
+    """
+    Exibe o estado do cache local do Jamendo: quantas faixas estao catalogadas,
+    quantas existem no disco, tamanho total e fontes Jamendo configuradas.
+    """
     from src.sources.music import CACHE_DIR, CATALOG_FILE
 
     config = _load_config()
@@ -785,9 +778,12 @@ def resource_jamendo() -> str:
 
 # ── intro boas-vindas ─────────────────────────────────────────────────────────
 
-@mcp.resource("radioia://intro")
-def resource_intro() -> str:
-    """Configuracao da intro de boas-vindas e status do audio gerado."""
+@mcp.tool()
+def ver_intro_boas_vindas() -> str:
+    """
+    Exibe a configuracao atual da intro de boas-vindas: falas configuradas,
+    voz usada e se o audio ja foi gerado (com tamanho e data de geracao).
+    """
     config = _load_config()
     wi     = config.get('welcome_intro', {})
     exists = os.path.exists(_WELCOME_INTRO_PATH)
