@@ -653,7 +653,7 @@ A resolução segue a ordem: **`model` da fonte → `llm.model` global → `clau
 
 ### Modelos disponíveis para o agente MCP (`llm.modelos`)
 
-O campo `llm.modelos` define quais modelos o agente operador (MCP) pode usar. Serve tanto para **descoberta** — o agente chama `listar_modelos()` para ver as opções — quanto para **restrição** — se configurado, `gerar_episodios()` e `gerar_clipping()` rejeitam qualquer modelo fora da lista.
+O campo `llm.modelos` define quais modelos o agente operador (MCP) pode usar. Serve tanto para **descoberta** — o agente lê `radioia://modelos` para ver as opções — quanto para **restrição** — se configurado, `gerar_episodios()` e `gerar_clipping()` rejeitam qualquer modelo fora da lista.
 
 ```yaml
 llm:
@@ -1025,7 +1025,9 @@ O estado das execuções é salvo em `scheduler_state.json`:
 
 O `mcp_server.py` expõe a RadioIA como um servidor [MCP (Model Context Protocol)](https://modelcontextprotocol.io), permitindo que agentes de IA operem a rádio completamente por conversa — gerando episódios, gerenciando a grade, alterando configurações e monitorando o sistema.
 
-As 40 ferramentas estão organizadas em módulos dentro de `mcp_tools/` por domínio — `content`, `config`, `system`, `spots`, `media`, `context`, `exports`. O `mcp_server.py` é apenas o ponto de entrada que carrega os módulos e inicia o servidor.
+As ferramentas e resources estão organizadas em módulos dentro de `mcp_tools/` por domínio — `content`, `config`, `system`, `spots`, `media`, `context`, `exports`, `resources`. O `mcp_server.py` é apenas o ponto de entrada que carrega os módulos e inicia o servidor.
+
+**24 ferramentas** (ações com efeitos) + **19 resources** (dados de leitura via URI `radioia://`). Resources não consomem tokens de contexto das ferramentas — o agente os lê sob demanda.
 
 ### Iniciar o servidor
 
@@ -1039,8 +1041,6 @@ python mcp_server.py
 
 | Ferramenta | Descrição |
 |-----------|-----------|
-| `listar_fontes()` | Lista todas as fontes configuradas com tipo, status e histórico |
-| `listar_modelos()` | Lista os modelos LLM disponíveis nesta instalação (definidos em `llm.modelos`) |
 | `gerar_episodios(["noticias", "copa"])` | Gera episódios para as fontes especificadas |
 | `gerar_episodios(["musica:3"])` | Gera bloco musical com N faixas |
 | `gerar_episodios(["url:https://..."])` | Gera episódio a partir de URL (web ou YouTube) |
@@ -1051,8 +1051,6 @@ python mcp_server.py
 | `gerar_clipping("copa", followup=True)` | Clipping de acompanhamento — só artigos recentes |
 | `gerar_clipping("tema", model="claude-opus-4-8")` | Clipping com modelo específico |
 | `gerar_clipping("tema", agregadores=["bing_news"])` | Clipping usando apenas um agregador específico |
-| `listar_episodios("2026-06-11")` | Lista episódios de uma data (padrão: hoje) com duração total |
-| `ler_episodio("noticias")` | Lê o roteiro completo e metadados de um episódio por prefixo |
 | `deletar_episodio("09-30_youtube")` | Remove a pasta de um episódio específico do output |
 | `replay_episodio("12-15_not")` | Replay de episódio por prefixo parcial da pasta |
 | `replay_episodio("12-15", "2026-06-03")` | Replay de episódio de uma data específica |
@@ -1066,21 +1064,17 @@ Fontes do tipo `combined` (ex: `bom-dia`) também são aceitas — use o id conf
 
 | Ferramenta | Descrição |
 |-----------|-----------|
-| `status_historico()` | Mostra quantos itens e episódios já foram veiculados |
 | `limpar_historico()` | Reseta o histórico — todos os conteúdos ficam elegíveis novamente |
 
 #### Grade e configuração
 
 | Ferramenta | Descrição |
 |-----------|-----------|
-| `ver_grade()` | Exibe a grade completa com status de execução do dia e próximo horário |
-| `ler_config("radio")` | Lê uma seção do `config.yaml` como JSON (`sources`, `narrators`, `llm`, `radio`, `vinheta`, `schedule`, `tts`) |
 | `adicionar_fonte("bom-dia", "combined", "Bom Dia MT", '{"sources":["noticias","youtube"]}')` | Cria uma nova fonte no config.yaml com validação de tipo e campos obrigatórios |
 | `configurar_fonte("musica", "enabled", "true")` | Habilita, desabilita ou altera um campo de qualquer fonte existente |
 | `atualizar_config("radio.name", "Minha Rádio")` | Altera qualquer valor do config via notação de ponto |
 | `adicionar_grade("16:00", ["noticias"], "Tarde")` | Adiciona entrada na grade (diária ou pontual, com suporte a `slot_id`/`replay_of`/`days`) |
 | `remover_grade("16:00", "Tarde")` | Remove entrada da grade por horário e label |
-| `ver_intro_boas_vindas()` | Mostra as frases configuradas, a voz e o status do áudio gerado |
 | `configurar_intro_boas_vindas(falas=[...])` | Atualiza as frases e/ou a voz da intro; regera o áudio automaticamente |
 | `regenerar_intro_boas_vindas()` | Apaga o áudio atual e regera com a configuração corrente (sorteia uma fala diferente) |
 
@@ -1093,7 +1087,6 @@ Fontes do tipo `combined` (ex: `bom-dia`) também são aceitas — use o id conf
 | `controlar_scheduler("status")` | Verifica se o scheduler está rodando (via PID real, não heurística) |
 | `controlar_scheduler("start")` | Inicia o scheduler em background — logs em `scheduler.log`, PID em `scheduler.pid` |
 | `controlar_scheduler("stop")` | Encerra o scheduler pelo PID salvo |
-| `ler_log(linhas=50)` | Retorna as últimas N linhas do `scheduler.log` para diagnóstico de falhas |
 
 O scheduler protege contra instâncias duplicadas: tentar iniciar uma segunda instância (pelo MCP ou pelo terminal) resulta em erro com o PID da instância já ativa.
 
@@ -1101,12 +1094,8 @@ O scheduler protege contra instâncias duplicadas: tentar iniciar uma segunda in
 
 | Ferramenta | Descrição |
 |-----------|-----------|
-| `status_sistema()` | Status completo: scheduler, player, API keys configuradas e uso de disco |
-| `status_player()` | Estado do player: ativo/inativo, playlist de hoje e próximo episódio agendado |
-| `listar_zips_wp()` | Lista arquivos ZIP de exportação do WhatsApp por fonte configurada (nome, tamanho, data) |
 | `limpar_output(dias_manter=7)` | Lista ou remove episódios antigos para liberar espaço (padrão: preview seguro) |
 | `testar_tts("Bem-vindos!")` | Gera `output/tts_test.mp3` para testar o TTS sem gerar episódio |
-| `ver_cache_jamendo()` | Status do cache local: faixas catalogadas, tamanho em disco e fontes configuradas |
 | `baixar_musicas_jamendo(id_fonte?)` | Baixa novas faixas do Jamendo para o cache; omitir `id_fonte` para baixar de todas as fontes |
 | `limpar_cache_jamendo(confirmar)` | Remove todos os arquivos e o catálogo do cache Jamendo (requer `confirmar=True`) |
 
@@ -1118,6 +1107,39 @@ O scheduler protege contra instâncias duplicadas: tentar iniciar uma segunda in
 | `exportar_episodios("concat")` | Gera MP3 único com todos os episódios do dia concatenados — salvo em `output/_exports/` |
 | `exportar_episodios("zip", "2026-06-10")` | Gera ZIP com os episódios de uma data específica na estrutura de pastas |
 | `exportar_episodios("concat", pastas=["09-00_noticias"])` | Exporta apenas os episódios selecionados |
+
+### Resources disponíveis
+
+Resources são dados que o agente lê sob demanda via URI — sem ocupar os tokens de contexto reservados às ferramentas. O agente descobre e acessa resources através do protocolo MCP (`list_resources` / `read_resource`).
+
+#### Resources estáticos
+
+| URI | Dados retornados |
+|-----|-----------------|
+| `radioia://briefing` | Snapshot operacional completo: rádio, scheduler, player, episódios de hoje, próximos agendamentos e notas |
+| `radioia://fontes` | Todas as fontes configuradas com tipo, status e histórico |
+| `radioia://modelos` | Modelos LLM disponíveis e modelo padrão (definidos em `llm.modelos`) |
+| `radioia://historico` | Status do histórico: itens vistos e total de episódios gerados |
+| `radioia://geracao` | Estado atual da geração em andamento (`geracao_status.json`) |
+| `radioia://episodios` | Episódios gerados hoje |
+| `radioia://grade` | Grade completa com status de execução e próximo horário |
+| `radioia://config` | Configuração completa (exceto schedule — use `radioia://grade` para a grade) |
+| `radioia://sistema` | Status geral: scheduler, player, API keys configuradas, uso de disco |
+| `radioia://player` | Estado do player web: playlist de hoje e próximo episódio agendado |
+| `radioia://log` | Últimas 50 linhas do `scheduler.log` |
+| `radioia://spots` | Spots configurados com tipo, peso e status do cache de áudio |
+| `radioia://jamendo` | Cache local do Jamendo: faixas catalogadas e tamanho em disco |
+| `radioia://intro` | Configuração da intro de boas-vindas e status do áudio gerado |
+| `radioia://zips-wp` | Arquivos ZIP de exportação do WhatsApp por fonte configurada |
+
+#### Resource templates (URI com parâmetros)
+
+| URI template | Parâmetros | Dados retornados |
+|-------------|-----------|-----------------|
+| `radioia://episodios/{data}` | `data` — YYYY-MM-DD | Episódios da data especificada |
+| `radioia://episodio/{data}/{pasta}` | `data` + `pasta` — prefixo parcial da pasta | Roteiro completo e metadados de um episódio |
+| `radioia://config/{secao}` | `secao` — nome da seção (`sources`, `llm`, `radio`, `tts`...) | Seção específica do `config.yaml` |
+| `radioia://log/{linhas}` | `linhas` — número inteiro | Últimas N linhas do `scheduler.log` |
 
 ### Configurar no Claude Code (`~/.claude/claude_desktop_config.json`)
 
@@ -1136,10 +1158,7 @@ Após configurar, você pode pedir ao Claude:
 - *"Gera um episódio de notícias e copa do mundo"*
 - *"Faz um clipping sobre a reforma tributária"*
 - *"Inicia o scheduler"* / *"Para o scheduler"*
-- *"Mostra as últimas 100 linhas do log do scheduler"*
 - *"Habilita a fonte de música e adiciona um bloco musical às 12h"*
-- *"Qual o status do sistema? O scheduler está rodando?"*
-- *"Mostra o roteiro do episódio de YouTube das 9h"*
 - *"Remove o episódio de clipping das 14h30"*
 - *"Remove episódios mais antigos que 14 dias"*
 
@@ -1172,16 +1191,17 @@ radioIA/
 ├── mcp_server.py                # ponto de entrada do servidor MCP
 ├── config.yaml                  # configuração completa
 ├── .env                         # chaves de API (não versionar)
-├── mcp_tools/                   # módulos de ferramentas MCP (40 ferramentas)
+├── mcp_tools/                   # módulos MCP — 24 ferramentas + 19 resources
 │   ├── _instance.py             # instância FastMCP compartilhada
 │   ├── _utils.py                # helpers compartilhados (load_config, scan_day, etc.)
 │   ├── content.py               # geração de episódios, histórico, replay
 │   ├── config.py                # grade e config.yaml (fontes, schedule)
-│   ├── system.py                # scheduler, player, log, disco, manutenção
+│   ├── system.py                # scheduler, disco, manutenção
 │   ├── spots.py                 # spots (adicionar, gerar, cache)
 │   ├── media.py                 # clipping, podcast, jamendo, intro de boas-vindas
-│   ├── context.py               # briefing e notas operacionais
-│   └── exports.py               # exportação de episódios (concat/zip)
+│   ├── context.py               # notas operacionais
+│   ├── exports.py               # exportação de episódios (concat/zip)
+│   └── resources.py             # resources de leitura (radioia://)
 ├── src/
 │   ├── script_generator.py      # geração de roteiros (LiteLLM — multi-provedor)
 │   ├── tts_generator.py         # síntese de voz (multi-provedor)
