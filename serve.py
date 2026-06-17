@@ -455,6 +455,8 @@ let selectedEpIds  = new Set();
 let dlModeActive   = false;
 let _dlModeTimer   = null;
 const DL_MODE_TIMEOUT_MS = 30000;
+let _notesLastScroll = 0;   // timestamp do último scroll/wheel/touchmove no painel de fontes
+const NOTES_IDLE_MS  = 20000;
 
 const S_EP           = 'radioIA_ep';
 const S_TIME         = 'radioIA_time';
@@ -486,6 +488,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Restaura volume salvo
   const savedVol = localStorage.getItem(S_VOL);
   if (savedVol !== null) audio.volume = parseFloat(savedVol);
+
+  // Rastreia interação com o painel de fontes (scroll intencional do usuário)
+  const notesEl = document.getElementById('notes');
+  ['scroll', 'wheel', 'touchmove'].forEach(ev =>
+    notesEl.addEventListener(ev, () => { _notesLastScroll = Date.now(); }, { passive: true })
+  );
 });
 
 const months = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
@@ -1237,7 +1245,12 @@ function updateActiveCard(t) {
       best = card;
     }
   });
+  const prevActive = document.querySelector('#notes .link-card.active');
   cards.forEach(card => card.classList.toggle('active', card === best));
+  if (best && best !== prevActive) {
+    const idle = !_notesLastScroll || Date.now() - _notesLastScroll >= NOTES_IDLE_MS;
+    if (idle) best.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
 }
 
 // ── Downloads ─────────────────────────────────────────────────────────────────
