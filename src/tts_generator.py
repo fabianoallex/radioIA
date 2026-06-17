@@ -10,7 +10,7 @@ MAX_LINE_CHARS = 450
 def parse_script(script: str) -> list[dict]:
     lines = []
     pattern = re.compile(r'\*{0,2}\[(LOCUTOR_[A-C])\]\*{0,2}:[\*\s]*(.+)')
-    item_pattern = re.compile(r'^\[ITEM_(\d+)\]$')
+    item_pattern = re.compile(r'^\[ITEM_(\d+)\]')
     current_item = None
     for line in script.splitlines():
         stripped = line.strip()

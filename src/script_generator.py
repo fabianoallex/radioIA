@@ -44,7 +44,7 @@ def _format_block(narrators: list[dict]) -> str:
     for i, n in enumerate(narrators):
         key = LOCUTOR_KEYS[i]
         lines.append(f"[{key}]: fala de {n['name']}")
-    lines.append('[ITEM_N]: marcador de item (linha sozinha antes de cada bloco, N = 1, 2, 3... — nao e fala)')
+    lines.append('[ITEM_N]  (linha isolada sem dois-pontos nem texto — imediatamente antes das falas de cada item numerado)')
     return '\n'.join(lines)
 
 
@@ -274,7 +274,7 @@ REGRAS:
 - Varie quem abre cada bloco de video
 - Comentarios de inscritos: cite apenas se genuinamente interessante, maximo 1 por video, nomeie o autor
 {solo_note}
-- Insira [ITEM_N] em linha separada antes de cada bloco de video (ex: [ITEM_1], [ITEM_2]...) — nao e fala, serve apenas como marcador de posicao
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Video 1; [ITEM_2] antes do Video 2 etc. — NAO usar na abertura nem no encerramento
 - NAO invente informacoes
 
 VIDEOS DO DIA:
@@ -336,7 +336,7 @@ REGRAS:
 - Diga "materia completa nas notas, noticia [numero]"
 - Tom informativo — pode ter leveza mas sem exageros
 {solo_note}
-- Insira [ITEM_N] em linha separada antes de cada noticia (ex: [ITEM_1], [ITEM_2]...) — nao e fala, serve apenas como marcador de posicao
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Noticia 1; [ITEM_2] antes da Noticia 2 etc. — NAO usar na abertura nem no encerramento
 - NAO invente informacoes
 
 NOTICIAS:
@@ -403,7 +403,7 @@ REGRAS:
 - Tom de game show: animado, dinamico, levemente competitivo
 - Reactions genuinas: surpresa, deboche amigavel, admiracao
 {solo_note}
-- Insira [ITEM_N] em linha separada antes de cada pergunta (ex: [ITEM_1], [ITEM_2]...) — nao e fala, serve apenas como marcador de posicao
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Pergunta 1; [ITEM_2] antes da Pergunta 2 etc. — NAO usar na abertura nem no encerramento
 - NAO invente informacoes alem do que esta nas perguntas
 
 PERGUNTAS:
@@ -467,7 +467,7 @@ REGRAS:
 - Conecte posts de subreddits diferentes quando houver relacao tematica
 - Reaja com personalidade: curiosidade, critica, humor conforme o perfil de cada apresentador
 {solo_note}
-- Insira [ITEM_N] em linha separada antes de cada post (ex: [ITEM_1], [ITEM_2]...) — nao e fala, serve apenas como marcador de posicao
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Post 1; [ITEM_2] antes do Post 2 etc. — NAO usar na abertura nem no encerramento
 - NAO invente informacoes
 
 POSTS:
@@ -533,7 +533,7 @@ REGRAS:
 - Baseie-se fielmente no conteudo das previsoes fornecidas
 - Se o conteudo for escasso, expanda com sabedoria astrologica coerente com o signo
 {solo_note}
-- Insira [ITEM_N] em linha separada antes de cada signo (ex: [ITEM_1], [ITEM_2]...) — nao e fala, serve apenas como marcador de posicao
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Signo 1; [ITEM_2] antes do Signo 2 etc. — NAO usar na abertura nem no encerramento
 
 PREVISOES DE HOJE:
 {content}
@@ -604,7 +604,7 @@ REGRAS:
 - Mencione nota ou popularidade apenas quando impressionante (ex: "quase 9 de nota!")
 - Traduza generos e termos tecnicos para o portugues do dia a dia
 - NAO invente informacoes alem das fornecidas
-- Insira [ITEM_N] em linha separada antes de cada filme (ex: [ITEM_1], [ITEM_2]...) — nao e fala, serve apenas como marcador de posicao
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Filme 1; [ITEM_2] antes do Filme 2 etc. — NAO usar na abertura nem no encerramento
 {solo_note}
 
 FILMES:
@@ -685,7 +685,7 @@ REGRAS:
 - Diga "link do episódio nas notas" no encerramento
 - Não invente informações além do conteúdo fornecido
 - Se o conteúdo for escasso, foque na apresentação do podcast e no tema geral
-- Insira [ITEM_N] em linha separada antes de cada episódio (ex: [ITEM_1], [ITEM_2]...) — nao e fala, serve apenas como marcador de posicao
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Episodio 1; [ITEM_2] antes do Episodio 2 etc. — NAO usar na abertura nem no encerramento
 {solo_note}
 
 EPISÓDIO(S):
@@ -787,7 +787,7 @@ REGRAS:
 - Aponte convergências e divergências entre os veículos quando existirem
 - Não leia os artigos na íntegra — sintetize os ângulos e enfoques
 - Não invente informações além do que está nos textos fornecidos
-- Insira [ITEM_N] em linha separada antes da cobertura de cada veículo (ex: [ITEM_1], [ITEM_2]...) — nao e fala, serve apenas como marcador de posicao
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Fonte 1; [ITEM_2] antes da Fonte 2 etc. — NAO usar na abertura nem no encerramento
 {solo_note}
 
 COBERTURA DA MÍDIA:
@@ -1014,7 +1014,7 @@ REGRAS:
 - Cada fala: maximo 2 sentencas
 - Mencione a origem de forma natural quando relevante: "segundo o G1...", "no YouTube..." — nunca diga "vi na internet"
 - NAO invente informacoes que nao estejam no conteudo fornecido
-- Insira [ITEM_N] em linha separada antes de cada fonte de conteudo (ex: [ITEM_1], [ITEM_2]...) — nao e fala, serve apenas como marcador de posicao
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Fonte 1; [ITEM_2] antes da Fonte 2 etc. — NAO usar na abertura nem no encerramento
 {solo_note}
 
 CONTEUDO:
@@ -1087,7 +1087,7 @@ REGRAS:
 - Se o prato for de culinaria estrangeira, mencione onde e popular e como os brasileiros podem adaptar
 {solo_note}
 - NAO invente ingredientes ou passos que nao estejam na receita
-- Insira [ITEM_N] em linha separada antes de cada receita (ex: [ITEM_1], [ITEM_2]...) — nao e fala, serve apenas como marcador de posicao
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Receita 1; [ITEM_2] antes da Receita 2 etc. — NAO usar na abertura nem no encerramento
 
 RECEITA:
 {content}
@@ -1226,7 +1226,7 @@ REGRAS:
 - Busque conexões entre itens de fontes diferentes quando fizer sentido narrativo
 - Tom: informativo mas leve — rádio é conversa, não leitura de boletim
 {solo_note}
-- Insira [ITEM_N] em linha separada antes de cada item (ex: [ITEM_1], [ITEM_2]...) — nao e fala, serve apenas como marcador de posicao
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Item 1; [ITEM_2] antes do Item 2 etc. — NAO usar na abertura nem no encerramento
 - NÃO invente informações
 
 CONTEÚDO:
