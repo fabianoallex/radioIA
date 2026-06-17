@@ -396,6 +396,7 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
     episode_id   = '/'.join(output_dir.replace('\\', '/').split('/')[-2:])
     links_text   = ' | '.join(f"[{i}] {v['title']} {v['url']}" for i, v in enumerate(items, 1))
 
+    item_timestamps = {}
     duration = mix_episode(
         audio_files=audio_files,
         lines=lines,
@@ -404,10 +405,12 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
         radio_config=config.get('radio', {}),
         vinhetas=vinhetas,
         station_name=radio_name,
+        item_timestamps=item_timestamps,
     )
 
     _write_status(source_id, source_name, 'finalizando', inicio=_inicio)
-    save_episode_metadata(items, script, output_dir, duration, source_name=source_name)
+    save_episode_metadata(items, script, output_dir, duration, source_name=source_name,
+                          item_timestamps=item_timestamps)
     save_episode_to_history(episode_id, items)
     shutil.rmtree(temp_dir, ignore_errors=True)
     _write_status(source_id, source_name, 'concluido', ativo=False, inicio=_inicio)
@@ -535,6 +538,7 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
     episode_path = os.path.join(output_dir, 'episode.mp3')
     links_text = ' | '.join(f"[{i}] {v['title']} {v['url']}" for i, v in enumerate(items, 1))
 
+    item_timestamps = {}
     duration = mix_episode(
         audio_files=audio_files,
         lines=lines,
@@ -543,10 +547,12 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
         radio_config=config.get('radio', {}),
         vinhetas=vinhetas,
         station_name=radio_name,
+        item_timestamps=item_timestamps,
     )
 
     _write_status(source_id, source_name, 'finalizando', inicio=_inicio)
-    save_episode_metadata(items, script, output_dir, duration, source_name=source_name)
+    save_episode_metadata(items, script, output_dir, duration, source_name=source_name,
+                          item_timestamps=item_timestamps)
     save_episode_to_history(episode_id, items)
     shutil.rmtree(temp_dir)
     _write_status(source_id, source_name, 'concluido', ativo=False, inicio=_inicio)

@@ -36,12 +36,14 @@ def _is_transition_line(text: str) -> bool:
 
 def mix_episode(audio_files: list[str], lines: list[dict], output_path: str,
                 metadata: dict, radio_config: dict | None = None,
-                vinhetas: dict | None = None, station_name: str = 'RadioIA') -> float:
+                vinhetas: dict | None = None, station_name: str = 'RadioIA',
+                item_timestamps: dict | None = None) -> float:
     radio_config = radio_config or {}
     vinhetas = vinhetas or {}
     fallback_tone = _generate_transition_tone()
 
     combined = AudioSegment.empty()
+    _last_item_idx = None
 
     # Opening vinheta
     if 'abertura' in vinhetas:
@@ -50,6 +52,13 @@ def mix_episode(audio_files: list[str], lines: list[dict], output_path: str,
     for i, (file_path, line) in enumerate(zip(audio_files, lines)):
         if i > 0 and _is_transition_line(line['text']):
             combined += vinhetas.get('id', fallback_tone)
+
+        if item_timestamps is not None:
+            item_idx = line.get('item_index')
+            if item_idx is not None and item_idx != _last_item_idx:
+                _last_item_idx = item_idx
+                if item_idx not in item_timestamps:
+                    item_timestamps[item_idx] = round(len(combined) / 1000, 1)
 
         segment = AudioSegment.from_mp3(file_path)
         combined += segment
@@ -84,9 +93,11 @@ def mix_episode(audio_files: list[str], lines: list[dict], output_path: str,
 
 
 def save_episode_metadata(videos: list[dict], script: str, output_dir: str,
-                          duration_secs: float, source_name: str = '') -> dict:
-    links = [
-        {
+                          duration_secs: float, source_name: str = '',
+                          item_timestamps: dict | None = None) -> dict:
+    links = []
+    for i, v in enumerate(videos, 1):
+        link = {
             'title': v['title'],
             'channel': v['channel'],
             'url': v['url'],
@@ -94,8 +105,9 @@ def save_episode_metadata(videos: list[dict], script: str, output_dir: str,
             'published_at': v.get('published_at', ''),
             'top_comments': v.get('comments', [])
         }
-        for v in videos
-    ]
+        if item_timestamps and i in item_timestamps:
+            link['start_time_seconds'] = item_timestamps[i]
+        links.append(link)
     metadata = {
         'source_name': source_name,
         'duration_seconds': round(duration_secs),

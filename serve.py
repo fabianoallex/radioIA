@@ -355,6 +355,12 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
 .gc-fontes { font-size: 11px; color: #6b7280;
              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @keyframes gen-pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+/* ── Seek por item ──────────────────────────────────────────────────────────── */
+.link-card.seekable { cursor: pointer; }
+.link-card.seekable:hover { border-color: #6366f1; }
+.link-card.active { border-color: #6366f1 !important; background: #1e1b4b; }
+.link-seek { font-size: 11px; color: #818cf8; margin-bottom: 6px; }
 </style>
 </head>
 <body>
@@ -468,6 +474,7 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem(S_EP,   currentEp.id);
       localStorage.setItem(S_TIME, t);
     }
+    updateActiveCard(t);
   });
 
   audio.addEventListener('play',  () => acquireWakeLock());
@@ -1171,6 +1178,7 @@ function playEpisode(ep) {
   });
 
   renderNotes(ep);
+  updateActiveCard(audio.currentTime);
   if (isMobile()) setTab('fontes');
 }
 
@@ -1195,13 +1203,41 @@ function renderNotes(ep) {
           <span style="color:#4b5563"> · ${c.likes} curtidas</span>
         </div>`).join('')}
       </div>` : '';
-    return `<div class="link-card">
+    const hasStart = !isMusic && lk.start_time_seconds != null;
+    const seekAttr  = hasStart ? ` data-start="${lk.start_time_seconds}"` : '';
+    const seekClass = hasStart ? ' seekable' : '';
+    const seekClick = hasStart ? ` onclick="seekTo(${lk.start_time_seconds})"` : '';
+    const seekHint  = hasStart ? `<div class="link-seek">▶ ${fmtDur(Math.round(lk.start_time_seconds))}</div>` : '';
+    return `<div class="link-card${seekClass}"${seekAttr}${seekClick}>
       <div class="link-num">${isMusic ? '🎵' : '#' + (i+1)}</div>
       <div class="link-title">${lk.title}</div>
       ${meta ? `<div class="link-meta">${meta}</div>` : ''}
-      ${urlHtml}${commentsHtml}
+      ${seekHint}${urlHtml}${commentsHtml}
     </div>`;
   }).join('');
+}
+
+function seekTo(seconds) {
+  const audio = document.getElementById('audio');
+  if (audio.src) {
+    audio.currentTime = seconds;
+    audio.play().catch(() => {});
+  }
+}
+
+function updateActiveCard(t) {
+  const cards = [...document.querySelectorAll('#notes .link-card.seekable')];
+  if (!cards.length) return;
+  let best = null;
+  let bestStart = -1;
+  cards.forEach(card => {
+    const start = parseFloat(card.dataset.start);
+    if (!isNaN(start) && start <= t && start > bestStart) {
+      bestStart = start;
+      best = card;
+    }
+  });
+  cards.forEach(card => card.classList.toggle('active', card === best));
 }
 
 // ── Downloads ─────────────────────────────────────────────────────────────────
