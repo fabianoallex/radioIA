@@ -40,10 +40,11 @@ def _narrator_block(narrators: list[dict]) -> str:
 
 
 def _format_block(narrators: list[dict]) -> str:
-    lines = ['FORMATO OBRIGATORIO (uma fala por linha):']
+    lines = ['FORMATO OBRIGATORIO:']
     for i, n in enumerate(narrators):
         key = LOCUTOR_KEYS[i]
         lines.append(f"[{key}]: fala de {n['name']}")
+    lines.append('[ITEM_N]: marcador de item (linha sozinha antes de cada bloco, N = 1, 2, 3... — nao e fala)')
     return '\n'.join(lines)
 
 
