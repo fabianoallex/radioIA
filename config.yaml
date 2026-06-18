@@ -370,25 +370,57 @@ sources:
   # Descobre automaticamente o assunto mais discutido do dia consultando RSS de
   # grandes portais brasileiros e usando o LLM para identificar o tópico.
   # Ativar: python main.py clipping-auto
-  # - id: clipping-auto
+  #
+  # Novos settings:
+  #   categoria           — filtra o LLM para um tema (política, economia, esportes…)
+  #   topic_cooldown_hours — evita repetir o mesmo assunto dentro de N horas (isolamento intra-dia)
+  #   topic_history_days  — evita repetir assuntos cobertos nos últimos N dias
+  #   followup automático — se o assunto já foi coberto hoje, ativa modo de acompanhamento
+  #
+  # Exemplo de grade completa de clipping (descomente e ajuste):
+  # - id: clipping-geral
   #   type: clipping_auto
-  #   name: "Clipping do Dia"
+  #   name: "Clipping Geral"
   #   enabled: false
   #   settings:
-  #     max_topics: 1           # tópicos a identificar (usa o 1º)
-  #     max_sources: 5          # veículos por tópico
+  #     max_topics: 3
+  #     max_sources: 5
   #     days_lookback: 1
   #     fetch_content: true
   #     max_content_chars: 2000
   #     llm_model: claude-haiku-4-5-20251001
+  #     topic_history_days: 7
+  #     topic_cooldown_hours: 4    # não repete o mesmo assunto em menos de 4h
   #     agregadores:
   #       - google_news
   #       - bing_news
-  #     trending_feeds:         # RSS dos portais para descoberta de manchetes
+  #     trending_feeds:
   #       - https://g1.globo.com/rss/g1/
   #       - https://feeds.folha.uol.com.br/emcimadahora/rss091.xml
   #       - https://feeds.bbci.co.uk/portuguese/rss.xml
   #       - https://rss.uol.com.br/feed/noticias.xml
+  #
+  # - id: clipping-economia
+  #   type: clipping_auto
+  #   name: "Clipping Economia"
+  #   enabled: false
+  #   settings:
+  #     categoria: economia        # LLM foca em tópicos de economia
+  #     max_topics: 3
+  #     max_sources: 5
+  #     topic_history_days: 7
+  #     topic_cooldown_hours: 4
+  #
+  # - id: clipping-esportes
+  #   type: clipping_auto
+  #   name: "Clipping Esportes"
+  #   enabled: false
+  #   settings:
+  #     categoria: esportes
+  #     max_topics: 3
+  #     max_sources: 5
+  #     topic_history_days: 3      # esportes mudam mais rápido
+  #     topic_cooldown_hours: 4
 
   # ── Plugin: WhatsApp (Exportação Manual) ─────────────────────────────────────
   # Exportar: WhatsApp → Grupo → ⋮ → Mais → Exportar conversa → Sem mídia

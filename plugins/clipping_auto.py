@@ -5,36 +5,48 @@ Descobre o assunto mais discutido do dia consultando RSS de grandes portais
 brasileiros e usando o LLM para identificar o tópico principal. A seguir,
 busca cobertura usando o fluxo normal de clipping.
 
-Uso (via CLI, com o id configurado no config.yaml):
+Funcionalidades:
+  - categoria: filtra o LLM para um tema específico (economia, esportes, etc.)
+  - topic_history_days: evita repetir tópicos dos últimos N dias
+  - topic_cooldown_hours: isolamento intra-dia (evita mesmo assunto em slots próximos)
+  - followup automático: se o tema já foi coberto hoje, usa modo de acompanhamento
+
+Uso (via CLI):
   python main.py clipping-auto
 
-Ou como fonte agendada:
-  - id: clipping-auto
+Exemplo de grade completa de clipping:
+  - id: clipping-politica
     type: clipping_auto
-    name: "Clipping do Dia"
-    enabled: false      # acionar manualmente ou agendar na grade
+    name: "Clipping Política"
+    enabled: true
     settings:
-      max_topics: 3           # quantos tópicos pedir ao LLM (usa o 1º não-recente)
-      max_sources: 5          # veículos por tópico
-      days_lookback: 1
-      fetch_content: true
-      max_content_chars: 2000
-      llm_model: claude-haiku-4-5-20251001
-      topic_history_days: 7   # evita repetir assunto coberto nos últimos N dias
-      agregadores:
-        - google_news
-        - bing_news
-      trending_feeds:         # RSS dos portais para descoberta de manchetes
-        - https://g1.globo.com/rss/g1/
-        - https://feeds.folha.uol.com.br/emcimadahora/rss091.xml
-        - https://feeds.bbci.co.uk/portuguese/rss.xml
-        - https://rss.uol.com.br/feed/noticias.xml
+      categoria: política
+      topic_history_days: 7
+      topic_cooldown_hours: 4
+
+  - id: clipping-economia
+    type: clipping_auto
+    name: "Clipping Economia"
+    enabled: true
+    settings:
+      categoria: economia
+      topic_history_days: 7
+      topic_cooldown_hours: 4
+
+  - id: clipping-esportes
+    type: clipping_auto
+    name: "Clipping Esportes"
+    enabled: true
+    settings:
+      categoria: esportes
+      topic_history_days: 3
+      topic_cooldown_hours: 4
 """
 
 import json
 import os
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import feedparser
 import litellm
@@ -48,10 +60,10 @@ DEFAULT_TRENDING_FEEDS = [
     'https://rss.uol.com.br/feed/noticias.xml',
 ]
 
-DEFAULT_LLM_MODEL    = 'claude-haiku-4-5-20251001'
+DEFAULT_LLM_MODEL      = 'claude-haiku-4-5-20251001'
 MAX_HEADLINES_PER_FEED = 40
-HISTORY_PATH         = os.path.join('output', '_clipping_auto_history.json')
-HISTORY_KEEP_DAYS    = 90   # mantém histórico por 90 dias, independente do filtro
+HISTORY_PATH           = os.path.join('output', '_clipping_auto_history.json')
+HISTORY_KEEP_DAYS      = 90
 
 _STOPWORDS = {'de', 'da', 'do', 'dos', 'das', 'em', 'no', 'na', 'nos', 'nas',
               'e', 'o', 'a', 'os', 'as', 'um', 'uma', 'por', 'para', 'com',
@@ -60,19 +72,47 @@ _STOPWORDS = {'de', 'da', 'do', 'dos', 'das', 'em', 'no', 'na', 'nos', 'nas',
 
 # ── Histórico de tópicos ──────────────────────────────────────────────────────
 
-def _load_recent_topics(history_days: int) -> list[str]:
+def _load_recent_topics(history_days: int, cooldown_hours: int = 0) -> list[str]:
+    """Tópicos a evitar: cobertos nos últimos N dias OU nas últimas H horas."""
     if not os.path.exists(HISTORY_PATH):
         return []
     try:
         with open(HISTORY_PATH, 'r', encoding='utf-8') as f:
             history = json.load(f)
-        cutoff = (date.today() - timedelta(days=history_days)).isoformat()
-        return [e['topic'] for e in history if e.get('date', '') >= cutoff]
+        cutoff_date = (date.today() - timedelta(days=history_days)).isoformat()
+        now = datetime.now()
+        topics: set[str] = set()
+        for e in history:
+            if e.get('date', '') >= cutoff_date:
+                topics.add(e['topic'])
+            elif cooldown_hours > 0:
+                ts = e.get('datetime')
+                if ts:
+                    try:
+                        hours_ago = (now - datetime.fromisoformat(ts)).total_seconds() / 3600
+                        if hours_ago < cooldown_hours:
+                            topics.add(e['topic'])
+                    except Exception:
+                        pass
+        return list(topics)
     except Exception:
         return []
 
 
-def _save_topic(topic: str) -> None:
+def _load_today_topics() -> list[str]:
+    """Tópicos já cobertos hoje — usados para detectar caso de followup."""
+    if not os.path.exists(HISTORY_PATH):
+        return []
+    try:
+        with open(HISTORY_PATH, 'r', encoding='utf-8') as f:
+            history = json.load(f)
+        today = date.today().isoformat()
+        return [e['topic'] for e in history if e.get('date') == today]
+    except Exception:
+        return []
+
+
+def _save_topic(topic: str, categoria: str = '') -> None:
     history = []
     if os.path.exists(HISTORY_PATH):
         try:
@@ -80,7 +120,12 @@ def _save_topic(topic: str) -> None:
                 history = json.load(f)
         except Exception:
             history = []
-    history.append({'topic': topic, 'date': date.today().isoformat()})
+    history.append({
+        'topic':     topic,
+        'date':      date.today().isoformat(),
+        'datetime':  datetime.now().isoformat(),
+        'categoria': categoria,
+    })
     cutoff = (date.today() - timedelta(days=HISTORY_KEEP_DAYS)).isoformat()
     history = [e for e in history if e.get('date', '') >= cutoff]
     os.makedirs('output', exist_ok=True)
@@ -95,8 +140,7 @@ def _is_similar(topic: str, recent: list[str], threshold: float = 0.4) -> bool:
         r_words = set(r.lower().split()) - _STOPWORDS
         if not words or not r_words:
             continue
-        overlap = len(words & r_words) / len(words | r_words)
-        if overlap >= threshold:
+        if len(words & r_words) / len(words | r_words) >= threshold:
             return True
     return False
 
@@ -130,11 +174,12 @@ def _collect_headlines(feeds: list[str], since: date) -> list[str]:
 # ── Descoberta de tópicos via LLM ─────────────────────────────────────────────
 
 def _discover_topics(headlines: list[str], max_topics: int,
-                     recent_topics: list[str],
+                     recent_topics: list[str], categoria: str,
                      model: str, api_base: str | None) -> list[str]:
     if not headlines:
         return []
-    headlines_text = '\n'.join(f'- {h}' for h in headlines)
+
+    category_hint = f' na área de {categoria}' if categoria else ''
 
     avoid_block = ''
     if recent_topics:
@@ -146,12 +191,12 @@ def _discover_topics(headlines: list[str], max_topics: int,
 
     prompt = (
         f'Abaixo estao manchetes recentes de portais de noticias brasileiros.\n'
-        f'Identifique os {max_topics} assunto(s) mais relevantes do dia '
+        f'Identifique os {max_topics} assunto(s) mais relevantes do dia{category_hint} '
         f'(mais recorrentes e de maior impacto jornalistico).\n'
         f'{avoid_block}'
         f'Responda APENAS com os topicos, um por linha, no formato exato:\n'
         f'TOPICO: frase curta de busca em portugues (maximo 6 palavras)\n\n'
-        f'Manchetes:\n{headlines_text}'
+        f'Manchetes:\n' + '\n'.join(f'- {h}' for h in headlines)
     )
     kwargs = {'api_base': api_base} if api_base else {}
     try:
@@ -174,12 +219,14 @@ def _discover_topics(headlines: list[str], max_topics: int,
 def fetch(source_config: dict, credentials=None) -> list[dict]:
     from plugins import clipping as clipping_plugin
 
-    settings          = source_config.get('settings') or {}
-    max_topics        = int(settings.get('max_topics', 3))
-    model             = settings.get('llm_model', DEFAULT_LLM_MODEL)
-    feeds             = settings.get('trending_feeds', DEFAULT_TRENDING_FEEDS)
-    days_lookback     = int(settings.get('days_lookback', 1))
-    history_days      = int(settings.get('topic_history_days', 7))
+    settings        = source_config.get('settings') or {}
+    max_topics      = int(settings.get('max_topics', 3))
+    model           = settings.get('llm_model', DEFAULT_LLM_MODEL)
+    feeds           = settings.get('trending_feeds', DEFAULT_TRENDING_FEEDS)
+    days_lookback   = int(settings.get('days_lookback', 1))
+    history_days    = int(settings.get('topic_history_days', 7))
+    cooldown_hours  = int(settings.get('topic_cooldown_hours', 0))
+    categoria       = settings.get('categoria', '').strip()
 
     api_base = None
     try:
@@ -190,8 +237,10 @@ def fetch(source_config: dict, credentials=None) -> list[dict]:
     except Exception:
         pass
 
-    since          = date.today() - timedelta(days=days_lookback)
-    recent_topics  = _load_recent_topics(history_days)
+    since         = date.today() - timedelta(days=days_lookback)
+    recent_topics = _load_recent_topics(history_days, cooldown_hours)
+    today_topics  = _load_today_topics()
+
     if recent_topics:
         print(f'  [clipping-auto] {len(recent_topics)} topico(s) recente(s) a evitar.')
 
@@ -202,34 +251,39 @@ def fetch(source_config: dict, credentials=None) -> list[dict]:
         print('  [clipping-auto] nenhuma manchete disponivel — abortando.')
         return []
 
-    # Pede mais tópicos do que o necessário para ter alternativas caso os primeiros sejam recentes
-    ask_for = max(max_topics, len(recent_topics) + 3)
-    print(f'  [clipping-auto] identificando topico(s) via LLM ({model})...')
-    topics = _discover_topics(headlines, ask_for, recent_topics, model, api_base)
+    ask_for   = max(max_topics, len(recent_topics) + 3)
+    cat_label = f' [{categoria}]' if categoria else ''
+    print(f'  [clipping-auto] identificando topico(s) via LLM ({model}){cat_label}...')
+    topics = _discover_topics(headlines, ask_for, recent_topics, categoria, model, api_base)
     if not topics:
         print('  [clipping-auto] LLM nao retornou topicos — abortando.')
         return []
 
-    # Seleciona o primeiro tópico que não seja similar a um recente
+    # Seleciona o primeiro candidato que não seja similar a um tópico recente
     topic = None
     for candidate in topics:
         if not _is_similar(candidate, recent_topics):
             topic = candidate
             break
-
     if topic is None:
-        # Todos são similares a recentes — usa o primeiro mesmo assim
         topic = topics[0]
-        print(f'  [clipping-auto] todos os topicos sao recentes; usando o mais relevante.')
+        print('  [clipping-auto] todos os topicos sao recentes; usando o mais relevante.')
 
     print(f'  [clipping-auto] topico selecionado: "{topic}"')
-    _save_topic(topic)
 
-    source_config['name'] = f'Clipping — {topic[:60]}'
+    # Followup automático: se o assunto já foi coberto hoje, usa modo de acompanhamento
+    followup = bool(settings.get('followup', False))
+    if not followup and _is_similar(topic, today_topics):
+        followup = True
+        print('  [clipping-auto] assunto ja coberto hoje — ativando modo followup automaticamente.')
+
+    _save_topic(topic, categoria)
+
+    source_config['name'] = f'Clipping{" " + categoria.title() if categoria else ""} — {topic[:55]}'
 
     clipping_config = {
         **source_config,
         'type': 'clipping',
-        'settings': {**settings, 'topic': topic},
+        'settings': {**settings, 'topic': topic, 'followup': followup},
     }
     return clipping_plugin.fetch(clipping_config, credentials)

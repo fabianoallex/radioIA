@@ -41,6 +41,8 @@ def gerar_clipping(topico: str, followup: bool = False, model: str = '',
                      Se omitido, usa o configurado em clipping.settings.agregadores
                      (padrao: ambos).
 
+    Para descoberta automática do assunto do dia use gerar_clipping_automatico().
+
     Equivalente CLI: python main.py "clipping:tema"  (ou com --followup)
     """
     config      = _load_config()
@@ -104,6 +106,113 @@ def gerar_clipping(topico: str, followup: bool = False, model: str = '',
         'topico':   topico,
         'mensagem': err or 'Nenhum episodio gerado. Verifique se ha artigos recentes sobre o tema.',
         'log':      log.strip(),
+    }, ensure_ascii=False, indent=2)
+
+
+# ── Clipping Automático ───────────────────────────────────────────────────────
+
+@mcp.tool()
+def gerar_clipping_automatico(
+    categoria: str = '',
+    topic_history_days: int = 7,
+    topic_cooldown_hours: int = 4,
+    max_sources: int = 5,
+    model: str = '',
+) -> str:
+    """
+    Gera um episodio de clipping descobrindo automaticamente o assunto mais discutido
+    do dia. Consulta RSS de grandes portais brasileiros, usa o LLM para identificar o
+    topico e gera o clipping normalmente sobre ele.
+
+    Tres mecanismos evitam repeticao:
+    - topic_history_days: nao repete topicos dos ultimos N dias
+    - topic_cooldown_hours: nao repete o mesmo assunto nas ultimas N horas (intra-dia)
+    - followup automatico: se o topico ja foi coberto hoje, usa modo de acompanhamento
+
+    Args:
+        categoria:            Tema para filtrar o LLM: "politica", "economia", "esportes",
+                              "tecnologia", "saude", "cultura" etc.
+                              Se vazio, cobre qualquer assunto em destaque.
+        topic_history_days:   Janela de exclusao inter-dia (default: 7).
+        topic_cooldown_hours: Janela de exclusao intra-dia em horas (default: 4).
+        max_sources:          Maximo de veiculos no clipping (default: 5).
+        model:                Modelo LLM para o roteiro. Vazio = usa padrao do config.
+
+    Exemplos:
+        gerar_clipping_automatico()
+        gerar_clipping_automatico(categoria="economia")
+        gerar_clipping_automatico(categoria="esportes", topic_history_days=3)
+
+    Para clipping com topico especifico use gerar_clipping("tema").
+    Equivalente CLI: python main.py clipping-auto
+    """
+    config       = _load_config()
+    all_sources  = config.get('sources', [])
+    seen_ids     = load_seen_ids()
+    credentials  = radio_main._get_oauth_credentials()
+    first_of_day = not radio_main._has_episodes_today()
+
+    if model:
+        modelos_cfg = config.get('llm', {}).get('modelos', [])
+        if modelos_cfg:
+            ids_permitidos = [m['id'] for m in modelos_cfg]
+            if model not in ids_permitidos:
+                return json.dumps({
+                    'status':            'erro',
+                    'mensagem':          f"Modelo '{model}' nao esta na lista de modelos permitidos.",
+                    'modelos_permitidos': modelos_cfg,
+                    'dica':              'Use listar_modelos() para ver as opcoes disponiveis.',
+                }, ensure_ascii=False, indent=2)
+
+    base         = next((s for s in all_sources if s['id'] == 'clipping-auto'), {})
+    base_settings = base.get('settings') or {}
+
+    settings = {
+        **base_settings,
+        'max_sources':          max_sources,
+        'topic_history_days':   topic_history_days,
+        'topic_cooldown_hours': topic_cooldown_hours,
+    }
+    if categoria:
+        settings['categoria'] = categoria
+
+    source_cfg = {
+        **base,
+        'id':      'clipping-auto',
+        'type':    'clipping_auto',
+        'name':    f"Clipping{' ' + categoria.title() if categoria else ''} do Dia",
+        'enabled': True,
+        'settings': settings,
+    }
+    if model:
+        source_cfg = {**source_cfg, 'model': model}
+
+    path, log, err = _capture(
+        radio_main._run_source, source_cfg, config, credentials, seen_ids, first_of_day
+    )
+
+    if path and os.path.exists(path):
+        meta_path = os.path.join(os.path.dirname(path), 'episode.json')
+        meta = {}
+        if os.path.exists(meta_path):
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+        dur = meta.get('duration_seconds', 0)
+        return json.dumps({
+            'status':    'ok',
+            'categoria': categoria or 'geral',
+            'episodio':  meta.get('source_name', source_cfg['name']),
+            'duracao':   f"{dur // 60}m {dur % 60}s",
+            'itens':     meta.get('videos_covered', 0),
+            'arquivo':   path,
+            'log':       log.strip(),
+        }, ensure_ascii=False, indent=2)
+
+    return json.dumps({
+        'status':    'erro',
+        'categoria': categoria or 'geral',
+        'mensagem':  err or 'Nenhum episodio gerado. Verifique se ha manchetes disponiveis.',
+        'log':       log.strip(),
     }, ensure_ascii=False, indent=2)
 
 
