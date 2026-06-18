@@ -1030,7 +1030,7 @@ O `mcp_server.py` expõe a RadioIA como um servidor [MCP (Model Context Protocol
 
 As ferramentas estão organizadas em módulos dentro de `mcp_tools/` por domínio — `content`, `config`, `system`, `spots`, `media`, `context`, `exports`, `resources`. O `mcp_server.py` é apenas o ponto de entrada que carrega os módulos e inicia o servidor.
 
-**40 ferramentas** organizadas por domínio: geração de conteúdo, consulta de estado, configuração, scheduler, sistema e exportação.
+**42 ferramentas** organizadas por domínio: geração de conteúdo, consulta de estado, configuração, scheduler, sistema e exportação.
 
 ### Iniciar o servidor
 
@@ -1054,6 +1054,9 @@ python mcp_server.py
 | `gerar_clipping("copa", followup=True)` | Clipping de acompanhamento — só artigos recentes |
 | `gerar_clipping("tema", model="claude-opus-4-8")` | Clipping com modelo específico |
 | `gerar_clipping("tema", agregadores=["bing_news"])` | Clipping usando apenas um agregador específico |
+| `gerar_clipping_automatico()` | Descobre e clipa o assunto mais discutido do dia automaticamente |
+| `gerar_clipping_automatico(categoria="economia")` | Clipping automático filtrado por tema |
+| `gerar_clipping_automatico(categoria="esportes", topic_history_days=3)` | Com janela de exclusão customizada |
 | `deletar_episodio("09-30_youtube")` | Remove a pasta de um episódio específico do output |
 | `replay_episodio("12-15_not")` | Replay de episódio por prefixo parcial da pasta |
 | `replay_episodio("12-15", "2026-06-03")` | Replay de episódio de uma data específica |
@@ -1064,6 +1067,8 @@ python mcp_server.py
 | `listar_modelos()` | Lista modelos LLM disponíveis e modelo padrão |
 | `status_historico()` | Itens já citados e total de episódios gerados |
 | `status_geracao()` | Estado da geração em andamento (progresso em tempo real) |
+| `ver_historico_clipping_auto()` | Tópicos cobertos pelo clipping automático nos últimos 7 dias |
+| `ver_historico_clipping_auto(dias=14)` | Histórico com janela customizada |
 
 **Fontes disponíveis em `gerar_episodios`:**
 `youtube` · `noticias` · `noticias-locais` · `tecnologia` · `horoscopo` · `utilidades` · `loteria` · `copa` · `brasileirao` · `champions` · `efemerides` · `quiz` · `reddit` · `receitas` · `filmes` · `filmes-cartaz` · `musica` · `musica-local` · `concursos` · `biblia`
@@ -1388,6 +1393,7 @@ plugins/
 | `concursos_pci.py` | `concursos_pci` | Notícias de concursos públicos (PCI Concursos) | `beautifulsoup4`, `trafilatura` |
 | `biblia.py` | `biblia` | Passagens bíblicas com reflexão (ABíbliaDigital) | `requests`, token em `ABIBLIADIGITAL_TOKEN` |
 | `clipping.py` | `clipping` | Panorama de como a mídia cobre um tema — gerado via CLI | — |
+| `clipping_auto.py` | `clipping_auto` | Clipping automático: descobre o tema mais discutido do dia via RSS + LLM | `feedparser`, `trafilatura` |
 | `whatsapp.py` | `whatsapp` | Resumo de grupo do WhatsApp a partir de exportação manual | — |
 
 **Configuração do plugin Bíblia** (`config.yaml`):
@@ -1452,6 +1458,96 @@ O episódio compara os ângulos de cada veículo ("O G1 destaca...", "Segundo a 
 ```
 
 Por padrão ambos os agregadores são usados. A seleção final é feita em **round-robin** entre eles — nenhum tem prioridade. Se um agregador retornar poucos resultados para o tema buscado, os slots restantes são preenchidos pelo outro. Artigos do mesmo veículo são deduplicados independente de qual agregador os retornou.
+
+**Plugin Clipping Automático** — descobre o assunto do dia sem intervenção manual:
+
+Consulta RSS de grandes portais brasileiros, coleta as manchetes das últimas 24h e usa o LLM para identificar o tópico mais relevante. A seguir, gera o clipping normalmente sobre esse tema. Ideal para agendar na grade sem precisar definir o assunto antecipadamente — inclusive para montar uma **grade inteira de clipping** com slots temáticos.
+
+```bash
+python main.py clipping-auto
+```
+
+Configure no `config.yaml`:
+
+```yaml
+- id: clipping-geral
+  type: clipping_auto
+  name: "Clipping do Dia"
+  enabled: false
+  settings:
+    max_topics: 3               # tópicos a pedir ao LLM (usa o 1º não-recente)
+    max_sources: 5
+    days_lookback: 1
+    fetch_content: true
+    max_content_chars: 2000
+    llm_model: claude-haiku-4-5-20251001
+    topic_history_days: 7       # evita repetir assunto dos últimos N dias
+    topic_cooldown_hours: 4     # evita repetir o mesmo assunto dentro de N horas
+    categoria: política         # filtra o LLM para um tema específico (opcional)
+    agregadores:
+      - google_news
+      - bing_news
+    trending_feeds:
+      - https://g1.globo.com/rss/g1/
+      - https://feeds.folha.uol.com.br/emcimadahora/rss091.xml
+      - https://feeds.bbci.co.uk/portuguese/rss.xml
+      - https://rss.uol.com.br/feed/noticias.xml
+```
+
+**Settings de controle de diversidade:**
+
+| Setting | Padrão | Descrição |
+|---------|--------|-----------|
+| `categoria` | — | Restringe o LLM a um tema: `política`, `economia`, `esportes`, `tecnologia`, `cultura` etc. Cada instância com categoria diferente cobre um ângulo distinto. |
+| `topic_history_days` | `7` | Evita repetir tópicos cobertos nos últimos N dias (entre execuções diferentes). |
+| `topic_cooldown_hours` | `0` | Evita repetir o mesmo tópico dentro de N horas — isolamento intra-dia. Útil quando o plugin roda várias vezes por dia na grade. |
+| Followup automático | — | Se o assunto selecionado já foi coberto hoje (em qualquer slot), ativa automaticamente o modo `followup: true` do clipping, focando apenas nos desenvolvimentos recentes em vez de reapresentar o caso do zero. |
+
+**Como evita repetições:** cada tópico usado é salvo em `output/_clipping_auto_history.json` com timestamp. O histórico é injetado no prompt do LLM para que ele já evite esses temas. Um filtro de similaridade por palavras-chave (Jaccard ≥ 0.4) é aplicado como segunda camada — se todos os candidatos forem similares a tópicos recentes, usa o mais relevante mesmo assim.
+
+**Exemplo de grade completa de clipping:**
+
+```yaml
+sources:
+  - id: clipping-politica
+    type: clipping_auto
+    name: "Clipping Política"
+    enabled: true
+    settings:
+      categoria: política
+      topic_cooldown_hours: 4
+      topic_history_days: 7
+
+  - id: clipping-economia
+    type: clipping_auto
+    name: "Clipping Economia"
+    enabled: true
+    settings:
+      categoria: economia
+      topic_cooldown_hours: 4
+      topic_history_days: 7
+
+  - id: clipping-esportes
+    type: clipping_auto
+    name: "Clipping Esportes"
+    enabled: true
+    settings:
+      categoria: esportes
+      topic_cooldown_hours: 4
+      topic_history_days: 3   # esportes mudam mais rápido
+
+schedule:
+  - time: "07:00"
+    sources: [clipping-politica]
+  - time: "09:00"
+    sources: [clipping-economia]
+  - time: "11:00"
+    sources: [clipping-esportes]
+  - time: "14:00"
+    sources: [clipping-politica]   # followup automático se mesmo assunto
+  - time: "16:00"
+    sources: [clipping-economia]
+```
 
 Consulte o guia completo com contrato, exemplos e boas práticas:
 

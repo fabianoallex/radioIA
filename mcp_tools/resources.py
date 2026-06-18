@@ -719,6 +719,61 @@ def listar_spots() -> str:
     }, ensure_ascii=False, indent=2)
 
 
+# ── clipping automático ───────────────────────────────────────────────────────
+
+@mcp.tool()
+def ver_historico_clipping_auto(dias: int = 7) -> str:
+    """
+    Exibe os topicos cobertos pelo clipping automatico nos ultimos N dias.
+    Util para entender o que ja foi coberto, planejar a programacao e
+    verificar se o isolamento de repeticao esta funcionando.
+
+    Args:
+        dias: Quantos dias de historico exibir (default: 7).
+    """
+    from datetime import date, timedelta
+
+    history_path = os.path.join(PROJECT_DIR, 'output', '_clipping_auto_history.json')
+    if not os.path.exists(history_path):
+        return json.dumps({
+            'status':   'ok',
+            'mensagem': 'Nenhum historico encontrado. Execute gerar_clipping_automatico() primeiro.',
+            'topicos':  [],
+        }, ensure_ascii=False, indent=2)
+
+    try:
+        with open(history_path, 'r', encoding='utf-8') as f:
+            history = json.load(f)
+    except Exception as e:
+        return json.dumps({'status': 'erro', 'mensagem': str(e)}, ensure_ascii=False, indent=2)
+
+    cutoff = (date.today() - timedelta(days=dias)).isoformat()
+    recent = [e for e in history if e.get('date', '') >= cutoff]
+    recent.sort(key=lambda e: e.get('datetime', e.get('date', '')), reverse=True)
+
+    by_date: dict = {}
+    for e in recent:
+        d = e.get('date', 'desconhecido')
+        if d not in by_date:
+            by_date[d] = []
+        entry: dict = {'topico': e['topic']}
+        if e.get('categoria'):
+            entry['categoria'] = e['categoria']
+        if e.get('datetime'):
+            try:
+                entry['hora'] = e['datetime'][11:16]
+            except Exception:
+                pass
+        by_date[d].append(entry)
+
+    return json.dumps({
+        'status':  'ok',
+        'dias':    dias,
+        'total':   len(recent),
+        'por_dia': by_date,
+    }, ensure_ascii=False, indent=2)
+
+
 # ── jamendo ───────────────────────────────────────────────────────────────────
 
 @mcp.tool()
