@@ -20,9 +20,48 @@ FALLBACK_INTRO_VOICE = 'pt-BR-ThalitaMultilingualNeural'
 WELCOME_INTRO_PATH = os.path.join('output', '_welcome_intro.mp3')
 
 
+def _spoken_date(d) -> str:
+    weekdays  = ['segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira',
+                 'sexta-feira', 'sábado', 'domingo']
+    months    = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+                 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
+    day_names = ['', 'primeiro', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito',
+                 'nove', 'dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis',
+                 'dezessete', 'dezoito', 'dezenove', 'vinte', 'vinte e um', 'vinte e dois',
+                 'vinte e três', 'vinte e quatro', 'vinte e cinco', 'vinte e seis', 'vinte e sete',
+                 'vinte e oito', 'vinte e nove', 'trinta', 'trinta e um']
+    tens_w = ['', 'dez', 'vinte', 'trinta', 'quarenta', 'cinquenta',
+              'sessenta', 'setenta', 'oitenta', 'noventa']
+    ones_w = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove']
+    teens  = ['dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis',
+              'dezessete', 'dezoito', 'dezenove']
+    r = d.year - 2000
+    if r == 0:
+        year_str = 'dois mil'
+    elif r < 10:
+        year_str = f'dois mil e {ones_w[r]}'
+    elif r < 20:
+        year_str = f'dois mil e {teens[r - 10]}'
+    elif r % 10 == 0:
+        year_str = f'dois mil e {tens_w[r // 10]}'
+    else:
+        year_str = f'dois mil e {tens_w[r // 10]} e {ones_w[r % 10]}'
+    return (f'hoje é {weekdays[d.weekday()]}, '
+            f'{day_names[d.day]} de {months[d.month - 1]} '
+            f'de {year_str}')
+
+
 def _generate_welcome_intro(radio_name: str):
+    from datetime import date
+    today = date.today()
     if os.path.exists(WELCOME_INTRO_PATH):
-        return
+        file_date = date.fromtimestamp(os.path.getmtime(WELCOME_INTRO_PATH))
+        if file_date == today:
+            return
+        try:
+            os.remove(WELCOME_INTRO_PATH)
+        except OSError:
+            pass
     try:
         import yaml
         with open('config.yaml', 'r', encoding='utf-8') as f:
@@ -32,12 +71,14 @@ def _generate_welcome_intro(radio_name: str):
         voice = wi.get('voice') or cfg.get('vinheta', {}).get('voice', FALLBACK_INTRO_VOICE)
     except Exception:
         falas, voice = [], FALLBACK_INTRO_VOICE
+    date_str = _spoken_date(today)
     import random
     if falas:
-        text = random.choice(falas).replace('{radio_name}', radio_name)
+        text = random.choice(falas).replace('{radio_name}', radio_name).replace('{date}', date_str)
     else:
         text = (
             f'Bom dia! Bem-vindo à {radio_name}. '
+            f'{date_str.capitalize()}. '
             f'É um prazer ter você conosco. '
             f'Fique à vontade para aproveitar a programação de hoje!'
         )
@@ -2049,7 +2090,16 @@ def api_fallback_intro():
 @app.route('/api/welcome-intro')
 def api_welcome_intro():
     if os.path.exists(WELCOME_INTRO_PATH):
-        return send_from_directory('output', '_welcome_intro.mp3', mimetype='audio/mpeg')
+        from datetime import date
+        file_date = date.fromtimestamp(os.path.getmtime(WELCOME_INTRO_PATH))
+        if file_date == date.today():
+            return send_from_directory('output', '_welcome_intro.mp3', mimetype='audio/mpeg')
+        # Arquivo de outro dia — remove e regenera em background
+        try:
+            os.remove(WELCOME_INTRO_PATH)
+        except OSError:
+            pass
+        threading.Thread(target=lambda: _generate_welcome_intro(_get_radio_name()), daemon=True).start()
     return '', 404
 
 
