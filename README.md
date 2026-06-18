@@ -1388,6 +1388,7 @@ plugins/
 | `concursos_pci.py` | `concursos_pci` | Notícias de concursos públicos (PCI Concursos) | `beautifulsoup4`, `trafilatura` |
 | `biblia.py` | `biblia` | Passagens bíblicas com reflexão (ABíbliaDigital) | `requests`, token em `ABIBLIADIGITAL_TOKEN` |
 | `clipping.py` | `clipping` | Panorama de como a mídia cobre um tema — gerado via CLI | — |
+| `clipping_auto.py` | `clipping_auto` | Clipping automático: descobre o tema mais discutido do dia via RSS + LLM | `feedparser`, `trafilatura` |
 | `whatsapp.py` | `whatsapp` | Resumo de grupo do WhatsApp a partir de exportação manual | — |
 
 **Configuração do plugin Bíblia** (`config.yaml`):
@@ -1452,6 +1453,41 @@ O episódio compara os ângulos de cada veículo ("O G1 destaca...", "Segundo a 
 ```
 
 Por padrão ambos os agregadores são usados. A seleção final é feita em **round-robin** entre eles — nenhum tem prioridade. Se um agregador retornar poucos resultados para o tema buscado, os slots restantes são preenchidos pelo outro. Artigos do mesmo veículo são deduplicados independente de qual agregador os retornou.
+
+**Plugin Clipping Automático** — descobre o assunto do dia sem intervenção manual:
+
+Consulta RSS de grandes portais brasileiros, coleta as manchetes das últimas 24h e usa o LLM para identificar o tópico mais relevante. A seguir, gera o clipping normalmente sobre esse tema. Ideal para agendar na grade sem precisar definir o assunto antecipadamente.
+
+```bash
+python main.py clipping-auto
+```
+
+Configure no `config.yaml`:
+
+```yaml
+- id: clipping-auto
+  type: clipping_auto
+  name: "Clipping do Dia"
+  enabled: false
+  settings:
+    max_topics: 3           # tópicos a pedir ao LLM (usa o 1º que não for recente)
+    max_sources: 5          # veículos por tópico
+    days_lookback: 1
+    fetch_content: true
+    max_content_chars: 2000
+    llm_model: claude-haiku-4-5-20251001
+    topic_history_days: 7   # evita repetir assunto coberto nos últimos N dias
+    agregadores:
+      - google_news
+      - bing_news
+    trending_feeds:         # RSS dos portais usados para descoberta de manchetes
+      - https://g1.globo.com/rss/g1/
+      - https://feeds.folha.uol.com.br/emcimadahora/rss091.xml
+      - https://feeds.bbci.co.uk/portuguese/rss.xml
+      - https://rss.uol.com.br/feed/noticias.xml
+```
+
+**Como evita repetições:** cada tópico usado é salvo em `output/_clipping_auto_history.json`. Ao rodar novamente, o histórico dos últimos `topic_history_days` dias é injetado no prompt do LLM para que ele já evite esses temas. Um filtro de similaridade por palavras-chave é aplicado como segunda camada — se todos os candidatos forem similares a tópicos recentes, usa o mais relevante do dia mesmo assim.
 
 Consulte o guia completo com contrato, exemplos e boas práticas:
 
