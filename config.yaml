@@ -366,6 +366,30 @@ sources:
   #       - google_news         # padrão — sem chave de API
   #       - bing_news           # padrão — sem chave de API
 
+  # ── Plugin: Clipping Automático ──────────────────────────────────────────────
+  # Descobre automaticamente o assunto mais discutido do dia consultando RSS de
+  # grandes portais brasileiros e usando o LLM para identificar o tópico.
+  # Ativar: python main.py clipping-auto
+  # - id: clipping-auto
+  #   type: clipping_auto
+  #   name: "Clipping do Dia"
+  #   enabled: false
+  #   settings:
+  #     max_topics: 1           # tópicos a identificar (usa o 1º)
+  #     max_sources: 5          # veículos por tópico
+  #     days_lookback: 1
+  #     fetch_content: true
+  #     max_content_chars: 2000
+  #     llm_model: claude-haiku-4-5-20251001
+  #     agregadores:
+  #       - google_news
+  #       - bing_news
+  #     trending_feeds:         # RSS dos portais para descoberta de manchetes
+  #       - https://g1.globo.com/rss/g1/
+  #       - https://feeds.folha.uol.com.br/emcimadahora/rss091.xml
+  #       - https://feeds.bbci.co.uk/portuguese/rss.xml
+  #       - https://rss.uol.com.br/feed/noticias.xml
+
   # ── Plugin: WhatsApp (Exportação Manual) ─────────────────────────────────────
   # Exportar: WhatsApp → Grupo → ⋮ → Mais → Exportar conversa → Sem mídia
   # Configure um id diferente para cada grupo que quiser transformar em episódio.

@@ -126,7 +126,7 @@ def _build_trivia_card(i: int, item: dict) -> str:
 DEFAULT_MODEL = 'claude-sonnet-4-6'
 
 
-_TIME_AWARE_TYPES = {'rss', 'clipping', 'youtube', 'reddit'}
+_TIME_AWARE_TYPES = {'rss', 'clipping', 'clipping_auto', 'youtube', 'reddit'}
 
 
 def generate_script(items: list[dict], narrators: list[dict], source_config: dict,
@@ -145,7 +145,7 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
     if source_type == 'podcast':
         cards  = [_build_podcast_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _podcast_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
-    elif source_type == 'clipping':
+    elif source_type in ('clipping', 'clipping_auto'):
         cards    = [_build_clipping_card(i, item) for i, item in enumerate(items, 1)]
         followup = bool((source_config.get('settings') or {}).get('followup', False))
         prompt   = _clipping_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name, followup)
@@ -1163,7 +1163,7 @@ def _build_combined_card(i: int, item: dict) -> str:
     context     = item.get('text', '')
     context_hint = f"\nConteúdo: {context}" if context else ''
     type_label = {
-        'rss': 'Notícia', 'youtube': 'Vídeo', 'clipping': 'Clipping',
+        'rss': 'Notícia', 'youtube': 'Vídeo', 'clipping': 'Clipping', 'clipping_auto': 'Clipping',
         'whatsapp': 'WhatsApp', 'efemerides': 'Efeméride',
     }.get(source_type, 'Item')
     return (
