@@ -1464,8 +1464,19 @@ Por padrão ambos os agregadores são usados. A seleção final é feita em **ro
 Consulta RSS de grandes portais brasileiros, coleta as manchetes das últimas 24h e usa o LLM para identificar o tópico mais relevante. A seguir, gera o clipping normalmente sobre esse tema. Ideal para agendar na grade sem precisar definir o assunto antecipadamente — inclusive para montar uma **grade inteira de clipping** com slots temáticos.
 
 ```bash
+# Geral — assunto mais discutido do dia
 python main.py clipping-auto
+
+# Por categoria (requer fonte com o id configurado no config.yaml)
+python main.py clipping-politica
+python main.py clipping-economia
+python main.py clipping-esportes
+
+# Vários de uma vez — cada um usa seu próprio histórico de tópicos
+python main.py clipping-politica clipping-economia clipping-esportes
 ```
+
+> O argumento CLI é sempre o `id` da fonte no `config.yaml`. Configure quantas instâncias quiser com categorias distintas — o comando `python main.py clipping-politica clipping-economia` roda as duas em sequência, cada uma buscando o assunto mais relevante do dia no seu tema.
 
 Configure no `config.yaml`:
 
