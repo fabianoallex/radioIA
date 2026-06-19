@@ -14,7 +14,7 @@ sources:
 
 - id: clipping-auto
   type: clipping_auto
-  name: Clipping do Dia
+  name: Clipping Automático
   enabled: false
   settings:
     max_topics: 1           # tópicos a identificar (usa o 1º)
@@ -31,6 +31,39 @@ sources:
       - https://feeds.folha.uol.com.br/emcimadahora/rss091.xml
       - https://feeds.bbci.co.uk/portuguese/rss.xml
       - https://rss.uol.com.br/feed/noticias.xml      
+
+- id: clipping-economia
+  type: clipping_auto
+  name: "Clipping Economia"
+  enabled: false
+  settings:
+    categoria: economia        # LLM foca em tópicos de economia
+    max_topics: 3
+    max_sources: 5
+    topic_history_days: 7
+    topic_cooldown_hours: 4
+
+- id: clipping-esportes
+  type: clipping_auto
+  name: "Clipping Esportes"
+  enabled: false
+  settings:
+    categoria: esportes
+    max_topics: 3
+    max_sources: 5
+    topic_history_days: 3      # esportes mudam mais rápido
+    topic_cooldown_hours: 4
+
+- id: clipping-entretenimento
+  type: clipping_auto
+  name: "Clipping Entretenimento"
+  enabled: false
+  settings:
+    categoria: entretenimento
+    max_topics: 3
+    max_sources: 5
+    topic_history_days: 5      
+    topic_cooldown_hours: 4      
 
 - id: youtube
   type: youtube
@@ -177,6 +210,24 @@ sources:
     name: Will Larson
   - url: https://tim-hilde.github.io/anthropic-rss/rss.xml
     name: Anthropic
+
+- id: ciencia
+  type: rss
+  name: Ciência
+  enabled: true
+  feeds:
+  - url: https://abori.com.br/blog/
+    name: Abori
+    scrape: true
+  - url: https://cienciahoje.org.br/
+    name: Ciência Hoje
+    scrape: true
+  - url: https://www.nature.com/nature.rss
+    name: Nature
+  settings:
+    max_items_per_feed: 3
+    max_items_total: 5
+    days_lookback: 1
 
   settings:
     max_items_per_feed: 1   # ← garante no máximo 1 por blog
@@ -353,8 +404,8 @@ sources:
     weather:
       enabled: true
       cities:
-      - Cuiaba,MT
-      - Varzea Grande,MT
+      - Cuiaba
+      - Varzea Grande
       api_key_env: OPENWEATHER_API_KEY
       forecast_days: 3
     finance:
