@@ -1186,9 +1186,11 @@ radioIA/
 ├── serve.py                     # player web (Flask)
 ├── scheduler.py                 # agendador de episódios
 ├── mcp_server.py                # ponto de entrada do servidor MCP
-├── config.yaml                  # configuração completa
-├── .env                         # chaves de API (não versionar)
-├── mcp_tools/                   # módulos MCP — 40 ferramentas
+├── config.yaml.example          # template de configuração (copie para config.yaml)
+├── config.yaml                  # configuração da instância (gitignore — não versionado)
+├── .env.example                 # template de variáveis de ambiente
+├── .env                         # chaves de API (gitignore — não versionado)
+├── mcp_tools/                   # módulos MCP — 42 ferramentas
 │   ├── _instance.py             # instância FastMCP compartilhada
 │   ├── _utils.py                # helpers compartilhados (load_config, scan_day, etc.)
 │   ├── content.py               # geração de episódios, histórico, replay
@@ -1226,12 +1228,15 @@ radioIA/
 │   ├── horoscopo.py             # horóscopo por signo (Personare)
 │   ├── receitas.py              # receitas culinárias (RSS + TheMealDB)
 │   ├── filmes.py                # indicações de filmes (TMDB)
+│   ├── podcast.py               # episódios de podcast (RSS de áudio)
 │   ├── url.py                   # episódio a partir de URL avulsa
 │   ├── biblia.py                # passagens bíblicas (ABíbliaDigital)
 │   ├── concursos_pci.py         # concursos públicos (PCI Concursos)
 │   ├── clipping.py              # panorama de cobertura midiática sobre um tema
+│   ├── clipping_auto.py         # clipping automático por tópicos do dia (RSS + LLM)
 │   ├── whatsapp.py              # resumo de grupo WhatsApp (exportação manual)
 │   └── exemplo_plugin.py        # template para novos plugins
+├── tests/                       # testes unitários (215 testes)
 ├── music/                       # músicas locais para o fallback do player
 └── output/                      # episódios gerados (não versionar)
 ```
