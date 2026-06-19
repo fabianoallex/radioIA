@@ -609,12 +609,15 @@ async function renderRoteiro(ep) {
     }
     const locColors = { A: 'loc-a', B: 'loc-b', C: 'loc-c' };
     el.innerHTML = data.items.map(item => {
-      const link     = (ep.links && item.item_index != null) ? ep.links[item.item_index - 1] : null;
-      const hasStart = link && link.start_time_seconds != null;
-      const seekAttr  = hasStart ? ` data-start="${link.start_time_seconds}"` : '';
+      const link      = (ep.links && item.item_index != null) ? ep.links[item.item_index - 1] : null;
+      const startTime = link && link.start_time_seconds != null
+        ? link.start_time_seconds
+        : (item.item_index == null && i === 0 ? 0 : null);
+      const hasStart  = startTime !== null;
+      const seekAttr  = hasStart ? ` data-start="${startTime}"` : '';
       const seekClass = hasStart ? ' seekable' : '';
-      const seekClick = hasStart ? ` onclick="seekTo(${link.start_time_seconds})"` : '';
-      const seekHint  = hasStart ? `<div class="roteiro-seek">▶ ${fmtDur(Math.round(link.start_time_seconds))}</div>` : '';
+      const seekClick = hasStart ? ` onclick="seekTo(${startTime})"` : '';
+      const seekHint  = hasStart ? `<div class="roteiro-seek">▶ ${fmtDur(Math.round(startTime))}</div>` : '';
       const numLabel  = item.item_index != null
         ? '#' + item.item_index + (link ? ' — ' + link.title : '')
         : 'Abertura / Encerramento';

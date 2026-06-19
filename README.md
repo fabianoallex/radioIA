@@ -1060,6 +1060,8 @@ python mcp_server.py
 | `gerar_clipping_automatico()` | Descobre e clipa o assunto mais discutido do dia automaticamente |
 | `gerar_clipping_automatico(categoria="economia")` | Clipping automático filtrado por tema |
 | `gerar_clipping_automatico(categoria="esportes", topic_history_days=3)` | Com janela de exclusão customizada |
+| `gerar_podcast("https://feed.rss")` | Gera episódio a partir de feed RSS ou MP3 direto de podcast |
+| `gerar_podcast("https://ep.mp3", topic="IA", start=60)` | Com foco temático e offset de início |
 | `deletar_episodio("09-30_youtube")` | Remove a pasta de um episódio específico do output |
 | `replay_episodio("12-15_not")` | Replay de episódio por prefixo parcial da pasta |
 | `replay_episodio("12-15", "2026-06-03")` | Replay de episódio de uma data específica |
@@ -1129,6 +1131,25 @@ O scheduler protege contra instâncias duplicadas: tentar iniciar uma segunda in
 | `baixar_musicas_jamendo(id_fonte?)` | Baixa novas faixas do Jamendo para o cache; omitir `id_fonte` para baixar de todas as fontes |
 | `limpar_cache_jamendo(confirmar)` | Remove todos os arquivos e o catálogo do cache Jamendo (requer `confirmar=True`) |
 
+#### Spots
+
+| Ferramenta | Descrição |
+|-----------|-----------|
+| `adicionar_spot("aviso", "tts", texto="Atenção: reunião às 15h.")` | Adiciona spot de texto fixo narrado por TTS |
+| `adicionar_spot("promo", "llm", topico="Promova o produto X em 20s", max_por_dia=3)` | Spot gerado diariamente pelo LLM |
+| `adicionar_spot("jingle", "file", path="spots/jingle.mp3", peso=2)` | Spot a partir de MP3 externo, com peso de rotação |
+| `remover_spot("aviso")` | Remove o spot do config.yaml (cache de áudio não é apagado) |
+| `gerar_spot("promo")` | Pré-gera o áudio cacheado de um spot tts/llm |
+| `gerar_spot("promo", forcar=True)` | Regenera o cache mesmo que já exista (novo script para llm) |
+| `deletar_cache_spot("aviso")` | Apaga o áudio cacheado para forçar regeneração na próxima reprodução |
+| `deletar_cache_spot("*")` | Limpa o cache de todos os spots |
+
+#### Operação
+
+| Ferramenta | Descrição |
+|-----------|-----------|
+| `registrar_nota("Clipping com tópicos +60 chars retorna poucos resultados", "quirk")` | Persiste observação operacional em `OPERACAO.md`, lida pelo `briefing()` em sessões futuras |
+
 #### Exportação
 
 | Ferramenta | Descrição |
@@ -1186,9 +1207,11 @@ radioIA/
 ├── serve.py                     # player web (Flask)
 ├── scheduler.py                 # agendador de episódios
 ├── mcp_server.py                # ponto de entrada do servidor MCP
-├── config.yaml                  # configuração completa
-├── .env                         # chaves de API (não versionar)
-├── mcp_tools/                   # módulos MCP — 40 ferramentas
+├── config.yaml.example          # template de configuração (copie para config.yaml)
+├── config.yaml                  # configuração da instância (gitignore — não versionado)
+├── .env.example                 # template de variáveis de ambiente
+├── .env                         # chaves de API (gitignore — não versionado)
+├── mcp_tools/                   # módulos MCP — 42 ferramentas
 │   ├── _instance.py             # instância FastMCP compartilhada
 │   ├── _utils.py                # helpers compartilhados (load_config, scan_day, etc.)
 │   ├── content.py               # geração de episódios, histórico, replay
@@ -1226,12 +1249,15 @@ radioIA/
 │   ├── horoscopo.py             # horóscopo por signo (Personare)
 │   ├── receitas.py              # receitas culinárias (RSS + TheMealDB)
 │   ├── filmes.py                # indicações de filmes (TMDB)
+│   ├── podcast.py               # episódios de podcast (RSS de áudio)
 │   ├── url.py                   # episódio a partir de URL avulsa
 │   ├── biblia.py                # passagens bíblicas (ABíbliaDigital)
 │   ├── concursos_pci.py         # concursos públicos (PCI Concursos)
 │   ├── clipping.py              # panorama de cobertura midiática sobre um tema
+│   ├── clipping_auto.py         # clipping automático por tópicos do dia (RSS + LLM)
 │   ├── whatsapp.py              # resumo de grupo WhatsApp (exportação manual)
 │   └── exemplo_plugin.py        # template para novos plugins
+├── tests/                       # testes unitários (215 testes)
 ├── music/                       # músicas locais para o fallback do player
 └── output/                      # episódios gerados (não versionar)
 ```
