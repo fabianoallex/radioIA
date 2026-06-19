@@ -615,6 +615,26 @@ def main():
         _cmd_download_musica()
         sys.exit(0)
 
+    # 'replay' sem parâmetro → lista episódios do dia disponíveis para replay
+    if 'replay' in sys.argv[1:] and not any(a.startswith('replay:') for a in sys.argv[1:]):
+        today = datetime.now().strftime('%Y-%m-%d')
+        day_dir = os.path.join('output', today)
+        if not os.path.isdir(day_dir):
+            print(f"Nenhum episodio encontrado para hoje ({today}).")
+        else:
+            folders = sorted([
+                f for f in os.listdir(day_dir)
+                if os.path.isdir(os.path.join(day_dir, f))
+                and os.path.exists(os.path.join(day_dir, f, 'episode.mp3'))
+            ])
+            if not folders:
+                print(f"Nenhum episodio com audio disponivel para hoje ({today}).")
+            else:
+                print(f"Episodios disponiveis para replay em {today}:")
+                for f in folders:
+                    print(f"  python main.py replay:{f}")
+        sys.exit(0)
+
     config = load_config()
     radio_name = config.get('radio', {}).get('name', 'RadioIA')
     print(f"{radio_name}\n")
