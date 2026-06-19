@@ -608,7 +608,7 @@ async function renderRoteiro(ep) {
       return;
     }
     const locColors = { A: 'loc-a', B: 'loc-b', C: 'loc-c' };
-    el.innerHTML = data.items.map(item => {
+    el.innerHTML = data.items.map((item, i) => {
       const link      = (ep.links && item.item_index != null) ? ep.links[item.item_index - 1] : null;
       const startTime = link && link.start_time_seconds != null
         ? link.start_time_seconds
