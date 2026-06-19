@@ -1074,6 +1074,9 @@ python mcp_server.py
 | `status_geracao()` | Estado da geração em andamento (progresso em tempo real) |
 | `ver_historico_clipping_auto()` | Tópicos cobertos pelo clipping automático nos últimos 7 dias |
 | `ver_historico_clipping_auto(dias=14)` | Histórico com janela customizada |
+| `listar_assuntos()` | Lista os principais assuntos do momento para escolha manual |
+| `listar_assuntos("economia")` | Assuntos filtrados por categoria |
+| `listar_assuntos("esportes", 5)` | Top 5 de esportes — cada item já traz o comando `gerar_clipping()` pronto |
 
 **Fontes disponíveis em `gerar_episodios`:**
 `youtube` · `noticias` · `noticias-locais` · `tecnologia` · `horoscopo` · `utilidades` · `loteria` · `copa` · `brasileirao` · `champions` · `efemerides` · `quiz` · `reddit` · `receitas` · `filmes` · `filmes-cartaz` · `musica` · `musica-local` · `concursos` · `biblia`
