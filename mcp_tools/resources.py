@@ -774,6 +774,82 @@ def ver_historico_clipping_auto(dias: int = 7) -> str:
     }, ensure_ascii=False, indent=2)
 
 
+@mcp.tool()
+def listar_assuntos(categoria: str = '', max_topicos: int = 10) -> str:
+    """
+    Lista os principais assuntos do momento coletados dos feeds de noticias.
+    Use para escolher um topico antes de gerar um clipping com gerar_clipping().
+
+    Consulta os mesmos feeds do clipping automatico, usa o LLM (Haiku) para
+    identificar os topicos mais relevantes e retorna a lista sem gerar episodio
+    nem registrar no historico — apenas para curadoria manual.
+
+    Args:
+        categoria:   Filtro tematico opcional (ex: "economia", "esportes", "politica").
+                     Se vazio, lista os assuntos mais relevantes do dia sem filtro.
+        max_topicos: Quantidade maxima de assuntos a listar (default: 10).
+
+    Exemplos:
+        listar_assuntos()                     — top 10 assuntos do dia
+        listar_assuntos("economia")           — assuntos de economia
+        listar_assuntos("esportes", 5)        — top 5 de esportes
+        # Em seguida: gerar_clipping("topico escolhido")
+    """
+    from datetime import date
+    import plugins.clipping_auto as ca
+
+    try:
+        import yaml
+        with open(os.path.join(PROJECT_DIR, 'config.yaml'), 'r', encoding='utf-8') as f:
+            cfg = yaml.safe_load(f)
+    except Exception:
+        cfg = {}
+
+    llm_cfg  = cfg.get('llm') or cfg.get('claude') or {}
+    api_base = llm_cfg.get('api_base')
+    model    = ca.DEFAULT_LLM_MODEL
+
+    # Usa feeds configurados na fonte clipping_auto do config.yaml, se existir
+    sources = cfg.get('sources', [])
+    ca_src  = next((s for s in sources if s.get('type') == 'clipping_auto'), {})
+    feeds   = (ca_src.get('settings') or {}).get('trending_feeds', ca.DEFAULT_TRENDING_FEEDS)
+
+    print(f'  [listar_assuntos] coletando manchetes de {len(feeds)} feed(s)...')
+    headlines = ca._collect_headlines(feeds, date.today())
+    print(f'  [listar_assuntos] {len(headlines)} manchete(s). Consultando LLM...')
+
+    if not headlines:
+        return json.dumps({
+            'status':   'erro',
+            'mensagem': 'Nenhuma manchete coletada dos feeds. Verifique conectividade.',
+        }, ensure_ascii=False, indent=2)
+
+    topics = ca._discover_topics(headlines, max_topicos, [], categoria, model, api_base)
+
+    if not topics:
+        return json.dumps({
+            'status':   'erro',
+            'mensagem': 'LLM nao retornou topicos. Tente novamente.',
+        }, ensure_ascii=False, indent=2)
+
+    cat_label = f' [{categoria}]' if categoria else ''
+    assuntos = [
+        {
+            'topico':  t,
+            'comando': f'gerar_clipping("{t}")',
+        }
+        for t in topics
+    ]
+
+    return json.dumps({
+        'status':          'ok',
+        'categoria':       categoria or 'geral',
+        'manchetes_lidas': len(headlines),
+        'assuntos':        assuntos,
+        'dica':            f'Use gerar_clipping("topico") para gerar o episodio do assunto escolhido.',
+    }, ensure_ascii=False, indent=2)
+
+
 # ── jamendo ───────────────────────────────────────────────────────────────────
 
 @mcp.tool()
