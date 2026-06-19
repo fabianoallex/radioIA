@@ -465,6 +465,13 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
         max_sources = int((source_config.get('settings') or {}).get('max_sources', 5))
         items = items[:max_sources]
 
+    # RSS: fetch() agora retorna candidatos de todos os feeds sem early-stop.
+    # Aplica max_total aqui, após o filtro de seen_ids, para que feeds
+    # consultados mais tarde também contribuam com itens novos.
+    if source_type == 'rss':
+        max_rss = int((source_config.get('settings') or {}).get('max_items_total', 10))
+        items = items[:max_rss]
+
     # Se poucos itens novos, expande o periodo de busca e complementa
     # (não se aplica a fontes com número fixo de itens como horoscopo/trivia)
     settings = source_config.get('settings') or {}
