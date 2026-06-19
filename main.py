@@ -615,6 +615,32 @@ def main():
         _cmd_download_musica()
         sys.exit(0)
 
+    # 'listar-assuntos' → descobre tópicos dos feeds e lista sem gerar episódio
+    if 'listar-assuntos' in sys.argv[1:]:
+        import plugins.clipping_auto as ca
+        from datetime import date as _date
+        argv_rest = sys.argv[sys.argv.index('listar-assuntos') + 1:]
+        categoria   = argv_rest[0] if argv_rest and not argv_rest[0].startswith('-') else ''
+        max_topicos = int(argv_rest[1]) if len(argv_rest) > 1 and argv_rest[1].isdigit() else 10
+        cfg = load_config()
+        api_base = (cfg.get('llm') or cfg.get('claude') or {}).get('api_base')
+        sources  = cfg.get('sources', [])
+        ca_src   = next((s for s in sources if s.get('type') == 'clipping_auto'), {})
+        feeds    = (ca_src.get('settings') or {}).get('trending_feeds', ca.DEFAULT_TRENDING_FEEDS)
+        cat_label = f' [{categoria}]' if categoria else ''
+        print(f"Coletando manchetes de {len(feeds)} feed(s)...")
+        headlines = ca._collect_headlines(feeds, _date.today())
+        print(f"{len(headlines)} manchete(s). Consultando LLM{cat_label}...")
+        topics = ca._discover_topics(headlines, max_topicos, [], categoria, ca.DEFAULT_LLM_MODEL, api_base)
+        if not topics:
+            print("Nenhum topico encontrado.")
+        else:
+            print(f"\nPrincipais assuntos{cat_label}:")
+            for i, t in enumerate(topics, 1):
+                print(f"  {i:2}. {t}")
+                print(f"      python main.py clipping:{t}")
+        sys.exit(0)
+
     # 'replay' sem parâmetro → lista episódios do dia disponíveis para replay
     if 'replay' in sys.argv[1:] and not any(a.startswith('replay:') for a in sys.argv[1:]):
         today = datetime.now().strftime('%Y-%m-%d')
