@@ -2001,6 +2001,20 @@ def api_script(ep_id):
     ep_dir      = os.path.join(OUTPUT_DIR, ep_id.replace('/', os.sep))
     script_path = os.path.join(ep_dir, 'script.txt')
     if not os.path.exists(script_path):
+        # Replay: script.txt fica na pasta original; segue replay_of
+        meta_path = os.path.join(ep_dir, 'episode.json')
+        if os.path.exists(meta_path):
+            try:
+                with open(meta_path, 'r', encoding='utf-8') as f:
+                    meta = json.load(f)
+                replay_of = meta.get('replay_of', '')
+                if replay_of:
+                    date_part = ep_id.split('/')[0] if '/' in ep_id else ''
+                    orig_dir  = os.path.join(OUTPUT_DIR, date_part, replay_of) if date_part else os.path.join(OUTPUT_DIR, replay_of)
+                    script_path = os.path.join(orig_dir, 'script.txt')
+            except Exception:
+                pass
+    if not os.path.exists(script_path):
         return jsonify({'items': []}), 404
     try:
         with open(script_path, 'r', encoding='utf-8') as f:
