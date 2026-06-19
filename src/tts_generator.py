@@ -7,6 +7,13 @@ import sys
 MAX_LINE_CHARS = 450
 
 
+# Frases de referencia que o LLM as vezes cola sem pontuacao antes
+_REF_PHRASE_RE = re.compile(
+    r'(\w)(\s+)(mat[eé]ria completa nas notas|link do v[ií]deo|link do epis[oó]dio|link do post)',
+    re.IGNORECASE,
+)
+
+
 def parse_script(script: str) -> list[dict]:
     lines = []
     pattern = re.compile(r'\*{0,2}\[(LOCUTOR_[A-C])\]\*{0,2}:[\*\s]*(.+)')
@@ -37,6 +44,7 @@ def _sanitize(text: str) -> str:
     text = text.replace('‘', "'").replace('’', "'")
     text = re.sub(r'[^\w\s,\.!?;:\-\(\)\"\'À-ɏ]', ' ', text)
     text = re.sub(r'\s+', ' ', text).strip()
+    text = _REF_PHRASE_RE.sub(lambda m: m.group(1) + '. ' + m.group(3), text)
     return text[:MAX_LINE_CHARS]
 
 
