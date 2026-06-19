@@ -250,7 +250,6 @@ def fetch(source_config: dict, credentials=None) -> list[dict]:
     feeds = source_config.get('feeds', [])
     settings = source_config.get('settings', {})
     max_per_feed = settings.get('max_items_per_feed', 3)
-    max_total = settings.get('max_items_total', 10)
     days_lookback = settings.get('days_lookback', 1)
     cutoff = datetime.now(timezone.utc) - timedelta(days=days_lookback)
 
@@ -261,6 +260,7 @@ def fetch(source_config: dict, credentials=None) -> list[dict]:
     all_items: list[dict] = []
 
     # fontes scrape rodam em paralelo (IO-bound)
+    # Consulta todos os feeds sem parar cedo: o caller filtra seen_ids e aplica max_total
     if scrape_feeds:
         workers = min(4, len(scrape_feeds))
         with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -273,13 +273,11 @@ def fetch(source_config: dict, credentials=None) -> list[dict]:
                     all_items.extend(future.result())
                 except Exception:
                     pass
-        all_items = all_items[:max_total]
 
     # fontes RSS nativas rodam sequencialmente
+    # Sem early-stop por max_total: feeds posteriores podem ter conteúdo novo
+    # após o filtro de histórico aplicado pelo caller
     for feed_config in rss_feeds:
-        if len(all_items) >= max_total:
-            break
-
         feed_name = feed_config.get('name', '')
         feed = feedparser.parse(feed_config['url'])
         if not feed_name:
@@ -287,7 +285,7 @@ def fetch(source_config: dict, credentials=None) -> list[dict]:
         count = 0
 
         for entry in feed.entries:
-            if count >= max_per_feed or len(all_items) >= max_total:
+            if count >= max_per_feed:
                 break
             published = _parse_date(entry)
             if published and published < cutoff:
