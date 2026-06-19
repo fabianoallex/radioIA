@@ -71,7 +71,9 @@ class TestFetchScrape:
 
         assert len(fetch(self._config(max_per_feed=2))) == 2
 
-    def test_max_items_total_respeitado(self, monkeypatch):
+    def test_todos_feeds_consultados_independente_de_max_total(self, monkeypatch):
+        # fetch() agora retorna candidatos de TODOS os feeds sem early-stop por max_total.
+        # O cap é aplicado pelo caller (_run_source) após filtrar seen_ids.
         self._mock_base(monkeypatch)
         config = {
             'feeds': [
@@ -85,7 +87,8 @@ class TestFetchScrape:
         monkeypatch.setattr('src.sources.rss._extract_article',
                             lambda url: ('Título', 'Texto.', None))
 
-        assert len(fetch(config)) == 3
+        # 2 feeds × max_per_feed=5 → 10 candidatos retornados (max_total ignorado aqui)
+        assert len(fetch(config)) == 10
 
     def test_item_com_data_antiga_filtrado(self, monkeypatch):
         self._mock_base(monkeypatch)
