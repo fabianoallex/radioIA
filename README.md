@@ -37,13 +37,12 @@ cd radioIA
 # Instale as dependências
 pip install -r requirements.txt
 
-# Crie seu config.yaml a partir do exemplo
+# Crie os arquivos de configuração a partir dos exemplos
 cp config.yaml.example config.yaml
+cp .env.example .env
 ```
 
-> O `config.yaml` é ignorado pelo git (`.gitignore`) — cada máquina mantém sua própria configuração sem risco de conflito ao fazer `git pull`.
-
-> **Atualizando de uma versão anterior?** O `litellm` foi adicionado como dependência para suporte a múltiplos provedores de LLM. Se você já tinha o projeto instalado, rode `pip install -r requirements.txt` novamente para incluí-lo — ele é necessário mesmo usando apenas o Claude.
+> Ambos os arquivos são ignorados pelo git (`.gitignore`) — cada máquina mantém sua própria configuração sem risco de conflito ao fazer `git pull`.
 
 ---
 
@@ -51,7 +50,7 @@ cp config.yaml.example config.yaml
 
 ### 1. Variáveis de ambiente (`.env`)
 
-Crie o arquivo `.env` na raiz do projeto:
+Criado a partir do `.env.example` no passo anterior. O arquivo não é versionado — preencha com suas chaves:
 
 ```env
 # Obrigatórias
