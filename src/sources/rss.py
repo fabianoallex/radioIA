@@ -279,7 +279,18 @@ def fetch(source_config: dict, credentials=None) -> list[dict]:
     # após o filtro de histórico aplicado pelo caller
     for feed_config in rss_feeds:
         feed_name = feed_config.get('name', '')
-        feed = feedparser.parse(feed_config['url'])
+        feed_url  = feed_config['url']
+        # user_agent por feed: alguns sites bloqueiam o UA padrão do feedparser/Chrome
+        custom_ua = feed_config.get('user_agent')
+        if custom_ua:
+            try:
+                r = _requests.get(feed_url, timeout=_HTTP_TIMEOUT,
+                                   headers={**_HTTP_HEADERS, 'User-Agent': custom_ua})
+                feed = feedparser.parse(r.content)
+            except Exception:
+                feed = feedparser.parse(feed_url)
+        else:
+            feed = feedparser.parse(feed_url)
         if not feed_name:
             feed_name = feed.feed.get('title', 'Feed')
         count = 0

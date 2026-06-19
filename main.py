@@ -638,7 +638,7 @@ def main():
             print(f"\nPrincipais assuntos{cat_label}:")
             for i, t in enumerate(topics, 1):
                 print(f"  {i:2}. {t}")
-                print(f"      python main.py clipping:{t}")
+                print(f'      python main.py clipping:"{t}"')
         sys.exit(0)
 
     # 'replay' sem parâmetro → lista episódios do dia disponíveis para replay
