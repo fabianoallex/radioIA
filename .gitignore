@@ -1,5 +1,6 @@
 # ── Credenciais e chaves — NUNCA versionar ────────────────────────────────────
 .env
+config.yaml
 credentials.json
 token.json
 client_secret*.json

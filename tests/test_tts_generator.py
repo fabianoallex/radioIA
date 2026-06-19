@@ -72,3 +72,48 @@ class TestParseScript:
         result = parse_script(script)
         assert len(result) == 3
         assert result[1]['locutor'] == 'LOCUTOR_B'
+
+
+class TestParseScriptItemMarkers:
+    def test_item_marker_sets_item_index(self):
+        script = "[ITEM_1]\n[LOCUTOR_A]: Primeira notícia."
+        result = parse_script(script)
+        assert result[0].get('item_index') == 1
+
+    def test_lines_before_marker_have_no_item_index(self):
+        script = "[LOCUTOR_A]: Abertura.\n[ITEM_1]\n[LOCUTOR_A]: Notícia."
+        result = parse_script(script)
+        assert 'item_index' not in result[0]
+        assert result[1].get('item_index') == 1
+
+    def test_marker_with_trailing_text_still_parsed(self):
+        # LLM pode escrever [ITEM_1]: texto — o regex permissivo deve aceitar
+        script = "[ITEM_2]: Fim do item anterior\n[LOCUTOR_A]: Segunda notícia."
+        result = parse_script(script)
+        assert result[0].get('item_index') == 2
+
+    def test_multiple_items_tracked_independently(self):
+        script = (
+            "[ITEM_1]\n"
+            "[LOCUTOR_A]: Fala do item 1.\n"
+            "[ITEM_2]\n"
+            "[LOCUTOR_B]: Fala do item 2.\n"
+        )
+        result = parse_script(script)
+        assert result[0].get('item_index') == 1
+        assert result[1].get('item_index') == 2
+
+    def test_marker_number_matches_correctly(self):
+        script = "[ITEM_10]\n[LOCUTOR_A]: Décimo item."
+        result = parse_script(script)
+        assert result[0].get('item_index') == 10
+
+    def test_item_index_persists_across_consecutive_lines(self):
+        script = (
+            "[ITEM_3]\n"
+            "[LOCUTOR_A]: Linha um.\n"
+            "[LOCUTOR_B]: Linha dois.\n"
+        )
+        result = parse_script(script)
+        assert result[0].get('item_index') == 3
+        assert result[1].get('item_index') == 3

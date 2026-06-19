@@ -402,6 +402,27 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
 .link-card.seekable:hover { border-color: #6366f1; }
 .link-card.active { border-color: #6366f1 !important; background: #1e1b4b; }
 .link-seek { font-size: 11px; color: #818cf8; margin-bottom: 6px; }
+
+/* ── Aba Roteiro ──────────────────────────────────────────────────────────── */
+.notes-tabs { display: flex; gap: 16px; margin-bottom: 14px; }
+.notes-tab  { font-size: 11px; color: #6b7280; text-transform: uppercase;
+              letter-spacing: .05em; cursor: pointer; padding-bottom: 3px;
+              border-bottom: 2px solid transparent; user-select: none; }
+.notes-tab.active { color: #a5b4fc; border-bottom-color: #6366f1; }
+.roteiro-item { background: #1f2937; border: 1px solid #374151; border-radius: 10px;
+               padding: 14px 16px; margin-bottom: 10px; }
+.roteiro-item.seekable { cursor: pointer; }
+.roteiro-item.seekable:hover { border-color: #6366f1; }
+.roteiro-item.active { border-color: #6366f1 !important; background: #1e1b4b; }
+.roteiro-num  { font-size: 11px; color: #818cf8; font-weight: 700; margin-bottom: 8px; }
+.roteiro-seek { font-size: 11px; color: #818cf8; margin-bottom: 8px; }
+.roteiro-line { font-size: 13px; line-height: 1.55; margin-bottom: 5px; color: #d1d5db; }
+.roteiro-line:last-child { margin-bottom: 0; }
+.roteiro-loc  { font-size: 10px; font-weight: 700; text-transform: uppercase;
+               letter-spacing: .06em; margin-right: 6px; }
+.loc-a { color: #6ee7b7; }
+.loc-b { color: #93c5fd; }
+.loc-c { color: #fca5a5; }
 </style>
 </head>
 <body>
@@ -457,7 +478,10 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
     {% endif %}
   </div>
   <div class="notes">
-    <div class="notes-header">Fontes do episódio</div>
+    <div class="notes-tabs">
+      <span class="notes-tab active" id="notes-tab-fontes" onclick="setNotesTab('fontes')">Fontes</span>
+      <span class="notes-tab" id="notes-tab-roteiro" onclick="setNotesTab('roteiro')">Roteiro</span>
+    </div>
     <div id="notes"><div class="empty">Selecione um episódio para ver as fontes.</div></div>
   </div>
 </div>
@@ -498,6 +522,7 @@ let _dlModeTimer   = null;
 const DL_MODE_TIMEOUT_MS = 30000;
 let _notesLastScroll = 0;   // timestamp do último scroll/wheel/touchmove no painel de fontes
 const NOTES_IDLE_MS  = 20000;
+let _notesTab = 'fontes';   // 'fontes' | 'roteiro'
 
 const S_EP           = 'radioIA_ep';
 const S_TIME         = 'radioIA_time';
@@ -557,6 +582,56 @@ document.addEventListener('visibilitychange', () => {
     if (!audio.paused) acquireWakeLock();
   }
 });
+
+// ── Abas do painel de notas (Fontes / Roteiro) ───────────────────────────────
+function setNotesTab(tab) {
+  _notesTab = tab;
+  document.getElementById('notes-tab-fontes').classList.toggle('active', tab === 'fontes');
+  document.getElementById('notes-tab-roteiro').classList.toggle('active', tab === 'roteiro');
+  if (!currentEp) return;
+  if (tab === 'fontes') renderNotes(currentEp);
+  else renderRoteiro(currentEp);
+}
+
+async function renderRoteiro(ep) {
+  const el = document.getElementById('notes');
+  el.innerHTML = '<div class="empty">Carregando roteiro...</div>';
+  try {
+    const res = await fetch('/api/script/' + ep.id);
+    if (!res.ok) {
+      el.innerHTML = '<div class="empty">Roteiro não disponível para este episódio.</div>';
+      return;
+    }
+    const data = await res.json();
+    if (!data.items || !data.items.length) {
+      el.innerHTML = '<div class="empty">Roteiro vazio.</div>';
+      return;
+    }
+    const locColors = { A: 'loc-a', B: 'loc-b', C: 'loc-c' };
+    el.innerHTML = data.items.map(item => {
+      const link     = (ep.links && item.item_index != null) ? ep.links[item.item_index - 1] : null;
+      const hasStart = link && link.start_time_seconds != null;
+      const seekAttr  = hasStart ? ` data-start="${link.start_time_seconds}"` : '';
+      const seekClass = hasStart ? ' seekable' : '';
+      const seekClick = hasStart ? ` onclick="seekTo(${link.start_time_seconds})"` : '';
+      const seekHint  = hasStart ? `<div class="roteiro-seek">▶ ${fmtDur(Math.round(link.start_time_seconds))}</div>` : '';
+      const numLabel  = item.item_index != null
+        ? '#' + item.item_index + (link ? ' — ' + link.title : '')
+        : 'Abertura / Encerramento';
+      const linesHtml = item.lines.map(l => {
+        const letter = l.locutor.replace('LOCUTOR_', '');
+        return `<div class="roteiro-line"><span class="roteiro-loc ${locColors[letter] || ''}">${letter}</span>${l.text}</div>`;
+      }).join('');
+      return `<div class="roteiro-item${seekClass}"${seekAttr}${seekClick}>
+        <div class="roteiro-num">${numLabel}</div>
+        ${seekHint}${linesHtml}
+      </div>`;
+    }).join('');
+    updateActiveCard(document.getElementById('audio').currentTime);
+  } catch (_) {
+    el.innerHTML = '<div class="empty">Erro ao carregar roteiro.</div>';
+  }
+}
 
 // ── Mobile tabs ───────────────────────────────────────────────────────────────
 function isMobile() { return window.innerWidth <= 768; }
@@ -1226,7 +1301,8 @@ function playEpisode(ep) {
     el.classList.toggle('active', el.dataset.id === ep.id);
   });
 
-  renderNotes(ep);
+  if (_notesTab === 'fontes') renderNotes(ep);
+  else renderRoteiro(ep);
   updateActiveCard(audio.currentTime);
   if (isMobile()) setTab('fontes');
 }
@@ -1275,7 +1351,7 @@ function seekTo(seconds) {
 }
 
 function updateActiveCard(t) {
-  const cards = [...document.querySelectorAll('#notes .link-card.seekable')];
+  const cards = [...document.querySelectorAll('#notes .link-card.seekable, #notes .roteiro-item.seekable')];
   if (!cards.length) return;
   let best = null;
   let bestStart = -1;
@@ -1914,6 +1990,33 @@ def api_geracao_status():
 @app.route('/api/episodes')
 def api_episodes():
     return jsonify(scan_episodes())
+
+
+@app.route('/api/script/<path:ep_id>')
+def api_script(ep_id):
+    from src.tts_generator import parse_script
+    ep_dir      = os.path.join(OUTPUT_DIR, ep_id.replace('/', os.sep))
+    script_path = os.path.join(ep_dir, 'script.txt')
+    if not os.path.exists(script_path):
+        return jsonify({'items': []}), 404
+    try:
+        with open(script_path, 'r', encoding='utf-8') as f:
+            script = f.read()
+        lines   = parse_script(script)
+        items   = []
+        current = {'item_index': None, 'lines': []}
+        for line in lines:
+            idx = line.get('item_index')
+            if idx != current['item_index']:
+                if current['lines']:
+                    items.append(current)
+                current = {'item_index': idx, 'lines': []}
+            current['lines'].append({'locutor': line['locutor'], 'text': line['text']})
+        if current['lines']:
+            items.append(current)
+        return jsonify({'items': items})
+    except Exception:
+        return jsonify({'items': []}), 500
 
 def _warm_announcement():
     """Gera o anúncio em background para que a próxima requisição seja imediata."""

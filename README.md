@@ -37,9 +37,11 @@ cd radioIA
 # Instale as dependências
 pip install -r requirements.txt
 
-# Configuração única por máquina — evita conflitos de git no config.yaml
-git config --global merge.ours.driver true
+# Crie seu config.yaml a partir do exemplo
+cp config.yaml.example config.yaml
 ```
+
+> O `config.yaml` é ignorado pelo git (`.gitignore`) — cada máquina mantém sua própria configuração sem risco de conflito ao fazer `git pull`.
 
 > **Atualizando de uma versão anterior?** O `litellm` foi adicionado como dependência para suporte a múltiplos provedores de LLM. Se você já tinha o projeto instalado, rode `pip install -r requirements.txt` novamente para incluí-lo — ele é necessário mesmo usando apenas o Claude.
 
@@ -76,6 +78,8 @@ FOOTBALL_DATA_API_KEY=...      # Futebol (football-data.org)
 ---
 
 ### 2. Arquivo de configuração (`config.yaml`)
+
+Criado a partir do `config.yaml.example` no passo anterior. O arquivo original não é versionado — cada instância (dev, produção) mantém o seu próprio. Para atualizar a partir do repositório basta `git pull`; o seu `config.yaml` nunca é sobrescrito.
 
 Toda a configuração da rádio está no `config.yaml`. Ele é dividido em:
 - **`sources`** — fontes de conteúdo
