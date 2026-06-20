@@ -244,7 +244,8 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
 .link-meta   { font-size: 12px; color: #9ca3af; margin-bottom: 8px; }
 .link-url    { font-size: 12px; color: #60a5fa; text-decoration: none; word-break: break-all; display: block; }
 .link-url:hover { text-decoration: underline; }
-.src-progress-bar  { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: #374151; }
+.src-progress-bar  { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: #374151; transition: height .4s ease; }
+.src-progress-bar.done { height: 1px; }
 .src-progress-fill { height: 100%; background: #6366f1; width: 0; transition: width .5s linear; }
 .comment-block  { margin-top: 10px; padding-top: 10px; border-top: 1px solid #374151; }
 .comment-label  { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
@@ -1399,6 +1400,7 @@ function updateActiveCard(t) {
     if (isNaN(start) || isNaN(end) || end <= start) return;
     const pct = Math.min(1, Math.max(0, (t - start) / (end - start)));
     bar.querySelector('.src-progress-fill').style.width = (pct * 100) + '%';
+    bar.classList.toggle('done', pct >= 1);
   });
 }
 
