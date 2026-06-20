@@ -798,6 +798,49 @@ O número de faixas baixadas por execução é controlado pelo parâmetro `cache
       tags: lounge
 ```
 
+### Admin UI (interface web de administração)
+
+Interface web para gerenciar a rádio sem editar o `config.yaml` diretamente. Permite configurar fontes, grade, spots, narradores e gerar episódios com acompanhamento em tempo real.
+
+```bash
+# Subir a API (serve o Admin UI em produção)
+uvicorn api.main:app --port 5001
+# Acesse http://localhost:5001
+```
+
+Em modo desenvolvimento (hot-reload):
+
+```bash
+# Terminal 1 — API
+uvicorn api.main:app --port 5001
+
+# Terminal 2 — Vite dev server
+cd ui && npm install && npm run dev
+# Acesse http://localhost:5173
+```
+
+Para fazer o build da interface antes de usar em produção:
+
+```bash
+cd ui && npm run build && cd ..
+```
+
+**Rodando dev e produção no mesmo PC simultaneamente:**
+
+```bash
+# Produção (segunda pasta do projeto)
+PLAYER_PORT=5001 uvicorn api.main:app --port 5002
+# Admin: http://localhost:5002 | Player: http://localhost:5001
+
+# Dev (pasta original)
+uvicorn api.main:app --port 5001    # player em localhost:5000 (padrão)
+cd ui && npm run dev                # Vite em http://localhost:5173
+```
+
+`PLAYER_PORT` informa ao Admin UI em qual porta o player web (`serve.py`) está rodando — usado para o link "Abrir player" no menu e o status no Dashboard. A porta da própria API é definida pelo argumento `--port` do uvicorn.
+
+---
+
 ### Player web
 
 ```bash
@@ -1214,6 +1257,15 @@ radioIA/
 ├── config.yaml                  # configuração da instância (gitignore — não versionado)
 ├── .env.example                 # template de variáveis de ambiente
 ├── .env                         # chaves de API (gitignore — não versionado)
+├── api/                         # Admin UI — FastAPI + React
+│   ├── main.py                  # app FastAPI (serve ui/dist/ em produção)
+│   ├── routers/                 # endpoints REST por domínio
+│   └── services/                # lógica de negócio separada dos endpoints
+├── ui/                          # frontend React + Vite + Tailwind
+│   ├── src/
+│   │   ├── pages/               # Dashboard, Gerador, Fontes, Grade, Episódios, Spots, Configurações
+│   │   └── components/          # Layout, LogStream, SourceCard, etc.
+│   └── dist/                    # build de produção (gerado por npm run build)
 ├── mcp_tools/                   # módulos MCP — 42 ferramentas
 │   ├── _instance.py             # instância FastMCP compartilhada
 │   ├── _utils.py                # helpers compartilhados (load_config, scan_day, etc.)
