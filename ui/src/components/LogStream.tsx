@@ -24,17 +24,21 @@ function classifyLine(line: string): string {
 }
 
 export function LogStream({ lines, className }: LogStreamProps) {
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+    const el = containerRef.current
+    if (el) el.scrollTop = el.scrollHeight
   }, [lines])
 
   return (
-    <div className={cn(
-      "font-mono text-xs leading-5 overflow-y-auto bg-zinc-950 rounded-lg border p-4",
-      className,
-    )}>
+    <div
+      ref={containerRef}
+      className={cn(
+        "font-mono text-xs leading-5 overflow-y-auto bg-zinc-950 rounded-lg border p-4",
+        className,
+      )}
+    >
       {lines.length === 0 ? (
         <span className="text-zinc-600">Aguardando geração...</span>
       ) : (
@@ -60,7 +64,6 @@ export function LogStream({ lines, className }: LogStreamProps) {
           )
         })
       )}
-      <div ref={bottomRef} />
     </div>
   )
 }
