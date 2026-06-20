@@ -473,6 +473,11 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
         max_rss = int((source_config.get('settings') or {}).get('max_items_total', 10))
         items = items[:max_rss]
 
+    # megacurioso: fetch() retorna o pool (fetch_count); max_items limita o episodio
+    if source_type == 'megacurioso':
+        max_mc = int((source_config.get('settings') or {}).get('max_items', 1))
+        items = items[:max_mc]
+
     # Se poucos itens novos, expande o periodo de busca e complementa
     # (não se aplica a fontes com número fixo de itens como horoscopo/trivia)
     settings = source_config.get('settings') or {}
