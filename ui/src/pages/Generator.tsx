@@ -7,7 +7,6 @@ import {
   BookOpen, Utensils, Book, Mic, Package,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { api } from "@/lib/api"
 import { LogStream } from "@/components/LogStream"
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -42,14 +41,6 @@ interface Source {
   plugin_info: { icon: string }
 }
 
-interface Episode {
-  pasta: string
-  horario: string
-  nome: string
-  duracao_seg: number
-  fonte: string
-}
-
 export default function Generator() {
   const queryClient = useQueryClient()
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -58,7 +49,6 @@ export default function Generator() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [logLines, setLogLines] = useState<string[]>([])
   const [done, setDone] = useState<boolean | null>(null)
-  const [newEpisodes, setNewEpisodes] = useState<Episode[]>([])
 
   const { data: sources = [] } = useQuery<Source[]>({
     queryKey: ["sources"],
@@ -84,7 +74,6 @@ export default function Generator() {
   const reset = () => {
     setLogLines([])
     setDone(null)
-    setNewEpisodes([])
   }
 
   const handleGenerate = useCallback(async () => {
@@ -138,15 +127,7 @@ export default function Generator() {
       setDone(false)
     } finally {
       setIsGenerating(false)
-      // Refresh episodes + system data
       queryClient.invalidateQueries({ queryKey: ["system"] })
-      // Load today's new episodes
-      try {
-        const eps = await api.get<{ episodios: Episode[] }>("/episodes/today")
-        setNewEpisodes(eps.episodios ?? [])
-      } catch {
-        // endpoint will exist in Phase 4
-      }
     }
   }, [selected, contexts, isGenerating, queryClient])
 
@@ -282,50 +263,26 @@ export default function Generator() {
           </div>
         </div>
 
-        {/* Right — log + result */}
-        <div className="flex-1 flex flex-col overflow-hidden p-6 gap-4">
-          {/* Log */}
-          <div className="flex-1 flex flex-col min-h-0">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Log de geração
+        {/* Right — log */}
+        <div className="flex-1 flex flex-col overflow-hidden p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Log de geração
+            </span>
+            {isGenerating && (
+              <span className="flex items-center gap-1.5 text-xs text-primary">
+                <span className="inline-block size-1.5 rounded-full bg-primary animate-pulse" />
+                Gerando...
               </span>
-              {isGenerating && (
-                <span className="flex items-center gap-1.5 text-xs text-primary">
-                  <span className="inline-block size-1.5 rounded-full bg-primary animate-pulse" />
-                  Gerando...
-                </span>
-              )}
-              {done === true && (
-                <span className="text-xs text-emerald-400">✓ Concluído</span>
-              )}
-              {done === false && (
-                <span className="text-xs text-red-400">✗ Erro</span>
-              )}
-            </div>
-            <LogStream lines={logLines} className="flex-1" />
+            )}
+            {done === true && (
+              <span className="text-xs text-emerald-400">✓ Concluído</span>
+            )}
+            {done === false && (
+              <span className="text-xs text-red-400">✗ Erro</span>
+            )}
           </div>
-
-          {/* Generated episodes (after completion) */}
-          {newEpisodes.length > 0 && (
-            <div className="shrink-0 max-h-48 overflow-y-auto">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                Episódios gerados
-              </p>
-              <div className="space-y-2">
-                {newEpisodes.map((ep) => (
-                  <div
-                    key={ep.pasta}
-                    className="flex items-center gap-3 rounded-lg border bg-card px-4 py-2.5"
-                  >
-                    <span className="text-xs font-mono text-muted-foreground w-10">{ep.horario}</span>
-                    <span className="flex-1 text-sm text-foreground">{ep.nome || ep.fonte}</span>
-                    <span className="text-xs text-muted-foreground">{Math.round(ep.duracao_seg / 60)}min</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <LogStream lines={logLines} className="flex-1" />
         </div>
       </div>
     </div>
