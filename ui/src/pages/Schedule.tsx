@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, Pencil, Trash2, Check, X, RefreshCw, RotateCcw } from "lucide-react"
+import { Plus, Pencil, Trash2, Check, X, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { api } from "@/lib/api"
 
