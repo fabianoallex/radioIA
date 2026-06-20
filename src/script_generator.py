@@ -191,7 +191,7 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
     elif source_type == 'horoscopo':
         cards = [_build_horoscopo_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _horoscopo_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
-    elif source_type == 'rss' or source_type == 'efemerides':
+    elif source_type == 'rss' or source_type == 'efemerides' or source_type == 'megacurioso':
         cards = [_build_news_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _news_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
     elif source_type == 'reddit':
