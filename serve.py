@@ -244,6 +244,8 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
 .link-meta   { font-size: 12px; color: #9ca3af; margin-bottom: 8px; }
 .link-url    { font-size: 12px; color: #60a5fa; text-decoration: none; word-break: break-all; display: block; }
 .link-url:hover { text-decoration: underline; }
+.src-progress-bar  { height: 3px; background: #374151; border-radius: 2px; margin: 8px 0; overflow: hidden; }
+.src-progress-fill { height: 100%; background: #6366f1; border-radius: 2px; width: 0; transition: width .5s linear; }
 .comment-block  { margin-top: 10px; padding-top: 10px; border-top: 1px solid #374151; }
 .comment-label  { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
 .comment-item   { font-size: 12px; color: #d1d5db; margin-bottom: 4px; }
@@ -1317,6 +1319,9 @@ function renderNotes(ep) {
     return;
   }
   const isMusic = episodeType(ep) === 'music';
+  const ends = ep.links.map((_, i) =>
+    ep.links[i + 1]?.start_time_seconds ?? (ep.duration ?? 0)
+  );
   el.innerHTML = ep.links.map((lk, i) => {
     const meta = isMusic
       ? [lk.channel, lk.album].filter(Boolean).join(' · ')
@@ -1336,11 +1341,14 @@ function renderNotes(ep) {
     const seekClass = hasStart ? ' seekable' : '';
     const seekClick = hasStart ? ` onclick="seekTo(${lk.start_time_seconds})"` : '';
     const seekHint  = hasStart ? `<div class="link-seek">▶ ${fmtDur(Math.round(lk.start_time_seconds))}</div>` : '';
+    const progressBar = hasStart
+      ? `<div class="src-progress-bar" data-end="${ends[i]}"><div class="src-progress-fill"></div></div>`
+      : '';
     return `<div class="link-card${seekClass}"${seekAttr}${seekClick}>
       <div class="link-num">${isMusic ? '🎵' : '#' + (i+1)}</div>
       <div class="link-title">${lk.title}</div>
       ${meta ? `<div class="link-meta">${meta}</div>` : ''}
-      ${seekHint}${urlHtml}${commentsHtml}
+      ${seekHint}${progressBar}${urlHtml}${commentsHtml}
     </div>`;
   }).join('');
 }
@@ -1371,6 +1379,14 @@ function updateActiveCard(t) {
     const idle = !_notesLastScroll || Date.now() - _notesLastScroll >= NOTES_IDLE_MS;
     if (idle) best.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
+  document.querySelectorAll('#notes .link-card[data-start] .src-progress-bar').forEach(bar => {
+    const card  = bar.closest('.link-card');
+    const start = parseFloat(card.dataset.start);
+    const end   = parseFloat(bar.dataset.end);
+    if (isNaN(start) || isNaN(end) || end <= start) return;
+    const pct = Math.min(1, Math.max(0, (t - start) / (end - start)));
+    bar.querySelector('.src-progress-fill').style.width = (pct * 100) + '%';
+  });
 }
 
 // ── Downloads ─────────────────────────────────────────────────────────────────
