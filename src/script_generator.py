@@ -129,6 +129,28 @@ DEFAULT_MODEL = 'claude-sonnet-4-6'
 _TIME_AWARE_TYPES = {'rss', 'clipping', 'clipping_auto', 'youtube', 'reddit'}
 
 
+_NORMALIZATION_BLOCK = """NORMALIZAÇÃO PARA LEITURA EM VOZ ALTA:
+Converta símbolos, siglas, abreviações, datas, horários, moedas, percentuais, medidas e números para a forma mais natural de fala em rádio. Nunca deixe símbolos ou abreviações que o locutor precise interpretar.
+
+Regras e exemplos:
+- Moeda BRL: R$ 3,2 milhões → "três milhões e duzentos mil reais" | R$ 1.234,56 → "mil duzentos e trinta e quatro reais e cinquenta e seis centavos"
+- Moeda USD: US$ 2,5 bilhões → "dois bilhões e meio de dólares"
+- Percentual: 15% → "quinze por cento"
+- Distância: 10 km → "dez quilômetros" | km/h → "quilômetros por hora"
+- Área/volume: m² → "metros quadrados" | m³ → "metros cúbicos"
+- Temperatura: 38°C → "trinta e oito graus Celsius"
+- Tempo: 3h45 → "três horas e quarenta e cinco minutos" | 09:30 → "nove e meia" ou "nove horas e trinta minutos"
+- Data: 21/06/2026 → "vinte e um de junho de dois mil e vinte e seis"
+- Rodovia: BR-163 → "BR cento e sessenta e três" | SP-330 → "SP trezentos e trinta"
+- Ordinal: 1º → "primeiro" | 2ª → "segunda" | nº 123 → "número cento e vinte e três"
+- Siglas conhecidas (escreva por extenso na primeira menção): CEO → "diretor executivo" | PIB → "Produto Interno Bruto" | IBGE → "I B G E" | IA → "inteligência artificial" | EUA → "Estados Unidos"
+- Siglas desconhecidas (soletre letra por letra): MCP → "M C P" | API → "A P I"
+- Tecnologia: 5G → "cinco G" | 4K → "quatro K"
+- Valores grandes: escreva por extenso — 1,2 trilhão → "um trilhão e duzentos bilhões"
+
+"""
+
+
 def generate_script(items: list[dict], narrators: list[dict], source_config: dict,
                     is_first_of_day: bool = True,
                     station_name: str = 'RadioIA',
@@ -187,6 +209,9 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
     else:
         cards = [_build_video_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _radio_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
+
+    if prompt.endswith('Roteiro:'):
+        prompt = prompt[:-len('Roteiro:')] + _NORMALIZATION_BLOCK + 'Roteiro:'
 
     if generation_time and source_type in _TIME_AWARE_TYPES and prompt.endswith('Roteiro:'):
         prompt = (
