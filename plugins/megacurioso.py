@@ -116,9 +116,6 @@ def fetch(source_config: dict, credentials=None) -> list[dict]:
 
     items = []
     for entry in feed.entries:
-        if len(items) >= max_items:
-            break
-
         url   = entry.get('link', '').strip()
         title = entry.get('title', '').strip()
         if not url or not title:
