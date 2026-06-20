@@ -175,7 +175,7 @@ export default function Dashboard() {
                 label="Player"
                 value={data?.player.ativo ? "Online" : "Offline"}
                 active={data?.player.ativo}
-                sub={data?.player.ativo ? "localhost:5000" : "python serve.py"}
+                sub={data?.player.ativo ? (data.player.url ?? "localhost:5000") : "python serve.py"}
               />
               <StatCard
                 icon={HardDrive}

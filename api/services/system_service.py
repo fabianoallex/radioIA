@@ -12,6 +12,8 @@ import yaml
 
 PROJECT_DIR = Path(__file__).parent.parent.parent
 
+_PLAYER_PORT = int(os.environ.get("PLAYER_PORT", 5000))
+
 
 # ── config ────────────────────────────────────────────────────────────────────
 
@@ -139,11 +141,12 @@ def stop_scheduler() -> dict:
 # ── player ────────────────────────────────────────────────────────────────────
 
 def get_player_status() -> dict:
+    url = f"http://localhost:{_PLAYER_PORT}"
     try:
-        urllib.request.urlopen("http://localhost:5000", timeout=2)
-        return {"ativo": True}
+        urllib.request.urlopen(url, timeout=2)
+        return {"ativo": True, "url": url}
     except Exception:
-        return {"ativo": False}
+        return {"ativo": False, "url": url}
 
 
 # ── episódios ─────────────────────────────────────────────────────────────────

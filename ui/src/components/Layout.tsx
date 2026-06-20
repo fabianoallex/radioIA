@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom"
+import { useQuery } from "@tanstack/react-query"
 import {
   LayoutDashboard,
   Zap,
@@ -10,6 +11,7 @@ import {
   ExternalLink,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { api } from "@/lib/api"
 
 const NAV = [
   { to: "/",         icon: LayoutDashboard, label: "Dashboard",    end: true },
@@ -22,12 +24,21 @@ const NAV = [
 ]
 
 export default function Layout() {
+  const { data: rtConfig } = useQuery<{ player_url: string; radio_name: string }>({
+    queryKey: ["runtime-config"],
+    queryFn: () => api.get("/config"),
+    staleTime: Infinity,
+  })
+
+  const playerUrl = rtConfig?.player_url ?? "http://localhost:5000"
+  const radioName = rtConfig?.radio_name ?? "RadioIA"
+
   return (
     <div className="flex h-screen w-full overflow-hidden">
       <aside className="flex w-56 shrink-0 flex-col border-r bg-sidebar border-sidebar-border">
         <div className="flex h-14 items-center gap-2 border-b border-sidebar-border px-4">
           <Radio className="size-5 text-primary" />
-          <span className="font-semibold text-sidebar-foreground tracking-tight">RadioIA</span>
+          <span className="font-semibold text-sidebar-foreground tracking-tight">{radioName}</span>
           <span className="ml-auto text-xs text-muted-foreground">admin</span>
         </div>
 
@@ -54,7 +65,7 @@ export default function Layout() {
 
         <div className="border-t border-sidebar-border p-2">
           <a
-            href="http://localhost:5000"
+            href={playerUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground transition-colors"
