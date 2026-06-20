@@ -8,10 +8,10 @@ LOCUTOR_KEYS = ['LOCUTOR_A', 'LOCUTOR_B', 'LOCUTOR_C']
 
 def _format_views(views: int) -> str:
     if views >= 1_000_000:
-        return f"{views / 1_000_000:.1f} milhoes de visualizacoes"
+        return f"{views / 1_000_000:.1f} milhões de visualizações"
     if views >= 1_000:
-        return f"{int(views / 1_000)} mil visualizacoes"
-    return f"{views} visualizacoes" if views else ''
+        return f"{int(views / 1_000)} mil visualizações"
+    return f"{views} visualizações" if views else ''
 
 
 def _format_age(published_at: str) -> str:
@@ -26,7 +26,7 @@ def _format_age(published_at: str) -> str:
             return "ontem"
         if days <= 6:
             return f"ha {days} dias"
-        return f"ha {days // 7} semana(s)"
+        return f"há {days // 7} semana(s)"
     except Exception:
         return ''
 
@@ -40,7 +40,7 @@ def _narrator_block(narrators: list[dict]) -> str:
 
 
 def _format_block(narrators: list[dict]) -> str:
-    lines = ['FORMATO OBRIGATORIO:']
+    lines = ['FORMATO OBRIGATÓRIO:']
     for i, n in enumerate(narrators):
         key = LOCUTOR_KEYS[i]
         lines.append(f"[{key}]: fala de {n['name']}")
@@ -58,7 +58,7 @@ def _build_video_card(i: int, item: dict) -> str:
     comments_hint = ''
     if comments:
         lines = [f'  - {c["author"]}: "{c["text"]}" ({c["likes"]} curtidas)' for c in comments]
-        comments_hint = '\nComentarios:\n' + '\n'.join(lines)
+        comments_hint = '\nComentários:\n' + '\n'.join(lines)
     return (
         f"[Video {i}]\n"
         f"Titulo: {item['title']}\n"
@@ -71,11 +71,11 @@ def _build_video_card(i: int, item: dict) -> str:
 def _build_news_card(i: int, item: dict) -> str:
     age_str = _format_age(item.get('published_at', ''))
     return (
-        f"[Noticia {i}]\n"
-        f"Titulo: {item['title']}\n"
+        f"[Notícia {i}]\n"
+        f"Título: {item['title']}\n"
         f"Fonte: {item.get('source_name', '')}\n"
         f"Publicada: {age_str}\n"
-        f"Conteudo: {item.get('text', '')}"
+        f"Conteúdo: {item.get('text', '')}"
     )
 
 
@@ -90,7 +90,7 @@ def _build_receita_card(i: int, item: dict) -> str:
 def _build_horoscopo_card(i: int, item: dict) -> str:
     return (
         f"[Signo {i}: {item['title']}]\n"
-        f"Previsao: {item.get('text', '')}"
+        f"Previsão: {item.get('text', '')}"
     )
 
 
@@ -105,7 +105,7 @@ def _build_reddit_card(i: int, item: dict) -> str:
         age_str,
     ]))
     context = item.get('text', '')
-    context_hint = f"\nConteudo: {context}" if context else ''
+    context_hint = f"\nConteúdo: {context}" if context else ''
     return (
         f"[Post {i}]\n"
         f"Titulo: {item['title']}\n"
@@ -195,19 +195,19 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
             f"No início do roteiro, mencione de forma natural e variada que as informacões foram "
             f"apuradas/levantadas às {generation_time}. Varie a forma — não use sempre a mesma frase. "
             f"Exemplos do estilo esperado: "
-            f'"Informacoes apuradas ate as {generation_time}", '
+            f'"Informações apuradas até as {generation_time}", '
             f'"Edição das {generation_time}", '
             f'"Com base no que levantamos às {generation_time}", '
             f'"Nosso boletim das {generation_time} traz...", '
             f'"O que apuramos até agora, {generation_time}..." — '
             f"e assim por diante, sempre variando. "
-            f"Deixe claro que e o horário de geracao do conteudo, nao a hora atual do ouvinte.\n\n"
+            f"Deixe claro que e o horário de geração do conteúdo, não a hora atual do ouvinte.\n\n"
             f"Roteiro:"
         )
 
     context = source_config.get('context', '')
     if context and prompt.endswith('Roteiro:'):
-        prompt = prompt[:-len('Roteiro:')] + f"INSTRUCAO DO PRODUTOR: {context}\n\nRoteiro:"
+        prompt = prompt[:-len('Roteiro:')] + f"INSTRUÇÃO DO PRODUTOR: {context}\n\nRoteiro:"
 
     if prompt_log_path:
         import os
@@ -235,27 +235,27 @@ def _radio_prompt(narrators: list[dict], names: list[str], station: str,
     falas_por_video = 3 + n
 
     solo_note = (
-        "- E um programa solo: use so [LOCUTOR_A], tom envolvente e direto ao ouvinte"
+        "- É um programa solo: use sÓ [LOCUTOR_A], tom envolvente e direto ao ouvinte"
         if n == 1 else
         f"- Distribua as falas entre os {n} apresentadores de forma equilibrada"
     )
 
     if is_first_of_day:
         abertura = (
-            f"1. ABERTURA DO DIA: {names_str} dao bom dia, se apresentam pelo nome, "
-            f'dizem que os ouvintes estao na {station_name}, '
+            f"1. ABERTURA DO DIA: {names_str} dão bom dia, se apresentam pelo nome, "
+            f'dizem que os ouvintes estão na {station_name}, '
             f'apresentam o segmento "{station}" e antecipam os destaques com energia (4-5 falas)'
         )
-        encerramento = "4. Encerramento: convide o ouvinte a continuar ouvindo a programacao do dia (2-3 falas)"
+        encerramento = "4. Encerramento: convide o ouvinte a continuar ouvindo a programação do dia (2-3 falas)"
     else:
         abertura = (
-            f'1. ENTRADA DE SEGMENTO: entre como continuacao da programacao — algo como '
+            f'1. ENTRADA DE SEGMENTO: entre como continuação da programação — algo como '
             f'"E chegou a hora do {station}!", "Voltamos com {station}..." ou similar. '
-            f'SEM bom dia, SEM apresentacao de nomes. (2-3 falas)'
+            f'SEM bom dia, SEM apresentação de nomes. (2-3 falas)'
         )
-        encerramento = "4. Encerramento rapido sinalizando que a programacao continua (1-2 falas)"
+        encerramento = "4. Encerramento rápido sinalizando que a programação continua (1-2 falas)"
 
-    return f"""Voce e um roteirista de radio FM brasileira.
+    return f"""Você é um roteirista de rádio FM brasileira.
 Crie o roteiro do segmento "{station}".
 
 APRESENTADORES:
@@ -263,26 +263,26 @@ APRESENTADORES:
 
 {format_block}
 
-ATENCAO: responda APENAS com as linhas do roteiro no formato acima. Sem titulos, sem markdown, sem asteriscos, sem tracejados, sem comentarios fora do roteiro. Use português correto com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
+ATENCAO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentarios fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
 
 PERSONALIDADES: respeite estritamente o perfil de cada apresentador em todas as falas.
 
 ESTRUTURA:
 {abertura}
-2. Para cada video: {falas_por_video} falas — o que e, canal, popularidade, quando, por que vale ver
-3. Transicoes variadas entre videos ("Proximo!", "E tem mais!", "Olha so...", "Mudando de assunto...")
+2. Para cada vídeo: {falas_por_video} falas — o que é, canal, popularidade, quando, por que vale ver
+3. Transições variadas entre vídeos ("Próximo!", "E tem mais!", "Olha so...", "Mudando de assunto...")
 {encerramento}
 
 REGRAS:
-- Cada fala: maximo 2 sentencas — radio e velocidade
-- Mencione canal, visualizacoes e data em cada video
-- Diga "link do video [numero] nas notas do episodio"
-- Use energia: exclamacoes, reacoes naturais de cada perfil
+- Cada fala: máximo 2 sentenças — rádio e velocidade
+- Mencione canal, visualizações e data em cada vídeo
+- Diga "link do video [número] nas notas do episódio"
+- Use energia: exclamações, reacões naturais de cada perfil
 - Varie quem abre cada bloco de video
-- Comentarios de inscritos: cite apenas se genuinamente interessante, maximo 1 por video, nomeie o autor
+- Comentários de inscritos: cite apenas se genuinamente interessante, máximo 1 por video, nomeie o autor
 {solo_note}
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Video 1; [ITEM_2] antes do Video 2 etc. — NAO usar na abertura nem no encerramento
-- NAO invente informacoes
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Vídeo 1; [ITEM_2] antes do Vídeo 2 etc. — NÃO usar na abertura nem no encerramento
+- NÃO invente informacões
 
 VIDEOS DO DIA:
 {content}
@@ -299,27 +299,27 @@ def _news_prompt(narrators: list[dict], names: list[str], source_name: str,
     names_str = ', '.join(names[:-1]) + f' e {names[-1]}' if n > 1 else names[0]
 
     solo_note = (
-        "- Apresentacao solo: fale diretamente com o ouvinte, tom jornalistico e preciso"
+        "- Apresentação solo: fale diretamente com o ouvinte, tom jornalístico e preciso"
         if n == 1 else
         f"- Distribua as falas de forma equilibrada entre os {n} apresentadores"
     )
 
     if is_first_of_day:
         abertura = (
-            f"1. ABERTURA DO DIA: {names_str} dao bom dia, se apresentam, "
-            f'dizem que os ouvintes estao na {station_name} e anunciam '
+            f"1. ABERTURA DO DIA: {names_str} dão bom dia, se apresentam, "
+            f'dizem que os ouvintes estão na {station_name} e anunciam '
             f'o boletim "{source_name}" com os principais temas (3-4 falas)'
         )
-        encerramento = "4. Encerramento: convide o ouvinte a continuar na programacao (2-3 falas)"
+        encerramento = "4. Encerramento: convide o ouvinte a continuar na programação (2-3 falas)"
     else:
         abertura = (
             f'1. ENTRADA DE BOLETIM: entre direto como um novo bloco — '
-            f'"Agora, {source_name}...", "E nas noticias..." ou similar. '
-            f'SEM bom dia, SEM reapresentacao. (2 falas)'
+            f'"Agora, {source_name}...", "E nas notícias..." ou similar. '
+            f'SEM bom dia, SEM reapresentação. (2 falas)'
         )
-        encerramento = "4. Encerramento curto indicando que a programacao segue (1-2 falas)"
+        encerramento = "4. Encerramento curto indicando que a programação segue (1-2 falas)"
 
-    return f"""Voce e um roteirista de boletim de noticias de radio brasileiro.
+    return f"""Você é um roteirista de boletim de notícias de rádio brasileiro.
 Crie o roteiro do "{source_name}".
 
 APRESENTADORES:
@@ -327,24 +327,24 @@ APRESENTADORES:
 
 {format_block}
 
-ATENCAO: responda APENAS com as linhas do roteiro no formato acima. Sem titulos, sem markdown, sem asteriscos, sem tracejados, sem comentarios fora do roteiro. Use português correto com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
+ATENÇÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentários fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
 
-PERSONALIDADES: respeite o perfil de cada apresentador mesmo no tom jornalistico.
+PERSONALIDADES: respeite o perfil de cada apresentador mesmo no tom jornalístico.
 
 ESTRUTURA:
 {abertura}
-2. Para cada noticia: 2-3 falas — o que aconteceu, fonte, contexto rapido
-3. Transicoes jornalisticas ("Em outras noticias...", "Tambem nesta edicao...", "No cenario de...")
+2. Para cada notícia: 2-3 falas — o que aconteceu, fonte, contexto rápido
+3. Transições jornalísticas ("Em outras notícias...", "Também nesta edição...", "No cenário de...")
 {encerramento}
 
 REGRAS:
-- Cada fala: maximo 2 sentencas
+- Cada fala: máximo 2 sentenças
 - Mencione sempre a fonte (G1, Folha, etc.)
-- Diga "materia completa nas notas, noticia [numero]"
+- Diga "materia completa nas notas, notícia [número]"
 - Tom informativo — pode ter leveza mas sem exageros
 {solo_note}
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Noticia 1; [ITEM_2] antes da Noticia 2 etc. — NAO usar na abertura nem no encerramento
-- NAO invente informacoes
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Notícia 1; [ITEM_2] antes da Notícia 2 etc. — NÃO usar na abertura nem no encerramento
+- NÃO invente informações
 
 NOTICIAS:
 {content}
@@ -368,19 +368,19 @@ def _trivia_prompt(narrators: list[dict], names: list[str], source_name: str,
 
     if is_first_of_day:
         abertura = (
-            f"1. ABERTURA: {names_str} dao bom dia, dizem que os ouvintes estao na {station_name}, "
+            f"1. ABERTURA: {names_str} dão bom dia, dizem que os ouvintes estão na {station_name}, "
             f"apresentam o quiz \"{source_name}\" "
             f"com energia de game show e convidam o ouvinte a participar (3-4 falas)"
         )
-        encerramento = "5. Encerramento: pontuacao imaginaria, elogio ao ouvinte, convide a ficar na programacao (2-3 falas)"
+        encerramento = "5. Encerramento: pontuação imaginária, elogio ao ouvinte, convide a ficar na programação (2-3 falas)"
     else:
         abertura = (
-            f'1. ENTRADA: entre como um novo bloco animado — "E hora do {source_name}!", '
+            f'1. ENTRADA: entre como um novo bloco animado — "É hora do {source_name}!", '
             f'"Bora testar seus conhecimentos!" ou similar. SEM bom dia. (2 falas)'
         )
-        encerramento = "5. Encerramento rapido celebrando o quiz e sinalizando que a programacao continua (1-2 falas)"
+        encerramento = "5. Encerramento rápido celebrando o quiz e sinalizando que a programação continua (1-2 falas)"
 
-    return f"""Voce e um roteirista de programa de quiz para radio FM brasileira.
+    return f"""Você é um roteirista de programa de quiz para rádio FM brasileira.
 Crie o roteiro do segmento "{source_name}" — um quiz divertido e interativo.
 
 APRESENTADORES:
@@ -388,30 +388,30 @@ APRESENTADORES:
 
 {format_block}
 
-ATENCAO: responda APENAS com as linhas do roteiro no formato acima. Sem titulos, sem markdown, sem asteriscos, sem tracejados, sem comentarios fora do roteiro. Use português correto com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
+ATENÇÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentários fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
 
 PERSONALIDADES: respeite o perfil de cada apresentador mesmo no tom de game show.
 
 ESTRUTURA:
 {abertura}
 2. Para cada pergunta:
-   - Apresente com energia (traduza para portugues se necessario)
+   - Apresente com energia (traduza para português se necessário)
    - Leia as alternativas A, B, C e D
-   - Convide o ouvinte a pensar: "pense ai...", "voce sabe?", "nao vale pesquisar!" etc. (1 fala curta)
-   - Revele a resposta correta com reacao
+   - Convide o ouvinte a pensar: "pense aí...", "você sabe?", "não vale pesquisar!" etc. (1 fala curta)
+   - Revele a resposta correta com reação
    - Acrescente 1 frase de curiosidade ou contexto sobre a resposta
-3. Transicoes animadas entre perguntas: "Proxima!", "Ficou facil? Vamos dificultar!", "Essa e para os experts!", etc.
-4. Reaja a perguntas dificeis ou categorias inusitadas com personalidade
+3. Transições animadas entre perguntas: "Próxima!", "Ficou fácil? Vamos dificultar!", "Essa é para os experts!", etc.
+4. Reaja a perguntas difíceis ou categorias inusitadas com personalidade
 {encerramento}
 
 REGRAS:
-- Todo o conteudo em portugues — traduza perguntas e respostas se necessario
-- Cada fala: maximo 2 sentencas
-- Tom de game show: animado, dinamico, levemente competitivo
-- Reactions genuinas: surpresa, deboche amigavel, admiracao
+- Todo o conteúdo em português — traduza perguntas e respostas se necessário
+- Cada fala: máximo 2 sentenças
+- Tom de game show: animado, dinâmico, levemente competitivo
+- Reactions genuínas: surpresa, deboche amigável, admiração
 {solo_note}
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Pergunta 1; [ITEM_2] antes da Pergunta 2 etc. — NAO usar na abertura nem no encerramento
-- NAO invente informacoes alem do que esta nas perguntas
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Pergunta 1; [ITEM_2] antes da Pergunta 2 etc. — NÃO usar na abertura nem no encerramento
+- NÃO invente informações além do que está nas perguntas
 
 PERGUNTAS:
 {content}
@@ -428,26 +428,26 @@ def _reddit_prompt(narrators: list[dict], names: list[str], source_name: str,
     names_str = ', '.join(names[:-1]) + f' e {names[-1]}' if n > 1 else names[0]
 
     solo_note = (
-        "- Apresentacao solo: comente os posts diretamente com o ouvinte, tom de conversa"
+        "- Apresentação solo: comente os posts diretamente com o ouvinte, tom de conversa"
         if n == 1 else
         f"- Distribua as falas de forma equilibrada entre os {n} apresentadores"
     )
 
     if is_first_of_day:
         abertura = (
-            f"1. ABERTURA DO DIA: {names_str} dao bom dia, dizem que os ouvintes estao na {station_name}, "
+            f"1. ABERTURA DO DIA: {names_str} dão bom dia, dizem que os ouvintes estão na {station_name}, "
             f"apresentam o \"{source_name}\" "
-            f"explicando que vao trazer o que esta bombando na internet hoje (3-4 falas)"
+            f"explicando que vão trazer o que está bombando na internet hoje (3-4 falas)"
         )
-        encerramento = "4. Encerramento: convide o ouvinte a continuar na programacao (2 falas)"
+        encerramento = "4. Encerramento: convide o ouvinte a continuar na programação (2 falas)"
     else:
         abertura = (
             f'1. ENTRADA: entre direto no assunto — "O que ta bombando no Reddit agora...", '
-            f'"A internet ta discutindo..." ou similar. SEM bom dia. (2 falas)'
+            f'"A internet tá discutindo..." ou similar. SEM bom dia. (2 falas)'
         )
-        encerramento = "4. Encerramento rapido sinalizando que a programacao continua (1-2 falas)"
+        encerramento = "4. Encerramento rapido sinalizando que a programação continua (1-2 falas)"
 
-    return f"""Voce e um roteirista de radio FM brasileira especializado em cultura digital.
+    return f"""Você é um roteirista de rádio FM brasileira especializado em cultura digital.
 Crie o roteiro do segmento "{source_name}" — os posts mais populares do Reddit brasileiro hoje.
 
 APRESENTADORES:
@@ -455,27 +455,27 @@ APRESENTADORES:
 
 {format_block}
 
-ATENCAO: responda APENAS com as linhas do roteiro no formato acima. Sem titulos, sem markdown, sem asteriscos, sem tracejados, sem comentarios fora do roteiro. Use português correto com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
+ATENÇÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentários fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
 
 PERSONALIDADES: respeite o perfil de cada apresentador em todas as falas.
 
-CONTEXTO: estes sao os posts que mais geraram engajamento hoje em cada subreddit — ja estao ordenados por popularidade.
+CONTEXTO: estes são os posts que mais geraram engajamento hoje em cada subreddit — já estão ordenados por popularidade.
 
 ESTRUTURA:
 {abertura}
-2. Para cada post: 2-3 falas — o que e, de qual subreddit, por que esta repercutindo, o que isso diz sobre o momento
-3. Transicoes variadas: "No r/investimentos ta bombando...", "A galera do r/brasil discutindo...", "Isso aqui gerou debate..."
+2. Para cada post: 2-3 falas — o que é, de qual subreddit, por que está repercutindo, o que isso diz sobre o momento
+3. Transições variadas: "No r/investimentos ta bombando...", "A galera do r/brasil discutindo...", "Isso aqui gerou debate..."
 {encerramento}
 
 REGRAS:
-- Cada fala: maximo 2 sentencas
-- Mencione sempre o subreddit — da contexto sobre que comunidade esta discutindo
-- Use o conteudo do post quando disponivel para enriquecer o comentario
-- Conecte posts de subreddits diferentes quando houver relacao tematica
-- Reaja com personalidade: curiosidade, critica, humor conforme o perfil de cada apresentador
+- Cada fala: máximo 2 sentencas
+- Mencione sempre o subreddit — da contexto sobre que comunidade está discutindo
+- Use o conteudo do post quando disponível para enriquecer o comentário
+- Conecte posts de subreddits diferentes quando houver relação temática
+- Reaja com personalidade: curiosidade, crítica, humor conforme o perfil de cada apresentador
 {solo_note}
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Post 1; [ITEM_2] antes do Post 2 etc. — NAO usar na abertura nem no encerramento
-- NAO invente informacoes
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Post 1; [ITEM_2] antes do Post 2 etc. — NÃO usar na abertura nem no encerramento
+- NÃO invente informações
 
 POSTS:
 {content}
@@ -492,18 +492,18 @@ def _horoscopo_prompt(narrators: list[dict], names: list[str], source_name: str,
     names_str = ', '.join(names[:-1]) + f' e {names[-1]}' if n > 1 else names[0]
 
     solo_note = (
-        "- Apresentacao solo: apresente cada signo diretamente ao ouvinte, tom mistico e caloroso"
+        "- Apresentação solo: apresente cada signo diretamente ao ouvinte, tom místico e caloroso"
         if n == 1 else
-        "- Cada apresentador 'assume' um signo — um le a previsao enquanto o outro reage ou complementa"
+        "- Cada apresentador 'assume' um signo — um lê a previsão enquanto o outro reage ou complementa"
     )
 
     if is_first_of_day:
         abertura = (
-            f"1. ABERTURA DO DIA: {names_str} dao bom dia, dizem que os ouvintes estao na {station_name} "
+            f"1. ABERTURA DO DIA: {names_str} dão bom dia, dizem que os ouvintes estão na {station_name} "
             f"e apresentam o {source_name} "
-            f"com tom mistico — mencione que os astros trazem mensagens especiais hoje (2-3 falas)"
+            f"com tom místico — mencione que os astros trazem mensagens especiais hoje (2-3 falas)"
         )
-        encerramento = "4. Encerramento: deseje um ótimo dia aos ouvintes e convide a continuar na programacao (2 falas)"
+        encerramento = "4. Encerramento: deseje um ótimo dia aos ouvintes e convide a continuar na programação (2 falas)"
     else:
         abertura = (
             f'1. ENTRADA: entre com mistério — "Os astros têm mensagem para dois signos...", '
@@ -511,36 +511,36 @@ def _horoscopo_prompt(narrators: list[dict], names: list[str], source_name: str,
         )
         encerramento = "4. Encerramento curto desejando que as energias se manifestem (1-2 falas)"
 
-    return f"""Voce e um roteirista de horoscopo para radio FM brasileira.
-Crie o roteiro do segmento "{source_name}" com as previsoes de hoje para dois signos.
+    return f"""Você é um roteirista de horóscopo para rádio FM brasileira.
+Crie o roteiro do segmento "{source_name}" com as previsões de hoje para dois signos.
 
 APRESENTADORES:
 {narrator_block}
 
 {format_block}
 
-ATENCAO: responda APENAS com as linhas do roteiro no formato acima. Sem titulos, sem markdown, sem asteriscos, sem tracejados, sem comentarios fora do roteiro. Use português correto com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
+ATENÇÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentários fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
 
-PERSONALIDADES: respeite o perfil de cada apresentador mesmo no tom mistico.
+PERSONALIDADES: respeite o perfil de cada apresentador mesmo no tom místico.
 
 ESTRUTURA:
 {abertura}
 2. Para cada signo:
-   - Anuncie o signo com energia e mistério: "Para os nativos de {{signo}}...", "Quem e de {{signo}}..."
-   - Apresente a previsao de forma envolvente e pessoal — fale diretamente com o ouvinte do signo
-   - Destaque os pontos principais: amor, trabalho, saude ou mensagem especial do dia
+   - Anuncie o signo com energia e mistério: "Para os nativos de {{signo}}...", "Quem é de {{signo}}..."
+   - Apresente a previsão de forma envolvente e pessoal — fale diretamente com o ouvinte do signo
+   - Destaque os pontos principais: amor, trabalho, saúde ou mensagem especial do dia
    - 3-4 falas por signo
-3. Transicao entre os signos com algo do tipo: "E para o proximo signo de hoje..."
+3. Transição entre os signos com algo do tipo: "E para o próximo signo de hoje..."
 {encerramento}
 
 REGRAS:
-- Cada fala: maximo 2-3 sentencas
-- Tom: mistico, caloroso, pessoal — o ouvinte deve sentir que a mensagem e para ele
-- Use expressoes como: "Os astros indicam...", "Esta e uma data propicia para...", "O universo pede..."
-- Baseie-se fielmente no conteudo das previsoes fornecidas
-- Se o conteudo for escasso, expanda com sabedoria astrologica coerente com o signo
+- Cada fala: máximo 2-3 sentencas
+- Tom: místico, caloroso, pessoal — o ouvinte deve sentir que a mensagem é para ele
+- Use expressões como: "Os astros indicam...", "Esta é uma data propícia para...", "O universo pede..."
+- Baseie-se fielmente no conteúdo das previsões fornecidas
+- Se o conteúdo for escasso, expanda com sabedoria astrologica coerente com o signo
 {solo_note}
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Signo 1; [ITEM_2] antes do Signo 2 etc. — NAO usar na abertura nem no encerramento
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Signo 1; [ITEM_2] antes do Signo 2 etc. — NÃO usar na abertura nem no encerramento
 
 PREVISOES DE HOJE:
 {content}
@@ -564,54 +564,54 @@ def _filmes_prompt(narrators: list[dict], names: list[str], source_name: str,
     names_str = ', '.join(names[:-1]) + f' e {names[-1]}' if n > 1 else names[0]
 
     solo_note = (
-        "- Apresentacao solo: alterne entre recomendar e reagir, como cinefilo apaixonado"
+        "- Apresentação solo: alterne entre recomendar e reagir, como cinéfilo apaixonado"
         if n == 1 else
         "- Um apresentador recomenda, o outro reage — troquem esse papel entre os filmes"
     )
 
     if is_first_of_day:
         abertura = (
-            f"1. ABERTURA: {names_str} dao bom dia, dizem que os ouvintes estao na {station_name} "
+            f"1. ABERTURA: {names_str} dão bom dia, dizem que os ouvintes estão na {station_name} "
             f"e apresentam o quadro \"{source_name}\" "
             f"com entusiasmo — criem expectativa sobre os filmes (2-3 falas)"
         )
-        encerramento = "5. Encerramento convidando o ouvinte a conferir os filmes e continuar na programacao (2 falas)"
+        encerramento = "5. Encerramento convidando o ouvinte a conferir os filmes e continuar na programação (2 falas)"
     else:
         abertura = (
-            f'1. ENTRADA direta no quadro: "E hora do {source_name}!", '
-            f'"Quem ai ama cinema?" ou similar. SEM bom dia. (1-2 falas)'
+            f'1. ENTRADA direta no quadro: "É hora do {source_name}!", '
+            f'"Quem aí ama cinema?" ou similar. SEM bom dia. (1-2 falas)'
         )
-        encerramento = "5. Encerramento rapido desejando bom cinema (1 fala)"
+        encerramento = "5. Encerramento rápido desejando bom cinema (1 fala)"
 
-    return f"""Voce e um roteirista de quadro de cinema para radio FM brasileira.
-Crie o roteiro do segmento "{source_name}" — indicacoes de filmes descontraidas e apaixonadas.
+    return f"""Você é um roteirista de quadro de cinema para rádio FM brasileira.
+Crie o roteiro do segmento "{source_name}" — indicações de filmes descontraídas e apaixonadas.
 
 APRESENTADORES:
 {narrator_block}
 
 {format_block}
 
-ATENCAO: responda APENAS com as linhas do roteiro no formato acima. Sem titulos, sem markdown, sem asteriscos, sem tracejados, sem comentarios fora do roteiro. Use português correto com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
+ATENÇÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentários fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
 
 PERSONALIDADES: respeite o perfil de cada apresentador — inclusive nas preferencias cinematograficas.
 
 ESTRUTURA:
 {abertura}
 2. Para cada filme (2-3 falas cada):
-   - Titulo, genero e ano em tom natural — nao leia como lista
-   - Destaque o que torna o filme especial: premissa, diretor, elenco, premios
-   - Recomende para que tipo de ocasiao: noite romantica, familia, adrenalina, choro garantido...
-   - Reacao do outro apresentador: concordar, discordar com bom humor, complementar
-3. Transicoes variadas entre filmes: "Falando em...", "Mudando de genero...", "E pra quem prefere..."
+   - Título, genero e ano em tom natural — não leia como lista
+   - Destaque o que torna o filme especial: premissa, diretor, elenco, prêmios
+   - Recomende para que tipo de ocasião: noite romântica, família, adrenalina, choro garantido...
+   - Reação do outro apresentador: concordar, discordar com bom humor, complementar
+3. Transições variadas entre filmes: "Falando em...", "Mudando de gênero...", "E pra quem prefere..."
 {encerramento}
 
 REGRAS:
-- Cada fala: maximo 2 sentencas — radio e velocidade
+- Cada fala: máximo 2 sentenças — rádio e velocidade
 - Tom: apaixonado por cinema, sem ser esnobe — fale como quem recomenda para amigos
 - Mencione nota ou popularidade apenas quando impressionante (ex: "quase 9 de nota!")
-- Traduza generos e termos tecnicos para o portugues do dia a dia
-- NAO invente informacoes alem das fornecidas
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Filme 1; [ITEM_2] antes do Filme 2 etc. — NAO usar na abertura nem no encerramento
+- Traduza generos e termos técnicos para o portugues do dia a dia
+- NÃO invente informações além das fornecidas
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Filme 1; [ITEM_2] antes do Filme 2 etc. — NÃO usar na abertura nem no encerramento
 {solo_note}
 
 FILMES:
@@ -668,7 +668,7 @@ APRESENTADORES:
 
 {format_block}
 
-ATENÇÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentários fora do roteiro. Use português correto com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
+ATENÇÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentários fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
 
 PERSONALIDADES: respeite o perfil de cada apresentador em todas as falas.
 
@@ -719,7 +719,7 @@ def _clipping_prompt(narrators: list[dict], names: list[str], source_name: str,
     names_str = ', '.join(names[:-1]) + f' e {names[-1]}' if n > 1 else names[0]
 
     solo_note = (
-        "- Apresentacao solo: conduza a análise diretamente com o ouvinte, tom jornalístico"
+        "- Apresentação solo: conduza a análise diretamente com o ouvinte, tom jornalístico"
         if n == 1 else
         f"- Distribua as falas entre os {n} apresentadores — um pode questionar, outro contextualizar"
     )
@@ -746,7 +746,7 @@ def _clipping_prompt(narrators: list[dict], names: list[str], source_name: str,
     else:
         if is_first_of_day:
             abertura = (
-                f"1. ABERTURA: {names_str} dao bom dia, dizem que os ouvintes estao na {station_name} "
+                f"1. ABERTURA: {names_str} dão bom dia, dizem que os ouvintes estão na {station_name} "
                 f'e apresentam o clipping — o que a mídia está falando sobre o assunto do dia (2-3 falas)'
             )
         else:
@@ -767,7 +767,7 @@ def _clipping_prompt(narrators: list[dict], names: list[str], source_name: str,
         )
         encerramento = "5. Encerramento: convide o ouvinte a continuar na programacao (1-2 falas)"
 
-    return f"""Voce e um roteirista de análise de mídia para radio FM brasileira.
+    return f"""Vocé é um roteirista de análise de mídia para rádio FM brasileira.
 Crie o roteiro do segmento de clipping — uma análise de como diferentes veículos estão cobrindo um mesmo assunto.
 
 APRESENTADORES:
@@ -775,7 +775,7 @@ APRESENTADORES:
 
 {format_block}
 
-ATENCAO: responda APENAS com as linhas do roteiro no formato acima. Sem titulos, sem markdown, sem asteriscos, sem tracejados, sem comentarios fora do roteiro. Use português correto com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
+ATENCAO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentários fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
 
 PERSONALIDADES: respeite o perfil de cada apresentador mesmo no tom analítico.
 
@@ -794,7 +794,7 @@ REGRAS:
 - Aponte convergências e divergências entre os veículos quando existirem
 - Não leia os artigos na íntegra — sintetize os ângulos e enfoques
 - Não invente informações além do que está nos textos fornecidos
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Fonte 1; [ITEM_2] antes da Fonte 2 etc. — NAO usar na abertura nem no encerramento
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Fonte 1; [ITEM_2] antes da Fonte 2 etc. — NÃO usar na abertura nem no encerramento
 {solo_note}
 
 COBERTURA DA MÍDIA:
@@ -819,14 +819,14 @@ def _whatsapp_prompt(narrators: list[dict], names: list[str], source_name: str,
     names_str = ', '.join(names[:-1]) + f' e {names[-1]}' if n > 1 else names[0]
 
     solo_note = (
-        "- Apresentacao solo: comente os assuntos diretamente com o ouvinte, tom de conversa"
+        "- Apresentação solo: comente os assuntos diretamente com o ouvinte, tom de conversa"
         if n == 1 else
         f"- Distribua as falas de forma equilibrada entre os {n} apresentadores"
     )
 
     if is_first_of_day:
         abertura = (
-            f"1. ABERTURA: {names_str} dao bom dia, dizem que os ouvintes estao na {station_name} "
+            f"1. ABERTURA: {names_str} dão bom dia, dizem que os ouvintes estão na {station_name} "
             f'e apresentam o quadro "{source_name}" — o resumo do que rolou no grupo (2-3 falas)'
         )
         encerramento = "4. Encerramento: convide o ouvinte a continuar na programacao (1-2 falas)"
@@ -835,9 +835,9 @@ def _whatsapp_prompt(narrators: list[dict], names: list[str], source_name: str,
             f'1. ENTRADA: entre direto no assunto — "O grupo {source_name} esteve movimentado...", '
             f'"Olha o que rolou no grupo hoje..." ou similar. SEM bom dia. (1-2 falas)'
         )
-        encerramento = "4. Encerramento curto sinalizando que a programacao continua (1 fala)"
+        encerramento = "4. Encerramento curto sinalizando que a programação continua (1 fala)"
 
-    return f"""Voce e um roteirista de radio FM brasileira especializado em resumos de grupos de mensagens.
+    return f"""Vocé é um roteirista de rádio FM brasileira especializado em resumos de grupos de mensagens.
 Crie o roteiro do segmento "{source_name}" — o resumo do que aconteceu no grupo de WhatsApp.
 
 APRESENTADORES:
@@ -845,7 +845,7 @@ APRESENTADORES:
 
 {format_block}
 
-ATENCAO: responda APENAS com as linhas do roteiro no formato acima. Sem titulos, sem markdown, sem asteriscos, sem tracejados, sem comentarios fora do roteiro. Use português correto com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
+ATENCAO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentários fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
 
 PERSONALIDADES: respeite o perfil de cada apresentador em todas as falas.
 
@@ -892,17 +892,17 @@ def _biblia_prompt(narrators: list[dict], names: list[str], source_name: str,
     names_str = ', '.join(names[:-1]) + f' e {names[-1]}' if n > 1 else names[0]
 
     solo_note = (
-        "- Apresentacao solo: conduza a reflexao diretamente com o ouvinte, tom intimo e acolhedor"
+        "- Apresentação solo: conduza a reflexão diretamente com o ouvinte, tom intimo e acolhedor"
         if n == 1 else
         f"- Distribua as falas entre os {n} apresentadores de forma equilibrada"
     )
 
     if is_first_of_day:
         abertura = (
-            f"1. ABERTURA: {names_str} dao bom dia, dizem que os ouvintes estao na {station_name} "
+            f"1. ABERTURA: {names_str} dão bom dia, dizem que os ouvintes estão na {station_name} "
             f'e apresentam o quadro "{source_name}" com tom acolhedor e espiritualizado (2-3 falas)'
         )
-        encerramento = "4. Encerramento: deseje uma reflexao proveitosa ao ouvinte e convide a continuar na programacao (2 falas)"
+        encerramento = "4. Encerramento: deseje uma reflexão proveitosa ao ouvinte e convide a continuar na programação (2 falas)"
     else:
         abertura = (
             f'1. ENTRADA: entre com leveza espiritual — "Chegou o momento da nossa Palavra do Dia...", '
@@ -910,32 +910,32 @@ def _biblia_prompt(narrators: list[dict], names: list[str], source_name: str,
         )
         encerramento = "4. Encerramento curto desejando paz e bencaos ao ouvinte (1-2 falas)"
 
-    return f"""Voce e um roteirista de quadro espiritual para radio FM brasileira.
-Crie o roteiro do segmento "{source_name}" — uma reflexao sobre uma passagem biblica.
+    return f"""Você é um roteirista de quadro espiritual para rádio FM brasileira.
+Crie o roteiro do segmento "{source_name}" — uma reflexão sobre uma passagem bíblica.
 
 APRESENTADORES:
 {narrator_block}
 
 {format_block}
 
-ATENCAO: responda APENAS com as linhas do roteiro no formato acima. Sem titulos, sem markdown, sem asteriscos, sem tracejados, sem comentarios fora do roteiro. Use português correto com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
+ATENCÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentarios fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
 
 PERSONALIDADES: respeite o perfil de cada apresentador mesmo no tom espiritualizado.
 
 ESTRUTURA:
 {abertura}
-2. Leia a passagem biblica com calma e reverencia (1-2 falas)
-3. Reflexao sobre o significado e aplicacao pratica na vida cotidiana (3-5 falas)
-4. Convide o ouvinte a guardar essa mensagem no coracao durante o dia
+2. Leia a passagem bíblica com calma e reverência (1-2 falas)
+3. Reflexão sobre o significado e aplicação prática na vida cotidiana (3-5 falas)
+4. Convide o ouvinte a guardar essa mensagem no coração durante o dia
 {encerramento}
 
 REGRAS CRITICAS:
-- Refira-se ao trecho sempre pela forma por extenso: "capitulo X, versiculo Y" — NUNCA use o formato numerico "X:Y" pois o audio nao le corretamente
-- Cada fala: maximo 2-3 sentencas
-- Tom: acolhedor, reflexivo, espiritualizado — como um pastor ou capelao de radio
-- Nao mencione links, notas de episodio ou fontes externas — o conteudo e a propria passagem
-- Conecte a mensagem biblica a situacoes concretas do dia a dia do ouvinte brasileiro
-- NAO invente versos ou trechos que nao estejam na passagem fornecida
+- Refira-se ao trecho sempre pela forma por extenso: "capitulo X, versiculo Y" — NUNCA use o formato numerico "X:Y" pois o audio não lê corretamente
+- Cada fala: máximo 2-3 sentencas
+- Tom: acolhedor, reflexivo, espiritualizado — como um pastor ou capelão de rádio
+- Não mencione links, notas de episódio ou fontes externas — o conteúdo e a própria passagem
+- Conecte a mensagem bíblica a situações concretas do dia a dia do ouvinte brasileiro
+- NÃO invente versos ou trechos que não estejam na passagem fornecida
 {solo_note}
 
 PASSAGEM BIBLICA:
@@ -967,64 +967,64 @@ def _url_prompt(narrators: list[dict], names: list[str], source_name: str,
     names_str = ', '.join(names[:-1]) + f' e {names[-1]}' if n > 1 else names[0]
 
     solo_note = (
-        "- Apresentacao solo: adapte o tom ao tipo de conteudo, fale diretamente com o ouvinte"
+        "- Apresentação solo: adapte o tom ao tipo de conteúdo, fale diretamente com o ouvinte"
         if n == 1 else
         f"- Distribua as falas entre os {n} apresentadores; quem reage, quem comenta, quem contextualiza"
     )
 
     if num_items > 1:
         task = (
-            f"Ha {num_items} fontes de conteudo. "
-            "Integre-as num episodio coeso — compare, contraponha ou apresente cada uma em sequencia "
-            "conforme o tipo e a relacao entre os conteudos."
+            f"Há {num_items} fontes de conteúdo. "
+            "Integre-as num episódio coeso — compare, contraponha ou apresente cada uma em sequência "
+            "conforme o tipo e a relação entre os conteúdos."
         )
     else:
         task = (
-            "Identifique o tipo de conteudo e escolha o tom adequado:\n"
-            "   - Noticia/artigo: informativo e contextualizado\n"
-            "   - Produto/lancamento: entusiasmado, destaque beneficios\n"
-            "   - Curiosidade/ciencia: admirado, exploratorio\n"
+            "Identifique o tipo de conteúdo e escolha o tom adequado:\n"
+            "   - Notícia/artigo: informativo e contextualizado\n"
+            "   - Produto/lançamento: entusiasmado, destaque beneficios\n"
+            "   - Curiosidade/ciência: admirado, exploratório\n"
             "   - Humor/piada: leve, bem-humorado — entregue a piada com timing\n"
             "   - Outros: adapte naturalmente"
         )
 
     if is_first_of_day:
-        abertura = f"1. ABERTURA: {names_str} dao bom dia, dizem que estao na {station_name} e apresentam o que vem por ai (2 falas)"
-        encerramento = "4. Encerramento convidando o ouvinte a continuar na programacao (1-2 falas)"
+        abertura = f"1. ABERTURA: {names_str} dão bom dia, dizem que estão na {station_name} e apresentam o que vem por aí (2 falas)"
+        encerramento = "4. Encerramento convidando o ouvinte a continuar na programação (1-2 falas)"
     else:
-        abertura = "1. ENTRADA direta no conteudo, sem bom dia nem apresentacao de nomes (1-2 falas)"
-        encerramento = "4. Encerramento rapido sinalizando continuidade da programacao (1 fala)"
+        abertura = "1. ENTRADA direta no conteúdo, sem bom dia nem apresentação de nomes (1-2 falas)"
+        encerramento = "4. Encerramento rápido sinalizando continuidade da programação (1 fala)"
 
-    return f"""Voce e um roteirista de radio FM brasileira.
-Receberá conteudo extraido de uma ou mais paginas web.
+    return f"""Você é um roteirista de rádio FM brasileira.
+Receberá conteúdo extraído de uma ou mais páginas web.
 
 TAREFA:
 {task}
-Crie um segmento de radio envolvente, como se fosse um quadro da programacao.
+Crie um segmento de rádio envolvente, como se fosse um quadro da programação.
 
 APRESENTADORES:
 {narrator_block}
 
 {format_block}
 
-ATENCAO: responda APENAS com as linhas do roteiro no formato acima. Sem titulos, sem markdown, sem asteriscos, sem tracejados, sem comentarios fora do roteiro. Use português correto com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
+ATENÇÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentários fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
 
 PERSONALIDADES: respeite o perfil de cada apresentador.
 
 ESTRUTURA:
 {abertura}
-2. Desenvolvimento do conteudo (4-6 falas): apresente, contextualize, reaja
-3. Destaque ou curiosidade extra relacionada ao conteudo (1-2 falas)
+2. Desenvolvimento do conteúdo (4-6 falas): apresente, contextualize, reaja
+3. Destaque ou curiosidade extra relacionada ao conteúdo (1-2 falas)
 {encerramento}
 
 REGRAS:
-- Cada fala: maximo 2 sentencas
+- Cada fala: máximo 2 sentenças
 - Mencione a origem de forma natural quando relevante: "segundo o G1...", "no YouTube..." — nunca diga "vi na internet"
-- NAO invente informacoes que nao estejam no conteudo fornecido
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Fonte 1; [ITEM_2] antes da Fonte 2 etc. — NAO usar na abertura nem no encerramento
+- NÃO invente informações que não estejam no conteúdo fornecido
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Fonte 1; [ITEM_2] antes da Fonte 2 etc. — NÃO usar na abertura nem no encerramento
 {solo_note}
 
-CONTEUDO:
+CONTEÚDO:
 {content}
 
 Roteiro:"""
@@ -1039,26 +1039,26 @@ def _receitas_prompt(narrators: list[dict], names: list[str], source_name: str,
     names_str = ', '.join(names[:-1]) + f' e {names[-1]}' if n > 1 else names[0]
 
     solo_note = (
-        "- Apresentacao solo: alterne entre apresentar a receita e reagir a ela, como se estivesse experimentando mentalmente"
+        "- Apresentação solo: alterne entre apresentar a receita e reagir a ela, como se estivesse experimentando mentalmente"
         if n == 1 else
         "- Um apresentador conduz a receita, o outro reage, faz perguntas e acrescenta dicas — troquem esse papel naturalmente"
     )
 
     if is_first_of_day:
         abertura = (
-            f"1. ABERTURA: {names_str} dao bom dia, dizem que os ouvintes estao na {station_name} "
+            f"1. ABERTURA: {names_str} dão bom dia, dizem que os ouvintes estão na {station_name} "
             f"e apresentam o quadro \"{source_name}\" "
             f"com apetite — criem expectativa sobre o prato do dia (2-3 falas)"
         )
-        encerramento = "5. Encerramento: convide o ouvinte a experimentar em casa e continue na programacao (2 falas)"
+        encerramento = "5. Encerramento: convide o ouvinte a experimentar em casa e continue na programação (2 falas)"
     else:
         abertura = (
             f'1. ENTRADA: entrem direto com curiosidade — "Boa tarde, chegou a hora do {source_name}!", '
-            f'"Voces ja decidiram o que vao cozinhar hoje?" ou similar. SEM bom dia. (1-2 falas)'
+            f'"Vocês já decidiram o que vão cozinhar hoje?" ou similar. SEM bom dia. (1-2 falas)'
         )
-        encerramento = "5. Encerramento rapido desejando bom apetite e sinalizando que a programacao continua (1 fala)"
+        encerramento = "5. Encerramento rápido desejando bom apetite e sinalizando que a programação continua (1 fala)"
 
-    return f"""Voce e um roteirista de quadro culinario para radio FM brasileira.
+    return f"""Você é um roteirista de quadro culinário para rádio FM brasileira.
 Crie o roteiro do segmento "{source_name}" — um quadro de receitas descontraido e apetitoso.
 
 APRESENTADORES:
@@ -1066,20 +1066,20 @@ APRESENTADORES:
 
 {format_block}
 
-ATENCAO: responda APENAS com as linhas do roteiro no formato acima. Sem titulos, sem markdown, sem asteriscos, sem tracejados, sem comentarios fora do roteiro. Use português correto com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
+ATENÇÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentários fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
 
 PERSONALIDADES: respeite o perfil de cada apresentador — inclusive na culinaria.
 
 ESTRUTURA:
 {abertura}
-2. APRESENTACAO DO PRATO (2-3 falas):
-   - Nome do prato e sua origem/culinaria
-   - Historia ou curiosidade sobre o prato
-   - Em que ocasiao preparar (jantar romantico, almoço de domingo, festa, dia a dia)
+2. APRESENTAÇÃO DO PRATO (2-3 falas):
+   - Nome do prato e sua origem/culinária
+   - História ou curiosidade sobre o prato
+   - Em que ocasião preparar (jantar romântico, almoço de domingo, festa, dia a dia)
 3. INGREDIENTES (2-3 falas):
-   - Liste os ingredientes de forma conversacional — nao como uma lista seca
+   - Liste os ingredientes de forma conversacional — não como uma lista seca
    - Destaque ingredientes inusitados ou importantes
-   - Sugira substituicoes faceis se houver ingredientes dificeis de encontrar
+   - Sugira substituições fáceis se houver ingredientes difíceis de encontrar
 4. PREPARO (3-4 falas):
    - Explique os passos principais de forma clara e apetitosa
    - Use linguagem sensorial: cores, cheiros, texturas, sons
@@ -1087,14 +1087,14 @@ ESTRUTURA:
 {encerramento}
 
 REGRAS:
-- Cada fala: maximo 3 sentencas
+- Cada fala: máximo 3 sentenças
 - Tom: descontraido, apetitoso, como conversa entre amigos na cozinha
-- Traduza os nomes de ingredientes e tecnicas para portugues brasileiro
-- Reaja com expressoes de sabor: "Nossa, deve ficar incrivel!", "Ja da agua na boca..."
-- Se o prato for de culinaria estrangeira, mencione onde e popular e como os brasileiros podem adaptar
+- Traduza os nomes de ingredientes e técnicas para português brasileiro
+- Reaja com expressões de sabor: "Nossa, deve ficar incrível!", "Já da água na boca..."
+- Se o prato for de culinária estrangeira, mencione onde é popular e como os brasileiros podem adaptar
 {solo_note}
-- NAO invente ingredientes ou passos que nao estejam na receita
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Receita 1; [ITEM_2] antes da Receita 2 etc. — NAO usar na abertura nem no encerramento
+- NÃO invente ingredientes ou passos que não estejam na receita
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Receita 1; [ITEM_2] antes da Receita 2 etc. — NÃO usar na abertura nem no encerramento
 
 RECEITA:
 {content}
