@@ -238,14 +238,14 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
 .notes-header { font-size: 10px; color: #6b7280; text-transform: uppercase;
                 letter-spacing: .05em; margin-bottom: 14px; }
 .link-card { background: #1f2937; border: 1px solid #374151; border-radius: 10px;
-             padding: 14px 16px; margin-bottom: 10px; }
+             padding: 14px 16px; margin-bottom: 10px; position: relative; overflow: hidden; }
 .link-num    { font-size: 11px; color: #818cf8; font-weight: 700; margin-bottom: 4px; }
 .link-title  { font-size: 14px; font-weight: 600; margin-bottom: 6px; line-height: 1.4; }
 .link-meta   { font-size: 12px; color: #9ca3af; margin-bottom: 8px; }
 .link-url    { font-size: 12px; color: #60a5fa; text-decoration: none; word-break: break-all; display: block; }
 .link-url:hover { text-decoration: underline; }
-.src-progress-bar  { height: 3px; background: #374151; border-radius: 2px; margin: 8px 0; overflow: hidden; }
-.src-progress-fill { height: 100%; background: #6366f1; border-radius: 2px; width: 0; transition: width .5s linear; }
+.src-progress-bar  { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: #374151; }
+.src-progress-fill { height: 100%; background: #6366f1; width: 0; transition: width .5s linear; }
 .comment-block  { margin-top: 10px; padding-top: 10px; border-top: 1px solid #374151; }
 .comment-label  { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
 .comment-item   { font-size: 12px; color: #d1d5db; margin-bottom: 4px; }
@@ -412,7 +412,7 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
               border-bottom: 2px solid transparent; user-select: none; }
 .notes-tab.active { color: #a5b4fc; border-bottom-color: #6366f1; }
 .roteiro-item { background: #1f2937; border: 1px solid #374151; border-radius: 10px;
-               padding: 14px 16px; margin-bottom: 10px; }
+               padding: 14px 16px; margin-bottom: 10px; position: relative; overflow: hidden; }
 .roteiro-item.seekable { cursor: pointer; }
 .roteiro-item.seekable:hover { border-color: #6366f1; }
 .roteiro-item.active { border-color: #6366f1 !important; background: #1e1b4b; }
@@ -610,16 +610,29 @@ async function renderRoteiro(ep) {
       return;
     }
     const locColors = { A: 'loc-a', B: 'loc-b', C: 'loc-c' };
-    el.innerHTML = data.items.map((item, i) => {
-      const link      = (ep.links && item.item_index != null) ? ep.links[item.item_index - 1] : null;
-      const startTime = link && link.start_time_seconds != null
+    const rStartTimes = data.items.map((item, i) => {
+      const link = (ep.links && item.item_index != null) ? ep.links[item.item_index - 1] : null;
+      return link && link.start_time_seconds != null
         ? link.start_time_seconds
         : (item.item_index == null && i === 0 ? 0 : null);
+    });
+    const rEnds = rStartTimes.map((_, i) => {
+      for (let j = i + 1; j < rStartTimes.length; j++) {
+        if (rStartTimes[j] !== null) return rStartTimes[j];
+      }
+      return ep.duration ?? 0;
+    });
+    el.innerHTML = data.items.map((item, i) => {
+      const link      = (ep.links && item.item_index != null) ? ep.links[item.item_index - 1] : null;
+      const startTime = rStartTimes[i];
       const hasStart  = startTime !== null;
       const seekAttr  = hasStart ? ` data-start="${startTime}"` : '';
       const seekClass = hasStart ? ' seekable' : '';
       const seekClick = hasStart ? ` onclick="seekTo(${startTime})"` : '';
       const seekHint  = hasStart ? `<div class="roteiro-seek">▶ ${fmtDur(Math.round(startTime))}</div>` : '';
+      const progressBar = hasStart
+        ? `<div class="src-progress-bar" data-end="${rEnds[i]}"><div class="src-progress-fill"></div></div>`
+        : '';
       const numLabel  = item.item_index != null
         ? '#' + item.item_index + (link ? ' — ' + link.title : '')
         : 'Abertura / Encerramento';
@@ -629,7 +642,7 @@ async function renderRoteiro(ep) {
       }).join('');
       return `<div class="roteiro-item${seekClass}"${seekAttr}${seekClick}>
         <div class="roteiro-num">${numLabel}</div>
-        ${seekHint}${linesHtml}
+        ${seekHint}${linesHtml}${progressBar}
       </div>`;
     }).join('');
     updateActiveCard(document.getElementById('audio').currentTime);
@@ -1348,7 +1361,7 @@ function renderNotes(ep) {
       <div class="link-num">${isMusic ? '🎵' : '#' + (i+1)}</div>
       <div class="link-title">${lk.title}</div>
       ${meta ? `<div class="link-meta">${meta}</div>` : ''}
-      ${seekHint}${progressBar}${urlHtml}${commentsHtml}
+      ${seekHint}${urlHtml}${commentsHtml}${progressBar}
     </div>`;
   }).join('');
 }
@@ -1379,8 +1392,8 @@ function updateActiveCard(t) {
     const idle = !_notesLastScroll || Date.now() - _notesLastScroll >= NOTES_IDLE_MS;
     if (idle) best.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
-  document.querySelectorAll('#notes .link-card[data-start] .src-progress-bar').forEach(bar => {
-    const card  = bar.closest('.link-card');
+  document.querySelectorAll('#notes [data-start] .src-progress-bar').forEach(bar => {
+    const card  = bar.closest('[data-start]');
     const start = parseFloat(card.dataset.start);
     const end   = parseFloat(bar.dataset.end);
     if (isNaN(start) || isNaN(end) || end <= start) return;
