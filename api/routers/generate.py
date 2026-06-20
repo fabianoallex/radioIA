@@ -22,7 +22,7 @@ async def generate(body: GenerateBody):
             yield "data: [ERRO:nenhuma fonte selecionada]\n\n"
         return StreamingResponse(empty(), media_type="text/event-stream")
 
-    cmd = [sys.executable, str(PROJECT_DIR / "main.py")] + body.sources
+    cmd = [sys.executable, "-u", str(PROJECT_DIR / "main.py")] + body.sources
 
     async def event_stream():
         try:
