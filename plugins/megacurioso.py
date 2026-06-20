@@ -17,7 +17,8 @@ Para usar, adicione ao config.yaml:
     enabled: true
     settings:
       feed_base_url: https://strapi.megacurioso.com.br/api/feed
-      max_items: 1          # 1 = um episodio por artigo
+      fetch_count: 10       # quantos artigos buscar da API (pool)
+      max_items: 1          # quantos artigos usar por episodio (apos filtro de historico)
       days_lookback: 7      # ignora artigos mais antigos que N dias
       max_content_chars: 3000
 """
@@ -43,9 +44,10 @@ METADATA = {
             'key': 'feed_base_url', 'label': 'URL base do feed', 'type': 'text',
             'default': FEED_BASE_URL_DEFAULT,
         },
-        {'key': 'max_items',        'label': 'Artigos por execução', 'type': 'number', 'default': 1},
-        {'key': 'days_lookback',    'label': 'Dias de lookback',     'type': 'number', 'default': 7},
-        {'key': 'max_content_chars','label': 'Máx. caracteres',      'type': 'number', 'default': MAX_CONTENT_CHARS},
+        {'key': 'fetch_count',      'label': 'Artigos a buscar (pool)', 'type': 'number', 'default': 10},
+        {'key': 'max_items',        'label': 'Artigos por episódio',    'type': 'number', 'default': 1},
+        {'key': 'days_lookback',    'label': 'Dias de lookback',        'type': 'number', 'default': 7},
+        {'key': 'max_content_chars','label': 'Máx. caracteres',         'type': 'number', 'default': MAX_CONTENT_CHARS},
     ],
 }
 
@@ -85,13 +87,14 @@ def _get_content(entry) -> str:
 def fetch(source_config: dict, credentials=None) -> list[dict]:
     settings      = source_config.get('settings') or {}
     feed_base_url = settings.get('feed_base_url', FEED_BASE_URL_DEFAULT).rstrip('/')
-    max_items     = int(settings.get('max_items', 1))
+    fetch_count   = int(settings.get('fetch_count', 10))
     days_lookback = int(settings.get('days_lookback', 7))
     max_chars     = int(settings.get('max_content_chars', MAX_CONTENT_CHARS))
     source_name   = source_config.get('name', 'Mega Curioso')
 
     # a API aceita o limite de artigos diretamente na URL: /api/feed/{n}
-    feed_url = f'{feed_base_url}/{max_items}'
+    # fetch_count define o pool; main.py aplica max_items apos filtrar historico
+    feed_url = f'{feed_base_url}/{fetch_count}'
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=days_lookback)
 
