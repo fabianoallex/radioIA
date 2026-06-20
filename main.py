@@ -368,6 +368,7 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
         model=model,
         api_base=api_base,
         generation_time=_inicio[:5],
+        prompt_log_path=os.path.join(output_dir, 'prompt.txt'),
     )
     print(f"  {len(script.split())} palavras.\n")
 
@@ -517,7 +518,8 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
     script = generate_script(items, narrators, source_config,
                              is_first_of_day=is_first_of_day, station_name=radio_name,
                              model=model, api_base=api_base,
-                             generation_time=_inicio[:5])
+                             generation_time=_inicio[:5],
+                             prompt_log_path=os.path.join(output_dir, 'prompt.txt'))
     print(f"  {len(script.split())} palavras.\n")
 
     print("Gerando audio...")

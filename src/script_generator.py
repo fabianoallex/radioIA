@@ -134,7 +134,8 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
                     station_name: str = 'RadioIA',
                     model: str = DEFAULT_MODEL,
                     api_base: str | None = None,
-                    generation_time: str | None = None) -> str:
+                    generation_time: str | None = None,
+                    prompt_log_path: str | None = None) -> str:
 
     n = min(len(narrators), 3)
     active = narrators[:n]
@@ -190,23 +191,29 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
     if generation_time and source_type in _TIME_AWARE_TYPES and prompt.endswith('Roteiro:'):
         prompt = (
             prompt[:-len('Roteiro:')] +
-            f"INSTRUCAO DE CONTEXTO TEMPORAL: Este episodio foi gerado as {generation_time}. "
-            f"No inicio do roteiro, mencione de forma natural e variada que as informacoes foram "
-            f"apuradas/levantadas as {generation_time}. Varie a forma — nao use sempre a mesma frase. "
+            f"INSTRUCÃO DE CONTEXTO TEMPORAL: Este episódio foi gerado às {generation_time}. "
+            f"No início do roteiro, mencione de forma natural e variada que as informacões foram "
+            f"apuradas/levantadas às {generation_time}. Varie a forma — não use sempre a mesma frase. "
             f"Exemplos do estilo esperado: "
             f'"Informacoes apuradas ate as {generation_time}", '
-            f'"Edicao das {generation_time}", '
-            f'"Com base no que levantamos as {generation_time}", '
+            f'"Edição das {generation_time}", '
+            f'"Com base no que levantamos às {generation_time}", '
             f'"Nosso boletim das {generation_time} traz...", '
-            f'"O que apuramos ate agora, {generation_time}..." — '
+            f'"O que apuramos até agora, {generation_time}..." — '
             f"e assim por diante, sempre variando. "
-            f"Deixe claro que e o horario de geracao do conteudo, nao a hora atual do ouvinte.\n\n"
+            f"Deixe claro que e o horário de geracao do conteudo, nao a hora atual do ouvinte.\n\n"
             f"Roteiro:"
         )
 
     context = source_config.get('context', '')
     if context and prompt.endswith('Roteiro:'):
         prompt = prompt[:-len('Roteiro:')] + f"INSTRUCAO DO PRODUTOR: {context}\n\nRoteiro:"
+
+    if prompt_log_path:
+        import os
+        os.makedirs(os.path.dirname(prompt_log_path), exist_ok=True)
+        with open(prompt_log_path, 'w', encoding='utf-8') as _f:
+            _f.write(prompt)
 
     kwargs = {'api_base': api_base} if api_base else {}
     response = litellm.completion(
