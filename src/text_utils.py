@@ -4,7 +4,10 @@ import re
 
 # ── Moeda ─────────────────────────────────────────────────────────────────────
 
-_CURRENCY_RE = re.compile(r'R\$\s*([\d.]+(?:,\d{2})?)')
+# R$ 3.000,00  ou  R$ 800
+_CURRENCY_RE = re.compile(r'R\$\s*([\d.]+(?:,\d{1,2})?)')
+# R 3.000,00  ou  R 800  (LLM às vezes omite o cifrão)
+_CURRENCY_BARE_RE = re.compile(r'\bR\s+(\d[\d.]*(?:,\d{1,2})?)')
 
 
 def _currency_to_words(match: re.Match) -> str:
@@ -41,10 +44,7 @@ def _currency_to_words(match: re.Match) -> str:
 # ── API pública ───────────────────────────────────────────────────────────────
 
 def normalize_for_tts(text: str) -> str:
-    """Converte expressões problemáticas para leitura em TTS.
-
-    Atualmente normaliza:
-    - Valores em reais: "R$ 3.000,00" → "3 mil reais"
-    """
+    """Converte expressões problemáticas para leitura em TTS."""
     text = _CURRENCY_RE.sub(_currency_to_words, text)
+    text = _CURRENCY_BARE_RE.sub(_currency_to_words, text)
     return text

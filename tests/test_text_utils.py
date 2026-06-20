@@ -43,3 +43,18 @@ class TestNormalizeForTTS:
         result = normalize_for_tts("R$ 2.300.000,00")
         assert "2 milhões" in result
         assert "300 mil" in result
+
+    # Sem cifrão — forma gerada pelo LLM
+    def test_bare_r_simple(self):
+        assert normalize_for_tts("R 800") == "800 reais"
+
+    def test_bare_r_thousands(self):
+        assert normalize_for_tts("R 3.000") == "3 mil reais"
+
+    def test_bare_r_with_cents(self):
+        assert normalize_for_tts("R 800,00") == "800 reais"
+
+    def test_bare_r_in_sentence(self):
+        result = normalize_for_tts("comercializados a partir de R 800 o metro quadrado")
+        assert "R 800" not in result
+        assert "800 reais" in result

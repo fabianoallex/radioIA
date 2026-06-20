@@ -63,7 +63,6 @@ export default function Generator() {
   const { data: sources = [] } = useQuery<Source[]>({
     queryKey: ["sources"],
     queryFn: () => api.get<Source[]>("/sources"),
-    select: (data) => data.filter((s) => s.enabled !== false),
   })
 
   const toggleSource = (id: string) => {
@@ -227,6 +226,10 @@ export default function Generator() {
                       <p className="text-sm text-foreground truncate">{src.name}</p>
                       <p className="text-xs text-muted-foreground">{src.type}</p>
                     </div>
+
+                    {src.enabled === false && (
+                      <span className="text-xs text-muted-foreground/50 shrink-0">off</span>
+                    )}
 
                     {isSelected && (
                       <button
