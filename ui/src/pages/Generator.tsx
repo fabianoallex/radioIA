@@ -308,7 +308,7 @@ export default function Generator() {
 
           {/* Generated episodes (after completion) */}
           {newEpisodes.length > 0 && (
-            <div className="shrink-0">
+            <div className="shrink-0 max-h-48 overflow-y-auto">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
                 Episódios gerados
               </p>
