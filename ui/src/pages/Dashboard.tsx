@@ -25,7 +25,7 @@ interface ScheduledSlot {
 interface SystemStatus {
   radio:     { nome: string }
   scheduler: { ativo: boolean; pid: number | null; ultimo_tick_seg: number | null }
-  player:    { ativo: boolean }
+  player:    { ativo: boolean; url?: string }
   hoje:      { data: string; total: number; duracao_total: string; episodios: Episode[] }
   disco:     { output_mb: number; disco_livre_gb: number }
   proximos:  ScheduledSlot[]
