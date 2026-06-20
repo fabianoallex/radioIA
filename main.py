@@ -718,8 +718,9 @@ def main():
             print(f"Disponiveis: {available}")
             sys.exit(1)
     elif not url_targets and not clipping_targets and not replay_targets:
-        # Sem args: roda tudo habilitado
-        sources = [s for s in all_sources if s.get('enabled', True)]
+        print("Nenhuma fonte especificada. Use: python main.py <fonte> [<fonte2> ...]")
+        print(f"Disponiveis: {', '.join(s['id'] for s in all_sources)}")
+        sys.exit(1)
     else:
         sources = []
 
