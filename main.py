@@ -696,6 +696,12 @@ def main():
     # Remove sufixo |contexto dos args para que _parse_cli leia só o source_id[:param]
     cli_args = [a.partition('|')[0] if '|' in a and not a.startswith('url:') else a for a in cli_args]
 
+    # 'clipping|tema' (Admin UI) → 'clipping:tema' (formato nativo do CLI)
+    cli_args = [
+        f"clipping:{_cli_contexts.pop(a)}" if a == 'clipping' and a in _cli_contexts else a
+        for a in cli_args
+    ]
+
     cli = _parse_cli(cli_args) if cli_args else {}
 
     # Extrai replay: direto do argv para suportar múltiplos (replay:X replay:Y)
@@ -705,6 +711,10 @@ def main():
     url_targets = [a.split(':', 1)[1] for a in cli_args if a.startswith('url:')]
     # Extrai clippings: clipping:tema → fonte sintética, sem precisar de config
     clipping_targets = [v for k, v in cli.items() if k == 'clipping' and v]
+    if any(k == 'clipping' and not v for k, v in cli.items()):
+        print("'clipping' requer um tópico. Use: python main.py \"clipping:reforma tributaria\"")
+        print("No Admin UI: selecione Clipping e preencha o campo de contexto com o tema.")
+        sys.exit(1)
     cli_clean   = {k: v for k, v in cli.items() if k not in ('url', 'replay', 'clipping')}
     requested   = set(cli_clean.keys())
 
