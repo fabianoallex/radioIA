@@ -5,13 +5,18 @@ Busca artigos do feed do Mega Curioso e gera episódios de curiosidades.
 O conteúdo completo já vem no campo content:encoded do feed, sem precisar
 visitar cada URL de artigo.
 
+A API do Mega Curioso aceita o número de artigos diretamente na URL:
+  https://strapi.megacurioso.com.br/api/feed/{max_items}
+
+O plugin constrói essa URL automaticamente com base em max_items.
+
 Para usar, adicione ao config.yaml:
   - id: megacurioso
     type: megacurioso
     name: "Mega Curioso"
     enabled: true
     settings:
-      feed_url: https://strapi.megacurioso.com.br/api/feed/5
+      feed_base_url: https://strapi.megacurioso.com.br/api/feed
       max_items: 1          # 1 = um episodio por artigo
       days_lookback: 7      # ignora artigos mais antigos que N dias
       max_content_chars: 3000
@@ -25,7 +30,7 @@ import feedparser
 import requests
 from bs4 import BeautifulSoup
 
-FEED_URL_DEFAULT = 'https://strapi.megacurioso.com.br/api/feed/5'
+FEED_BASE_URL_DEFAULT = 'https://strapi.megacurioso.com.br/api/feed'
 MAX_CONTENT_CHARS = 3000
 
 METADATA = {
@@ -35,8 +40,8 @@ METADATA = {
     'credentials': [],
     'config_schema': [
         {
-            'key': 'feed_url', 'label': 'URL do feed', 'type': 'text',
-            'default': FEED_URL_DEFAULT,
+            'key': 'feed_base_url', 'label': 'URL base do feed', 'type': 'text',
+            'default': FEED_BASE_URL_DEFAULT,
         },
         {'key': 'max_items',        'label': 'Artigos por execução', 'type': 'number', 'default': 1},
         {'key': 'days_lookback',    'label': 'Dias de lookback',     'type': 'number', 'default': 7},
@@ -79,11 +84,14 @@ def _get_content(entry) -> str:
 
 def fetch(source_config: dict, credentials=None) -> list[dict]:
     settings      = source_config.get('settings') or {}
-    feed_url      = settings.get('feed_url', FEED_URL_DEFAULT).strip()
+    feed_base_url = settings.get('feed_base_url', FEED_BASE_URL_DEFAULT).rstrip('/')
     max_items     = int(settings.get('max_items', 1))
     days_lookback = int(settings.get('days_lookback', 7))
     max_chars     = int(settings.get('max_content_chars', MAX_CONTENT_CHARS))
     source_name   = source_config.get('name', 'Mega Curioso')
+
+    # a API aceita o limite de artigos diretamente na URL: /api/feed/{n}
+    feed_url = f'{feed_base_url}/{max_items}'
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=days_lookback)
 
