@@ -59,6 +59,8 @@ def _scan(dt: str) -> list[dict]:
             "tamanho_bytes": audio.stat().st_size,
             "date":          dt,
             "status":        meta.get("status", "published"),
+            "links":         meta.get("links", []),
+            "generation":    meta.get("generation"),
         })
     return result
 
