@@ -896,7 +896,15 @@ async function pollEpisodes() {
 
     if (fallbackMode) {
       showToast(`Novo episódio: ${todayNew[0].source_name || todayNew[0].source_id}`, false);
-      exitFallback(todayNew[0]);
+      const audio = document.getElementById('audio');
+      if (!audio.paused) {
+        exitFallback(todayNew[0]);
+      } else {
+        // Pausado no modo musical — sai do modo mas não inicia o episódio
+        fallbackMode = false;
+        document.getElementById('music-mode-btn').classList.remove('active');
+        markNewEpisodes(todayNew.map(e => e.id));
+      }
     } else {
       showToast(`Novo episódio: ${todayNew[0].source_name || todayNew[0].source_id}`, false);
       markNewEpisodes(todayNew.map(e => e.id));
