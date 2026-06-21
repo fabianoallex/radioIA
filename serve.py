@@ -735,9 +735,9 @@ async function init() {
       }
     }
   } else {
-    // Novo dia ou sem histórico — abre hoje direto
+    // Novo dia ou sem histórico — começa pelo episódio mais antigo do dia
     selectDate(today, false);
-    if (todayEps.length) playEpisode(todayEps[0]);
+    if (todayEps.length) playEpisode(todayEps[todayEps.length - 1]);
     else enterFallback();
   }
 
