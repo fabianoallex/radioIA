@@ -183,6 +183,7 @@ def _run_replay(replay_of, current_time: str, label: str, state: dict, today: st
             meta = json.load(f)
 
     meta['audio_path']     = os.path.abspath(orig_mp3)
+    meta['replay_of']      = ep_id          # formato {date}/{folder}, igual ao replay manual
     meta['replay_of_slot'] = replay_of
 
     with open(os.path.join(output_dir, 'episode.json'), 'w', encoding='utf-8') as f:
