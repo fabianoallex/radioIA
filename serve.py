@@ -867,7 +867,7 @@ function updateGeneratingItem(status) {
     '</div>';
   const nextEl = document.querySelector('#playlist .ep-next');
   const pl = document.getElementById('playlist');
-  if (nextEl) pl.insertBefore(el, nextEl); else pl.appendChild(el);
+  if (nextEl) nextEl.after(el); else pl.prepend(el);
 }
 
 async function pollEpisodes() {
@@ -1253,7 +1253,7 @@ function appendNextScheduled() {
             `<div class="ep-meta">próximo na grade · ver grade</div>` +
           `</div>`;
       }
-      document.getElementById('playlist').appendChild(el);
+      document.getElementById('playlist').prepend(el);
     })
     .catch(() => {});
 }
