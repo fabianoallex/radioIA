@@ -801,6 +801,12 @@ function updateGeneratingItem(status) {
   if (!status || currentDate !== today) { _genDoneEpIds = null; return; }
   if (status.data && status.data !== today) { _genDoneEpIds = null; _genDoneSuppressed = false; return; }
 
+  // Ignora status com mais de 20 minutos (geração antiga ou processo encerrado)
+  if (status.atualizado && status.data) {
+    const age = (Date.now() - new Date(`${status.data}T${status.atualizado}`).getTime()) / 60000;
+    if (age > 20) { _genDoneEpIds = null; _genDoneSuppressed = false; return; }
+  }
+
   const isDone  = !status.ativo && status.etapa === 'concluido';
   const isError = !status.ativo && status.etapa === 'erro';
   const semConteudo = isDone && (status.progresso || '').includes('sem conteudo');
