@@ -719,7 +719,7 @@ async function init() {
     if (nearEnd) {
       // Episódio quase no fim — avança para o próximo ou modo musical
       const idx  = todayEps.findIndex(e => e.id === savedEp.id);
-      const next = idx >= 0 ? todayEps[idx + 1] : null;
+      const next = idx > 0 ? todayEps[idx - 1] : null;
       if (next) playEpisode(next);
       else enterFallback();
     } else {
@@ -1131,8 +1131,8 @@ document.getElementById('audio').addEventListener('ended', () => {
   const el  = document.querySelector(`.ep-item[data-id="${currentEp?.id}"]`);
   if (el) el.classList.add('played');
 
-  if (idx >= 0 && idx < eps.length - 1) {
-    const nextEp = eps[idx + 1];
+  if (idx > 0) {
+    const nextEp = eps[idx - 1];
     _episodeTransitionCount++;
     const doBreak = BETWEEN_EPISODES_EVERY > 0
                     && _episodeTransitionCount % BETWEEN_EPISODES_EVERY === 0;
