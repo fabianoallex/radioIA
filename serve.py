@@ -195,6 +195,7 @@ header h1 { font-size: 18px; font-weight: 700; color: #f9fafb; }
 .badge-content { background: #312e81; color: #a5b4fc; }
 .badge-music   { background: #064e3b; color: #6ee7b7; }
 .badge-news    { background: #431407; color: #fdba74; }
+.badge-replay  { background: #422006; color: #fcd34d; }
 .badge-fallback{ background: #1c1917; color: #a8a29e; }
 .badge-welcome { background: #1e3a5f; color: #93c5fd; }
 .player-name   { font-size: 16px; font-weight: 600; color: #f9fafb; margin-bottom: 2px; }
@@ -223,7 +224,11 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
 .ep-item:hover { background: #1f2937; }
 .ep-item.active { background: #1e1b4b; border-color: #6366f1; }
 .ep-item.played { opacity: .5; }
-.ep-item.new-ep { border-left-color: #10b981; background: #064e3b22; }
+.ep-item.new-ep  { border-left-color: #10b981; background: #064e3b22; }
+.ep-item.ep-replay { border-left-color: #d97706; }
+.ep-replay-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+                 background: #422006; color: #fcd34d; border-radius: 3px;
+                 padding: 1px 5px; margin-right: 6px; vertical-align: middle; }
 .ep-dot  { width: 8px; height: 8px; border-radius: 50%; background: #4b5563; flex-shrink: 0; }
 .ep-item.active .ep-dot { background: #6366f1; }
 .ep-item.played .ep-dot { background: #374151; }
@@ -1179,6 +1184,7 @@ function fmtViews(v) {
 }
 
 function episodeType(ep) {
+  if (ep.replay_of) return 'replay';
   const id = (ep.source_id || '').toLowerCase();
   if (id.includes('music') || id === 'musica' || id === 'musica-local') return 'music';
   if (id.includes('noticia') || id.includes('rss') || id.includes('tech') || id.includes('economia')) return 'news';
@@ -1186,9 +1192,10 @@ function episodeType(ep) {
 }
 
 function badgeLabel(type) {
-  if (type === 'music') return ['badge-music',   '🎵 Música'];
-  if (type === 'news')  return ['badge-news',    '📰 Notícias'];
-  return                       ['badge-content', '▶ Conteúdo'];
+  if (type === 'replay') return ['badge-replay',  '↩ Replay'];
+  if (type === 'music')  return ['badge-music',   '🎵 Música'];
+  if (type === 'news')   return ['badge-news',    '📰 Notícias'];
+  return                        ['badge-content', '▶ Conteúdo'];
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
@@ -1265,9 +1272,10 @@ function selectDate(date, autoplay = true) {
 function renderPlaylist(eps) {
   const showCheck = DL_CONCATENATED || DL_ZIP;
   document.getElementById('playlist').innerHTML = eps.map(ep => {
-    const name = ep.source_name || ep.source_id;
-    const dur  = fmtDur(ep.duration);
-    const cnt  = ep.videos_covered ? ep.videos_covered + ' itens' : '';
+    const name    = ep.source_name || ep.source_id;
+    const dur     = fmtDur(ep.duration);
+    const cnt     = ep.videos_covered ? ep.videos_covered + ' itens' : '';
+    const replayTag = ep.replay_of ? '<span class="ep-replay-tag">↩ replay</span>' : '';
     const metaLine1 = [ep.time, dur].filter(Boolean).join(' · ');
     const eid  = ep.id.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const enam = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -1281,11 +1289,11 @@ function renderPlaylist(eps) {
         ` · <span class="ep-dl-link" onclick="event.stopPropagation();shareEp('${eid}','${enam}')">compartilhar</span>`
       : '';
     const metaLine2 = [cnt, dlLinks].filter(Boolean).join(' · ');
-    return `<div class="ep-item" data-id="${ep.id}" onclick="onEpClick('${eid}')">
+    return `<div class="ep-item${ep.replay_of ? ' ep-replay' : ''}" data-id="${ep.id}" onclick="onEpClick('${eid}')">
       ${checkHtml}
       <div class="ep-dot"></div>
       <div style="min-width:0;flex:1">
-        <div class="ep-label">${name}</div>
+        <div class="ep-label">${replayTag}${name}</div>
         ${metaLine1 ? `<div class="ep-meta">${metaLine1}</div>` : ''}
         ${metaLine2 ? `<div class="ep-meta">${metaLine2}</div>` : ''}
       </div>
@@ -1647,7 +1655,7 @@ def _add_episode(episodes: list, ep_path: str, ep_id: str, date: str, source_id:
     if os.path.exists(meta_path):
         with open(meta_path, 'r', encoding='utf-8') as f:
             meta = json.load(f)
-    episodes.append({
+    ep: dict = {
         'id':             ep_id,
         'date':           date,
         'time':           time,
@@ -1657,7 +1665,10 @@ def _add_episode(episodes: list, ep_path: str, ep_id: str, date: str, source_id:
         'videos_covered': meta.get('videos_covered', 0),
         'links':          meta.get('links', []),
         'status':         meta.get('status', 'published'),
-    })
+    }
+    if meta.get('replay_of'):
+        ep['replay_of'] = meta['replay_of']
+    episodes.append(ep)
 
 
 def scan_episodes():
