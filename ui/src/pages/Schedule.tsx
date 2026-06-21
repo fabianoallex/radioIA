@@ -448,8 +448,10 @@ export default function Schedule() {
     _highlight(time)
   }
 
-  // Find "next" slot index within visible slots (first whose time > now)
-  const nextIdx = visibleSlots.findIndex(({ slot }) => slot.time > now)
+  // Find "next" slot — primeiro futuro que não seja replay com original ausente
+  const nextIdx = visibleSlots.findIndex(({ slot }) =>
+    slot.time > now && !(slot.replay_of != null && missingReplays.has(slot.replay_of))
+  )
 
   // Scroll to now-row
   useEffect(() => {
