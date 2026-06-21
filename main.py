@@ -375,7 +375,7 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
 
     print(f"Gerando roteiro ({model})...")
     _llm_t0 = _local_now()
-    script = generate_script(
+    script, llm_usage = generate_script(
         items, narrators,
         {**source_config, 'type': 'combined'},
         is_first_of_day=is_first_of_day,
@@ -441,6 +441,8 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
         'script_words':  len(script.split()),
         'items_count':   len(items),
     }
+    if llm_usage:
+        _generation.update(llm_usage)
     save_episode_metadata(items, script, output_dir, duration, source_name=source_name,
                           item_timestamps=item_timestamps, generation=_generation, publish=publish)
     save_episode_to_history(episode_id, items)
@@ -554,11 +556,11 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
 
     print(f"Gerando roteiro ({model})...")
     _llm_t0 = _local_now()
-    script = generate_script(items, narrators, source_config,
-                             is_first_of_day=is_first_of_day, station_name=radio_name,
-                             model=model, api_base=api_base,
-                             generation_time=_inicio[:5],
-                             prompt_log_path=os.path.join(output_dir, 'prompt.txt'))
+    script, llm_usage = generate_script(items, narrators, source_config,
+                                        is_first_of_day=is_first_of_day, station_name=radio_name,
+                                        model=model, api_base=api_base,
+                                        generation_time=_inicio[:5],
+                                        prompt_log_path=os.path.join(output_dir, 'prompt.txt'))
     _llm_t1 = _local_now()
     print(f"  {len(script.split())} palavras.\n")
 
@@ -615,6 +617,8 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
         'script_words':  len(script.split()),
         'items_count':   len(items),
     }
+    if llm_usage:
+        _generation.update(llm_usage)
     save_episode_metadata(items, script, output_dir, duration, source_name=source_name,
                           item_timestamps=item_timestamps, generation=_generation, publish=publish)
     save_episode_to_history(episode_id, items)
