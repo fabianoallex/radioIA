@@ -168,6 +168,7 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
   const dlUrl      = `/api/episodes/${ep.date}/${ep.pasta}/download`
   const promptUrl  = `/episodes/${ep.date}/${ep.pasta}/prompt`
   const scriptUrl  = `/episodes/${ep.date}/${ep.pasta}/script`
+  const logUrl     = `/episodes/${ep.date}/${ep.pasta}/log`
   const epPath     = `${ep.date}/${ep.pasta}`
   const isDraft    = ep.status === "draft"
   const hasDetails = (ep.links && ep.links.length > 0) || ep.generation
@@ -392,9 +393,10 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
             </div>
           )}
 
-          {/* Prompt e Roteiro */}
+          {/* Prompt, Roteiro e Log */}
           <TextSection label="Prompt" url={promptUrl} />
           <TextSection label="Roteiro" url={scriptUrl} />
+          <TextSection label="Log" url={logUrl} />
         </div>
       )}
     </div>

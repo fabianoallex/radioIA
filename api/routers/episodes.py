@@ -193,6 +193,16 @@ def get_script(dt: str, folder: str):
     return PlainTextResponse(f.read_text(encoding="utf-8"))
 
 
+@router.get("/episodes/{dt}/{folder}/log")
+def get_log(dt: str, folder: str):
+    _chk_date(dt)
+    _chk_folder(folder)
+    f = OUTPUT_DIR / dt / folder / "generation.log"
+    if not f.exists():
+        raise HTTPException(404, "generation.log não encontrado")
+    return PlainTextResponse(f.read_text(encoding="utf-8"))
+
+
 @router.post("/episodes/{dt}/{folder}/replay")
 def replay_episode(dt: str, folder: str, target_dt: str | None = None):
     _chk_date(dt)
