@@ -225,9 +225,10 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
 .ep-item.active { background: #1e1b4b; border-color: #6366f1; }
 .ep-item.played { opacity: .5; }
 .ep-item.new-ep  { border-left-color: #10b981; background: #064e3b22; }
+.ep-new-meta     { margin-top: 2px; }
 .ep-new-badge    { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
                    background: #064e3b; color: #6ee7b7; border-radius: 3px;
-                   padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
+                   padding: 1px 5px; }
 .ep-item.ep-replay { border-left-color: #d97706; }
 .ep-replay-meta { color: #9ca3af; }
 .ep-replay-tag  { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
@@ -526,6 +527,9 @@ let fallbackIdx   = 0;
 let _genDoneEpIds       = null;   // IDs capturados quando geração concluiu
 let _genDoneSuppressed  = false;  // true = episódio já carregou, suprimir item até nova geração
 const _newEpIds         = new Set(); // IDs de episódios novos desta sessão (não persiste em reload)
+let _nextScheduled = null;   // último next-scheduled recebido do servidor
+let _serverOffset  = 0;      // Date.now() + _serverOffset ≈ hora do servidor (ms)
+let _countdownTimer = null;  // intervalo do countdown do próximo agendado
 let _fallbackTrackCount      = 0;
 let _episodeTransitionCount  = 0;
 let _playingAnnouncement     = false;   // suprime ended global durante qualquer break
@@ -1237,6 +1241,29 @@ function renderDays() {
     el.classList.toggle('active', el.dataset.date === currentDate));
 }
 
+function _countdownMeta() {
+  if (!_nextScheduled || !_nextScheduled.target_ts) return 'próximo na grade · ver grade';
+  const msLeft  = _nextScheduled.target_ts - (Date.now() + _serverOffset);
+  const minLeft = Math.ceil(msLeft / 60_000);
+  if (minLeft >= 1 && minLeft <= 5)
+    return `daqui ${minLeft} minuto${minLeft > 1 ? 's' : ''} · ver grade`;
+  return 'próximo na grade · ver grade';
+}
+
+function _tickCountdown() {
+  if (!_nextScheduled) { clearInterval(_countdownTimer); _countdownTimer = null; return; }
+  const el = document.getElementById('ep-next-el');
+  if (!el)             { clearInterval(_countdownTimer); _countdownTimer = null; return; }
+  const msLeft = _nextScheduled.target_ts - (Date.now() + _serverOffset);
+  if (msLeft <= 0) {
+    clearInterval(_countdownTimer); _countdownTimer = null;
+    appendNextScheduled();
+    return;
+  }
+  const meta = el.querySelector('.ep-next-meta');
+  if (meta) meta.textContent = _countdownMeta();
+}
+
 function appendNextScheduled() {
   const today = localDateISO();
   if (currentDate !== today) return;
@@ -1245,8 +1272,14 @@ function appendNextScheduled() {
     .then(next => {
       // Remove só depois do fetch — sem flicker
       document.querySelectorAll('#playlist .ep-next').forEach(el => el.remove());
+      if (_countdownTimer) { clearInterval(_countdownTimer); _countdownTimer = null; }
+      _nextScheduled = next;
       if (!next) return;
+
+      if (next.server_ts) _serverOffset = next.server_ts - Date.now();
+
       const el = document.createElement('div');
+      el.id = 'ep-next-el';
       el.className = 'ep-item ep-next';
       if (next.scheduler_active === false) {
         el.innerHTML =
@@ -1259,12 +1292,22 @@ function appendNextScheduled() {
         el.style.cursor = 'pointer';
         el.title = 'Ver grade completa do dia';
         el.onclick = showSchedule;
+        const replayRow = next.is_replay
+          ? `<div class="ep-meta ep-replay-meta"><span class="ep-replay-tag">↩ replay</span></div>`
+          : '';
         el.innerHTML =
           `<div class="ep-dot"></div>` +
           `<div style="min-width:0">` +
             `<div class="ep-label">${next.time_display} &mdash; ${next.label}</div>` +
-            `<div class="ep-meta">próximo na grade · ver grade</div>` +
+            replayRow +
+            `<div class="ep-meta ep-next-meta">${_countdownMeta()}</div>` +
           `</div>`;
+        // Inicia countdown se faltam ≤ 5 min (+ margem de 30s)
+        if (next.target_ts) {
+          const msLeft = next.target_ts - (Date.now() + _serverOffset);
+          if (msLeft > 0 && msLeft <= 5 * 60_000 + 30_000)
+            _countdownTimer = setInterval(_tickCountdown, 60_000);
+        }
       }
       document.getElementById('playlist').prepend(el);
     })
@@ -1320,12 +1363,13 @@ function renderPlaylist(eps) {
       : '';
     const metaLine2 = [cnt, dlLinks].filter(Boolean).join(' · ');
     const isNew = _newEpIds.has(ep.id);
-    const newBadge = isNew ? '<span class="ep-new-badge">novo</span>' : '';
+    const newBadge = isNew ? '<div class="ep-new-meta"><span class="ep-new-badge">novo</span></div>' : '';
     return `<div class="ep-item${ep.replay_of ? ' ep-replay' : ''}${isNew ? ' new-ep' : ''}" data-id="${ep.id}" onclick="onEpClick('${eid}')">
       ${checkHtml}
       <div class="ep-dot"></div>
       <div style="min-width:0;flex:1">
-        <div class="ep-label">${name}${newBadge}</div>
+        <div class="ep-label">${name}</div>
+        ${newBadge}
         ${replayMeta}
         ${metaLine1 ? `<div class="ep-meta">${metaLine1}</div>` : ''}
         ${metaLine2 ? `<div class="ep-meta">${metaLine2}</div>` : ''}
@@ -1348,6 +1392,7 @@ function playEpisode(ep) {
   if (!ep) return;
   fallbackMode = false;
   _newEpIds.delete(ep.id);
+  document.querySelector(`.ep-item[data-id="${ep.id}"] .ep-new-meta`)?.remove();
   currentEp = ep;
   _lastSave = 0;
   localStorage.setItem(S_EP,   ep.id);
@@ -1562,7 +1607,7 @@ async function shareEp(epId, name) {
 }
 
 async function downloadDayConcat() {
-  const ids = [...selectedEpIds];
+  const ids = [...selectedEpIds].sort();
   if (!ids.length) return;
   _resetDlTimer();
   const btn  = document.getElementById('dl-concat-btn');
@@ -1594,7 +1639,7 @@ async function downloadDayConcat() {
 }
 
 async function downloadDayZip() {
-  const ids = [...selectedEpIds];
+  const ids = [...selectedEpIds].sort();
   if (!ids.length) return;
   _resetDlTimer();
   const btn  = document.getElementById('dl-zip-btn');
@@ -2292,6 +2337,15 @@ def api_next_scheduled():
         now_time   = now.strftime('%H:%M')
         today_wd   = now.weekday()
 
+        # Carrega programacao_map para validar replays
+        pmap_today = {}
+        try:
+            with open('scheduler_state.json', 'r', encoding='utf-8') as _sf:
+                _st = json.load(_sf)
+            pmap_today = _st.get('programacao_map', {}).get(today_str, {})
+        except Exception:
+            pass
+
         upcoming = []
         for entry in schedule:
             entry_date = entry.get('date')
@@ -2303,18 +2357,34 @@ def api_next_scheduled():
             days = entry.get('days')
             if days and not any(_DAYS.get(str(d).lower(), -1) == today_wd for d in days):
                 continue
+            replay_of = entry.get('replay_of')
+            if replay_of is not None:
+                ep_id = pmap_today.get(str(replay_of))
+                if not ep_id:
+                    continue  # original não foi gerado ainda, ignora
+                orig_mp3 = os.path.join(OUTPUT_DIR, ep_id, 'episode.mp3')
+                if not os.path.exists(orig_mp3):
+                    continue  # MP3 original sumiu, ignora
             label = entry.get('label', '')
             if not label:
                 sources = entry.get('sources', [])
-                label = 'Replay' if entry.get('replay_of') else ', '.join(str(s) for s in sources)
+                label = 'Replay' if replay_of is not None else ', '.join(str(s) for s in sources)
             h, m = t.split(':')
-            upcoming.append({'time': t, 'time_display': f"{int(h)}h{m}", 'label': label,
-                             'scheduler_active': True})
+            row = {'time': t, 'time_display': f"{int(h)}h{m}", 'label': label,
+                   'scheduler_active': True}
+            if replay_of is not None:
+                row['is_replay'] = True
+            upcoming.append(row)
 
         if not upcoming:
             return jsonify(None)
         upcoming.sort(key=lambda x: x['time'])
-        return jsonify(upcoming[0])
+        result = upcoming[0]
+        h_r, m_r = result['time'].split(':')
+        target_dt = now.replace(hour=int(h_r), minute=int(m_r), second=0, microsecond=0)
+        result['server_ts'] = int(now.timestamp() * 1000)
+        result['target_ts'] = int(target_dt.timestamp() * 1000)
+        return jsonify(result)
     except Exception:
         return jsonify(None)
 
