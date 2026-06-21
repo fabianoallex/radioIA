@@ -228,6 +228,8 @@ function SlotRow({
   isPast,
   isNext,
   originalMissing,
+  highlighted,
+  onGoToOriginal,
   onEdit,
   onDelete,
 }: {
@@ -235,6 +237,8 @@ function SlotRow({
   isPast: boolean
   isNext: boolean
   originalMissing: boolean
+  highlighted: boolean
+  onGoToOriginal?: () => void
   onEdit: () => void
   onDelete: () => void
 }) {
@@ -243,9 +247,10 @@ function SlotRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-md group",
+        "flex items-center gap-3 px-3 py-2 rounded-md group transition-colors",
         isNext && "ring-1 ring-primary/50 bg-primary/5",
         isNext && isReplay && originalMissing && "ring-amber-500/50 bg-amber-500/5",
+        highlighted && "ring-2 ring-primary/60 bg-primary/10",
         isPast && "opacity-40",
       )}
     >
@@ -264,12 +269,19 @@ function SlotRow({
       <div className="hidden sm:flex items-center gap-1 shrink-0">
         {isReplay ? (
           <>
-            <span className={cn(
-              "text-xs px-1.5 py-0.5 rounded",
-              originalMissing ? "bg-amber-500/15 text-amber-400" : slotBadgeClass(slot)
-            )}>
+            <button
+              onClick={(e) => { e.stopPropagation(); onGoToOriginal?.() }}
+              disabled={!onGoToOriginal}
+              title={onGoToOriginal ? "Ir para o slot original" : undefined}
+              className={cn(
+                "text-xs px-1.5 py-0.5 rounded transition-colors",
+                originalMissing ? "bg-amber-500/15 text-amber-400" : slotBadgeClass(slot),
+                onGoToOriginal && "hover:opacity-70 cursor-pointer",
+                !onGoToOriginal && "cursor-default",
+              )}
+            >
               replay:{slot.replay_of}
-            </span>
+            </button>
             {originalMissing && (
               <span className="flex items-center gap-0.5 text-xs text-amber-400/80">
                 <AlertTriangle className="size-3" />
@@ -325,7 +337,10 @@ export default function Schedule() {
   const [editForm, setEditForm] = useState<SlotForm>(emptyForm())
   const [addingNew, setAddingNew] = useState(false)
   const [newForm, setNewForm] = useState<SlotForm>(emptyForm())
-  const nowRowRef = useRef<HTMLDivElement>(null)
+  const [highlightedSlotId, setHighlightedSlotId] = useState<number | null>(null)
+  const nowRowRef  = useRef<HTMLDivElement>(null)
+  const listRef    = useRef<HTMLDivElement>(null)
+  const slotRefs   = useRef<Map<number, HTMLDivElement>>(new Map())
 
   // Tick every minute
   useEffect(() => {
@@ -386,6 +401,14 @@ export default function Schedule() {
     setAddingNew(false)
   }
 
+  const scrollToOriginal = (replayOf: number) => {
+    const el = slotRefs.current.get(replayOf)
+    if (!el) return
+    el.scrollIntoView({ behavior: "smooth", block: "center" })
+    setHighlightedSlotId(replayOf)
+    setTimeout(() => setHighlightedSlotId(null), 1500)
+  }
+
   // Find "next" slot index within visible slots (first whose time > now)
   const nextIdx = visibleSlots.findIndex(({ slot }) => slot.time > now)
 
@@ -413,7 +436,12 @@ export default function Schedule() {
           </p>
         </div>
         <button
-          onClick={() => { setAddingNew(true); setEditingIdx(null); setNewForm(emptyForm()) }}
+          onClick={() => {
+            setAddingNew(true)
+            setEditingIdx(null)
+            setNewForm(emptyForm())
+            listRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+          }}
           className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Plus className="size-3.5" />
@@ -427,7 +455,7 @@ export default function Schedule() {
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5">
+      <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5">
         {isLoading ? (
           <div className="space-y-1">
             {Array.from({ length: 8 }, (_, i) => (
@@ -454,7 +482,10 @@ export default function Schedule() {
               const isNext = vIdx === nextIdx
 
               return (
-                <div key={`${slot.time}-${idx}`}>
+                <div
+                  key={`${slot.time}-${idx}`}
+                  ref={el => { if (el && slot.slot_id != null) slotRefs.current.set(slot.slot_id, el) }}
+                >
                   {/* "now" separator */}
                   {isNext && (
                     <div ref={nowRowRef} className="flex items-center gap-2 py-1 my-1">
@@ -469,6 +500,8 @@ export default function Schedule() {
                     isPast={isPast}
                     isNext={isNext}
                     originalMissing={slot.replay_of != null && missingReplays.has(slot.replay_of)}
+                    highlighted={slot.slot_id != null && highlightedSlotId === slot.slot_id}
+                    onGoToOriginal={slot.replay_of != null ? () => scrollToOriginal(slot.replay_of!) : undefined}
                     onEdit={() => startEdit(idx)}
                     onDelete={() => handleDelete(idx)}
                   />
