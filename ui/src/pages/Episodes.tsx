@@ -116,11 +116,46 @@ function fmtNum(n: number | undefined): string {
   return n.toLocaleString("pt-BR")
 }
 
+// ─── TextSection (lazy) ─────────────────────────────────────────
+function TextSection({ label, url }: { label: string; url: string }) {
+  const [open, setOpen] = useState(false)
+  const { data, isFetching, isError } = useQuery<string>({
+    queryKey: ["ep-text", url],
+    queryFn:  () => api.getText(url),
+    enabled:  open,
+    staleTime: Infinity,
+  })
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {open ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+        {label}
+      </button>
+      {open && (
+        <div className="mt-2">
+          {isFetching && <p className="text-xs text-muted-foreground">Carregando...</p>}
+          {isError   && <p className="text-xs text-destructive">Erro ao carregar.</p>}
+          {data && (
+            <pre className="text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap break-words bg-muted/40 rounded p-3 max-h-72 overflow-y-auto font-mono">
+              {data}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── EpisodeCard ────────────────────────────────────────────────
 function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) {
   const [expanded, setExpanded] = useState(false)
   const streamUrl  = `/api/episodes/${ep.date}/${ep.pasta}/stream`
   const dlUrl      = `/api/episodes/${ep.date}/${ep.pasta}/download`
+  const promptUrl  = `/episodes/${ep.date}/${ep.pasta}/prompt`
+  const scriptUrl  = `/episodes/${ep.date}/${ep.pasta}/script`
   const epPath     = `${ep.date}/${ep.pasta}`
   const isDraft    = ep.status === "draft"
   const hasDetails = (ep.links && ep.links.length > 0) || ep.generation
@@ -323,6 +358,10 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
               </div>
             </div>
           )}
+
+          {/* Prompt e Roteiro */}
+          <TextSection label="Prompt" url={promptUrl} />
+          <TextSection label="Roteiro" url={scriptUrl} />
         </div>
       )}
     </div>

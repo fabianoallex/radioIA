@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel
 
 OUTPUT_DIR = Path(__file__).parent.parent.parent / "output"
@@ -133,6 +133,26 @@ def download_audio(dt: str, folder: str):
         media_type="audio/mpeg",
         headers={"Content-Disposition": f'attachment; filename="{folder}.mp3"'},
     )
+
+
+@router.get("/episodes/{dt}/{folder}/prompt")
+def get_prompt(dt: str, folder: str):
+    _chk_date(dt)
+    _chk_folder(folder)
+    f = OUTPUT_DIR / dt / folder / "prompt.txt"
+    if not f.exists():
+        raise HTTPException(404, "prompt.txt não encontrado")
+    return PlainTextResponse(f.read_text(encoding="utf-8"))
+
+
+@router.get("/episodes/{dt}/{folder}/script")
+def get_script(dt: str, folder: str):
+    _chk_date(dt)
+    _chk_folder(folder)
+    f = OUTPUT_DIR / dt / folder / "script.txt"
+    if not f.exists():
+        raise HTTPException(404, "script.txt não encontrado")
+    return PlainTextResponse(f.read_text(encoding="utf-8"))
 
 
 class StatusBody(BaseModel):
