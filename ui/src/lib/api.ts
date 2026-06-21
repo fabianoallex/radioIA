@@ -12,8 +12,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+async function getText(path: string): Promise<string> {
+  const res = await fetch(`${BASE}${path}`)
+  if (!res.ok) throw new Error(res.statusText)
+  return res.text()
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
+  getText: (path: string) => getText(path),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "POST", body: JSON.stringify(body) }),
   put: <T>(path: string, body?: unknown) =>
