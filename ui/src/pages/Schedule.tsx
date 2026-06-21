@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, Pencil, Trash2, Check, X, RefreshCw, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -228,6 +228,10 @@ function SlotRow({
   isPast,
   isNext,
   originalMissing,
+  highlighted,
+  replayCount,
+  onToggleReplays,
+  onGoToOriginal,
   onEdit,
   onDelete,
 }: {
@@ -235,6 +239,10 @@ function SlotRow({
   isPast: boolean
   isNext: boolean
   originalMissing: boolean
+  highlighted: boolean
+  replayCount: number
+  onToggleReplays?: () => void
+  onGoToOriginal?: () => void
   onEdit: () => void
   onDelete: () => void
 }) {
@@ -243,9 +251,10 @@ function SlotRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-md group",
+        "flex items-center gap-3 px-3 py-2 rounded-md group transition-colors",
         isNext && "ring-1 ring-primary/50 bg-primary/5",
         isNext && isReplay && originalMissing && "ring-amber-500/50 bg-amber-500/5",
+        highlighted && "ring-2 ring-primary/60 bg-primary/10",
         isPast && "opacity-40",
       )}
     >
@@ -264,12 +273,19 @@ function SlotRow({
       <div className="hidden sm:flex items-center gap-1 shrink-0">
         {isReplay ? (
           <>
-            <span className={cn(
-              "text-xs px-1.5 py-0.5 rounded",
-              originalMissing ? "bg-amber-500/15 text-amber-400" : slotBadgeClass(slot)
-            )}>
+            <button
+              onClick={(e) => { e.stopPropagation(); onGoToOriginal?.() }}
+              disabled={!onGoToOriginal}
+              title={onGoToOriginal ? "Ir para o slot original" : undefined}
+              className={cn(
+                "text-xs px-1.5 py-0.5 rounded transition-colors",
+                originalMissing ? "bg-amber-500/15 text-amber-400" : slotBadgeClass(slot),
+                onGoToOriginal && "hover:opacity-70 cursor-pointer",
+                !onGoToOriginal && "cursor-default",
+              )}
+            >
               replay:{slot.replay_of}
-            </span>
+            </button>
             {originalMissing && (
               <span className="flex items-center gap-0.5 text-xs text-amber-400/80">
                 <AlertTriangle className="size-3" />
@@ -288,7 +304,18 @@ function SlotRow({
           <span className="text-xs text-muted-foreground">+{(slot.sources ?? []).length - 2}</span>
         )}
         {slot.slot_id != null && (
-          <span className="text-xs text-zinc-600 ml-1">#{slot.slot_id}</span>
+          <span className="flex items-center gap-0.5 ml-1">
+            <span className="text-xs text-zinc-600">#{slot.slot_id}</span>
+            {replayCount > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggleReplays?.() }}
+                className="text-xs text-zinc-500 hover:text-primary px-1 rounded transition-colors"
+                title={`${replayCount} replay(s) — ver horários`}
+              >
+                ↺{replayCount}
+              </button>
+            )}
+          </span>
         )}
       </div>
 
@@ -325,7 +352,12 @@ export default function Schedule() {
   const [editForm, setEditForm] = useState<SlotForm>(emptyForm())
   const [addingNew, setAddingNew] = useState(false)
   const [newForm, setNewForm] = useState<SlotForm>(emptyForm())
-  const nowRowRef = useRef<HTMLDivElement>(null)
+  const [highlightedTime, setHighlightedTime]       = useState<string | null>(null)
+  const [activeReplayListId, setActiveReplayListId] = useState<number | null>(null)
+  const nowRowRef  = useRef<HTMLDivElement>(null)
+  const listRef    = useRef<HTMLDivElement>(null)
+  const slotRefs   = useRef<Map<number, HTMLDivElement>>(new Map())
+  const timeRefs   = useRef<Map<string,  HTMLDivElement>>(new Map())
 
   // Tick every minute
   useEffect(() => {
@@ -386,6 +418,38 @@ export default function Schedule() {
     setAddingNew(false)
   }
 
+  const replaysBySlotId = useMemo(() => {
+    const map = new Map<number, Slot[]>()
+    for (const { slot } of visibleSlots) {
+      if (slot.replay_of != null) {
+        const arr = map.get(slot.replay_of) ?? []
+        arr.push(slot)
+        map.set(slot.replay_of, arr)
+      }
+    }
+    return map
+  }, [visibleSlots])
+
+  const _highlight = (time: string) => {
+    setHighlightedTime(time)
+    setTimeout(() => setHighlightedTime(null), 1500)
+  }
+
+  const scrollToOriginal = (replayOf: number) => {
+    const el = slotRefs.current.get(replayOf)
+    if (!el) return
+    el.scrollIntoView({ behavior: "smooth", block: "center" })
+    const origTime = visibleSlots.find(v => v.slot.slot_id === replayOf)?.slot.time
+    if (origTime) _highlight(origTime)
+  }
+
+  const scrollToTime = (time: string) => {
+    const el = timeRefs.current.get(time)
+    if (!el) return
+    el.scrollIntoView({ behavior: "smooth", block: "center" })
+    _highlight(time)
+  }
+
   // Find "next" slot index within visible slots (first whose time > now)
   const nextIdx = visibleSlots.findIndex(({ slot }) => slot.time > now)
 
@@ -413,7 +477,12 @@ export default function Schedule() {
           </p>
         </div>
         <button
-          onClick={() => { setAddingNew(true); setEditingIdx(null); setNewForm(emptyForm()) }}
+          onClick={() => {
+            setAddingNew(true)
+            setEditingIdx(null)
+            setNewForm(emptyForm())
+            listRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+          }}
           className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Plus className="size-3.5" />
@@ -427,7 +496,7 @@ export default function Schedule() {
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5">
+      <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5">
         {isLoading ? (
           <div className="space-y-1">
             {Array.from({ length: 8 }, (_, i) => (
@@ -453,8 +522,17 @@ export default function Schedule() {
               const isPast = slot.time < now && vIdx !== nextIdx - 1
               const isNext = vIdx === nextIdx
 
+              const replaysOf = slot.slot_id != null ? (replaysBySlotId.get(slot.slot_id) ?? []) : []
+
               return (
-                <div key={`${slot.time}-${idx}`}>
+                <div
+                  key={`${slot.time}-${idx}`}
+                  ref={el => {
+                    if (!el) return
+                    timeRefs.current.set(slot.time, el)
+                    if (slot.slot_id != null) slotRefs.current.set(slot.slot_id, el)
+                  }}
+                >
                   {/* "now" separator */}
                   {isNext && (
                     <div ref={nowRowRef} className="flex items-center gap-2 py-1 my-1">
@@ -469,9 +547,29 @@ export default function Schedule() {
                     isPast={isPast}
                     isNext={isNext}
                     originalMissing={slot.replay_of != null && missingReplays.has(slot.replay_of)}
+                    highlighted={slot.time === highlightedTime}
+                    replayCount={replaysOf.length}
+                    onToggleReplays={replaysOf.length > 0 ? () => setActiveReplayListId(id => id === slot.slot_id ? null : slot.slot_id!) : undefined}
+                    onGoToOriginal={slot.replay_of != null ? () => scrollToOriginal(slot.replay_of!) : undefined}
                     onEdit={() => startEdit(idx)}
                     onDelete={() => handleDelete(idx)}
                   />
+
+                  {/* Lista de replays do slot original */}
+                  {activeReplayListId === slot.slot_id && replaysOf.length > 0 && (
+                    <div className="ml-14 mb-1 flex flex-col">
+                      {replaysOf.map(r => (
+                        <button
+                          key={r.time}
+                          onClick={() => { scrollToTime(r.time); setActiveReplayListId(null) }}
+                          className="text-left text-xs px-2 py-1 rounded flex items-center gap-1.5 text-zinc-400 hover:text-foreground hover:bg-muted transition-colors"
+                        >
+                          <span className="text-zinc-600">↩</span>
+                          {r.time} — {r.label || (r.sources ?? []).join(", ")}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   {editingIdx === idx && (
                     <div className="ml-4 mt-1 mb-2">
