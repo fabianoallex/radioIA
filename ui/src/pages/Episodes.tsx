@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react"
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
 import {
-  ChevronLeft, ChevronRight, Download, Archive,
+  ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
+  Download, Archive,
   Rss, Music, PlayCircle, BarChart2, TrendingUp,
   MessageSquare, Star, Film, BookOpen, Utensils,
   Book, HelpCircle, Mic, Package, Radio,
-  Eye, EyeOff, Trash2,
+  Eye, EyeOff, Trash2, ExternalLink, Cpu, Clock,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { api } from "@/lib/api"
@@ -66,6 +67,30 @@ function todayIso(): string {
 }
 
 // ─── types ──────────────────────────────────────────────────────
+interface EpLink {
+  title: string
+  channel: string
+  url: string
+  views: number
+  published_at: string
+  start_time_seconds?: number
+}
+
+interface Generation {
+  model?: string
+  started_at?: string
+  finished_at?: string
+  total_seconds?: number
+  llm_seconds?: number
+  tts_seconds?: number
+  mix_seconds?: number
+  script_words?: number
+  items_count?: number
+  prompt_tokens?: number
+  completion_tokens?: number
+  total_tokens?: number
+}
+
 interface Episode {
   pasta: string
   horario: string
@@ -75,14 +100,30 @@ interface Episode {
   tamanho_bytes: number
   date: string
   status: "published" | "draft"
+  links?: EpLink[]
+  generation?: Generation
+}
+
+// ─── helpers (detalhe) ──────────────────────────────────────────
+function fmtSecs(s: number | undefined): string {
+  if (!s) return "—"
+  if (s < 60) return `${s}s`
+  return `${Math.floor(s / 60)}m ${s % 60}s`
+}
+
+function fmtNum(n: number | undefined): string {
+  if (n === undefined || n === null) return "—"
+  return n.toLocaleString("pt-BR")
 }
 
 // ─── EpisodeCard ────────────────────────────────────────────────
 function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) {
+  const [expanded, setExpanded] = useState(false)
   const streamUrl  = `/api/episodes/${ep.date}/${ep.pasta}/stream`
   const dlUrl      = `/api/episodes/${ep.date}/${ep.pasta}/download`
   const epPath     = `${ep.date}/${ep.pasta}`
   const isDraft    = ep.status === "draft"
+  const hasDetails = (ep.links && ep.links.length > 0) || ep.generation
 
   const toggleStatus = useMutation({
     mutationFn: () => api.patch(`/episodes/${epPath}/status`, {
@@ -102,8 +143,11 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
     }
   }
 
+  const gen = ep.generation
+
   return (
     <div className={cn("rounded-lg border bg-card overflow-hidden", isDraft && "border-amber-500/40 opacity-80")}>
+      {/* Header row */}
       <div className="flex items-center gap-3 px-4 py-3">
         <div className="rounded-md bg-primary/10 p-1.5 shrink-0">
           <EpIcon sourceId={ep.source_id} />
@@ -124,6 +168,15 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
           <p className="text-xs text-muted-foreground">{fmtDuration(ep.duracao_seg)}</p>
         </div>
         <div className="flex items-center gap-1 ml-2">
+          {hasDetails && (
+            <button
+              onClick={() => setExpanded(v => !v)}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title={expanded ? "Ocultar detalhes" : "Ver detalhes"}
+            >
+              {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+            </button>
+          )}
           <button
             onClick={() => toggleStatus.mutate()}
             disabled={toggleStatus.isPending}
@@ -151,19 +204,127 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
         </div>
       </div>
 
+      {/* Player */}
       <div className="px-4 pb-3">
-        <audio
-          controls
-          preload="none"
-          className="w-full h-8"
-          style={{ colorScheme: "dark" }}
-        >
+        <audio controls preload="none" className="w-full h-8" style={{ colorScheme: "dark" }}>
           <source src={streamUrl} type="audio/mpeg" />
         </audio>
         {ep.tamanho_bytes > 0 && (
           <p className="text-right text-xs text-zinc-600 mt-1">{fmtBytes(ep.tamanho_bytes)}</p>
         )}
       </div>
+
+      {/* Details panel */}
+      {expanded && (
+        <div className="border-t px-4 py-3 space-y-4 text-xs">
+
+          {/* Links / itens */}
+          {ep.links && ep.links.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                Itens ({ep.links.length})
+              </p>
+              <ol className="space-y-1.5">
+                {ep.links.map((lnk, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="text-muted-foreground shrink-0 font-mono">{i + 1}.</span>
+                    <div className="min-w-0">
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-foreground leading-snug">{lnk.title}</span>
+                        {lnk.url && (
+                          <a
+                            href={lnk.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 mt-0.5 text-muted-foreground hover:text-foreground"
+                          >
+                            <ExternalLink className="size-3" />
+                          </a>
+                        )}
+                      </div>
+                      <div className="flex gap-2 text-muted-foreground mt-0.5">
+                        {lnk.channel && <span>{lnk.channel}</span>}
+                        {lnk.published_at && <span>· {lnk.published_at}</span>}
+                        {lnk.views > 0 && <span>· {fmtNum(lnk.views)} views</span>}
+                        {lnk.start_time_seconds !== undefined && (
+                          <span>· ⏱ {fmtSecs(lnk.start_time_seconds)}</span>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {/* Generation metadata */}
+          {gen && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                Geração
+              </p>
+              <div className="space-y-2">
+                {/* Model + timing */}
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {gen.model && (
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <Cpu className="size-3" />
+                      <span className="font-mono">{gen.model}</span>
+                    </span>
+                  )}
+                  {gen.started_at && (
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <Clock className="size-3" />
+                      {gen.started_at.slice(11, 19)}
+                      {gen.finished_at && <> → {gen.finished_at.slice(11, 19)}</>}
+                    </span>
+                  )}
+                </div>
+
+                {/* Timing breakdown */}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+                  {gen.total_seconds !== undefined && (
+                    <span>Total: <strong className="text-foreground">{fmtSecs(gen.total_seconds)}</strong></span>
+                  )}
+                  {gen.llm_seconds !== undefined && (
+                    <span>LLM: <strong className="text-foreground">{fmtSecs(gen.llm_seconds)}</strong></span>
+                  )}
+                  {gen.tts_seconds !== undefined && (
+                    <span>TTS: <strong className="text-foreground">{fmtSecs(gen.tts_seconds)}</strong></span>
+                  )}
+                  {gen.mix_seconds !== undefined && (
+                    <span>Mix: <strong className="text-foreground">{fmtSecs(gen.mix_seconds)}</strong></span>
+                  )}
+                </div>
+
+                {/* Tokens */}
+                {gen.total_tokens !== undefined && (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+                    <span>
+                      Tokens:{" "}
+                      <strong className="text-foreground">{fmtNum(gen.prompt_tokens)}</strong>
+                      {" prompt + "}
+                      <strong className="text-foreground">{fmtNum(gen.completion_tokens)}</strong>
+                      {" completion = "}
+                      <strong className="text-foreground">{fmtNum(gen.total_tokens)}</strong>
+                    </span>
+                  </div>
+                )}
+
+                {/* Words / items */}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+                  {gen.script_words !== undefined && (
+                    <span>Roteiro: <strong className="text-foreground">{fmtNum(gen.script_words)}</strong> palavras</span>
+                  )}
+                  {gen.items_count !== undefined && (
+                    <span>Itens: <strong className="text-foreground">{gen.items_count}</strong></span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
