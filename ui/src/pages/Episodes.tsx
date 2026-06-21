@@ -102,9 +102,21 @@ interface Episode {
   status: "published" | "draft"
   links?: EpLink[]
   generation?: Generation
+  replay_of?: string
 }
 
 // ─── helpers (detalhe) ──────────────────────────────────────────
+function fmtReplayOf(replayOf: string, epDate: string): string {
+  const parts    = replayOf.split("/")
+  const origDate = parts.length >= 2 ? parts[0] : epDate
+  const origFld  = parts.length >= 2 ? parts[1] : parts[0]
+  const origTime = (origFld.split("_")[0] ?? "").replace("-", "h")
+  const dateLabel = origDate !== epDate
+    ? `${origDate.slice(8)}/${origDate.slice(5, 7)} às ${origTime}`
+    : origTime
+  return dateLabel
+}
+
 function fmtSecs(s: number | undefined): string {
   if (!s) return "—"
   if (s < 60) return `${s}s`
@@ -202,6 +214,14 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
             )}
           </div>
           <p className="text-xs text-muted-foreground">{ep.source_id}</p>
+          {ep.replay_of && (
+            <p className="text-xs mt-0.5">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-medium">
+                <Repeat className="size-2.5" />
+                replay · original: {fmtReplayOf(ep.replay_of, ep.date)}
+              </span>
+            </p>
+          )}
         </div>
         <div className="text-right shrink-0">
           <p className="text-xs font-mono text-muted-foreground">{ep.horario}</p>

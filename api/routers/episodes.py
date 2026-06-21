@@ -10,8 +10,25 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel
 
-OUTPUT_DIR = Path(__file__).parent.parent.parent / "output"
+OUTPUT_DIR   = Path(__file__).parent.parent.parent / "output"
 HISTORY_PATH = Path(__file__).parent.parent.parent / "history.json"
+GEN_STATUS   = Path(__file__).parent.parent.parent / "geracao_status.json"
+
+
+def _clear_gen_status_if_matches(source_id: str, date: str) -> None:
+    """Se geracao_status.json aponta para este episódio como 'concluido', neutraliza o etapa."""
+    if not GEN_STATUS.exists():
+        return
+    try:
+        st = json.loads(GEN_STATUS.read_text(encoding="utf-8"))
+        if (not st.get("ativo")
+                and st.get("etapa") == "concluido"
+                and st.get("fonte") == source_id
+                and st.get("data") == date):
+            st["etapa"] = "cancelado"
+            GEN_STATUS.write_text(json.dumps(st, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 router = APIRouter(tags=["episodes"])
@@ -35,8 +52,8 @@ def _scan(dt: str) -> list[dict]:
     for folder in sorted(day_dir.iterdir(), reverse=True):
         if not folder.is_dir():
             continue
-        audio = folder / "episode.mp3"
-        if not audio.exists():
+        audio = _resolve_audio(dt, folder.name)
+        if not audio:
             continue
         meta: dict = {}
         ep_json = folder / "episode.json"
@@ -45,12 +62,11 @@ def _scan(dt: str) -> list[dict]:
                 meta = json.loads(ep_json.read_text(encoding="utf-8"))
             except Exception:
                 pass
-        # Folder format: HH-MM_source_id
         name = folder.name
         parts = name.split("_", 1)
         horario = parts[0].replace("-", ":") if len(parts) == 2 else ""
         source_id = parts[1] if len(parts) == 2 else name
-        result.append({
+        row: dict = {
             "pasta":         name,
             "horario":       horario,
             "source_id":     source_id,
@@ -61,7 +77,10 @@ def _scan(dt: str) -> list[dict]:
             "status":        meta.get("status", "published"),
             "links":         meta.get("links", []),
             "generation":    meta.get("generation"),
-        })
+        }
+        if meta.get("replay_of"):
+            row["replay_of"] = meta["replay_of"]
+        result.append(row)
     return result
 
 
@@ -266,6 +285,9 @@ def delete_episode(dt: str, folder: str):
                 HISTORY_PATH.write_text(json.dumps(hist, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:
             pass
+
+    source_id = folder.split("_", 1)[1] if "_" in folder else folder
+    _clear_gen_status_if_matches(source_id, dt)
 
     shutil.rmtree(str(ep_dir), ignore_errors=True)
     return {"deleted": ep_id, "items_removed": items_removed}

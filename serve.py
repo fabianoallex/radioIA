@@ -226,9 +226,10 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
 .ep-item.played { opacity: .5; }
 .ep-item.new-ep  { border-left-color: #10b981; background: #064e3b22; }
 .ep-item.ep-replay { border-left-color: #d97706; }
-.ep-replay-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
-                 background: #422006; color: #fcd34d; border-radius: 3px;
-                 padding: 1px 5px; margin-right: 6px; vertical-align: middle; }
+.ep-replay-meta { color: #9ca3af; }
+.ep-replay-tag  { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+                  background: #422006; color: #fcd34d; border-radius: 3px;
+                  padding: 1px 5px; margin-right: 4px; vertical-align: middle; }
 .ep-dot  { width: 8px; height: 8px; border-radius: 50%; background: #4b5563; flex-shrink: 0; }
 .ep-item.active .ep-dot { background: #6366f1; }
 .ep-item.played .ep-dot { background: #374151; }
@@ -1275,7 +1276,17 @@ function renderPlaylist(eps) {
     const name    = ep.source_name || ep.source_id;
     const dur     = fmtDur(ep.duration);
     const cnt     = ep.videos_covered ? ep.videos_covered + ' itens' : '';
-    const replayTag = ep.replay_of ? '<span class="ep-replay-tag">↩ replay</span>' : '';
+    let replayMeta = '';
+    if (ep.replay_of) {
+      const roSplit   = ep.replay_of.split('/');          // ["2026-06-21","08-30_youtube"] ou ["08-30_youtube"]
+      const origDate  = roSplit.length >= 2 ? roSplit[0] : ep.date;
+      const origFld   = roSplit.length >= 2 ? roSplit[1] : roSplit[0];
+      const origTime  = (origFld.split('_')[0] || '').replace('-', 'h');
+      const dateLabel = origDate !== ep.date
+        ? `${origDate.slice(8)}/${origDate.slice(5,7)} ${origTime}`
+        : origTime;
+      replayMeta = `<div class="ep-meta ep-replay-meta"><span class="ep-replay-tag">↩ replay</span> original: ${dateLabel}</div>`;
+    }
     const metaLine1 = [ep.time, dur].filter(Boolean).join(' · ');
     const eid  = ep.id.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const enam = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -1293,7 +1304,8 @@ function renderPlaylist(eps) {
       ${checkHtml}
       <div class="ep-dot"></div>
       <div style="min-width:0;flex:1">
-        <div class="ep-label">${replayTag}${name}</div>
+        <div class="ep-label">${name}</div>
+        ${replayMeta}
         ${metaLine1 ? `<div class="ep-meta">${metaLine1}</div>` : ''}
         ${metaLine2 ? `<div class="ep-meta">${metaLine2}</div>` : ''}
       </div>
@@ -2091,6 +2103,25 @@ def delete_episode(ep_id):
                     json.dump(hist, f, ensure_ascii=False, indent=2)
         except Exception:
             pass
+
+    # Se geracao_status ainda aponta para este episódio como concluído, neutraliza
+    parts = ep_id.split('/', 1)
+    date_part   = parts[0] if len(parts) > 1 else ''
+    folder_part = parts[1] if len(parts) > 1 else ep_id
+    source_id   = folder_part.split('_', 1)[1] if '_' in folder_part else folder_part
+    try:
+        if os.path.exists(_STATUS_FILE):
+            with open(_STATUS_FILE, 'r', encoding='utf-8') as _sf:
+                _st = json.load(_sf)
+            if (not _st.get('ativo')
+                    and _st.get('etapa') == 'concluido'
+                    and _st.get('fonte') == source_id
+                    and _st.get('data') == date_part):
+                _st['etapa'] = 'cancelado'
+                with open(_STATUS_FILE, 'w', encoding='utf-8') as _sf:
+                    json.dump(_st, _sf, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
     import shutil as _shutil
     _shutil.rmtree(ep_dir, ignore_errors=True)
