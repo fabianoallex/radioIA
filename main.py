@@ -26,7 +26,8 @@ _STATUS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'geracao
 
 
 def _write_status(source_id: str, source_name: str, etapa: str,
-                  progresso: str = '', inicio: str = '', ativo: bool = True, erro: str = None):
+                  progresso: str = '', inicio: str = '', ativo: bool = True,
+                  erro: str = None, publicar: bool = True):
     try:
         with open(_STATUS_FILE, 'w', encoding='utf-8') as _f:
             json.dump({
@@ -39,6 +40,7 @@ def _write_status(source_id: str, source_name: str, etapa: str,
                 'data':       _local_now().strftime('%Y-%m-%d'),
                 'atualizado': _local_now().strftime('%H:%M:%S'),
                 'erro':       erro,
+                'publicar':   publicar,
             }, _f, ensure_ascii=False, indent=2)
     except Exception:
         pass
@@ -313,7 +315,7 @@ def _run_utility_source(source_config: dict, config: dict, is_first_of_day: bool
 
 
 def _run_combined_source(source_config: dict, config: dict, credentials,
-                         seen_ids: set, is_first_of_day: bool) -> str | None:
+                         seen_ids: set, is_first_of_day: bool, publish: bool = True) -> str | None:
     source_id   = source_config['id']
     source_name = source_config['name']
     sub_ids     = source_config.get('sources', [])
@@ -440,13 +442,14 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
         'items_count':   len(items),
     }
     save_episode_metadata(items, script, output_dir, duration, source_name=source_name,
-                          item_timestamps=item_timestamps, generation=_generation)
+                          item_timestamps=item_timestamps, generation=_generation, publish=publish)
     save_episode_to_history(episode_id, items)
     shutil.rmtree(temp_dir, ignore_errors=True)
-    _write_status(source_id, source_name, 'concluido', ativo=False, inicio=_inicio)
+    _write_status(source_id, source_name, 'concluido', ativo=False, inicio=_inicio, publicar=publish)
 
     mins, secs = int(duration // 60), int(duration % 60)
-    print(f"\nEpisodio combinado pronto: {episode_path}")
+    draft_note = ' [RASCUNHO]' if not publish else ''
+    print(f"\nEpisodio combinado pronto{draft_note}: {episode_path}")
     print(f"Duracao: {mins}m {secs}s | Itens: {len(items)}")
     for i, item in enumerate(items, 1):
         print(f"  [{i}] {item['title'][:60]}")
@@ -455,7 +458,7 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
 
 
 def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
-                is_first_of_day: bool = True) -> str | None:
+                is_first_of_day: bool = True, publish: bool = True) -> str | None:
     source_type = source_config['type']
     source_id = source_config['id']
     source_name = source_config['name']
@@ -613,13 +616,14 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
         'items_count':   len(items),
     }
     save_episode_metadata(items, script, output_dir, duration, source_name=source_name,
-                          item_timestamps=item_timestamps, generation=_generation)
+                          item_timestamps=item_timestamps, generation=_generation, publish=publish)
     save_episode_to_history(episode_id, items)
     shutil.rmtree(temp_dir)
-    _write_status(source_id, source_name, 'concluido', ativo=False, inicio=_inicio)
+    _write_status(source_id, source_name, 'concluido', ativo=False, inicio=_inicio, publicar=publish)
 
     mins, secs = int(duration // 60), int(duration % 60)
-    print(f"\nEpisodio pronto: {episode_path}")
+    draft_note = ' [RASCUNHO]' if not publish else ''
+    print(f"\nEpisodio pronto{draft_note}: {episode_path}")
     print(f"Duracao: {mins}m {secs}s | Itens: {len(items)}")
     for i, item in enumerate(items, 1):
         print(f"  [{i}] {item['title'][:60]}")
@@ -822,6 +826,13 @@ def main():
     else:
         print("Sem OAuth — usando canais configurados.\n")
 
+    if '--draft' in sys.argv:
+        publish = False
+    else:
+        publish = not config.get('llm', {}).get('draft', False)
+    if not publish:
+        print("Modo rascunho ativado — episodios nao serao publicados no player.\n")
+
     seen_ids = load_seen_ids()
     generated = []
     first_of_day = not _has_episodes_today()
@@ -883,7 +894,8 @@ def main():
             continue
 
         if source_config.get('type') == 'combined':
-            path = _run_combined_source(source_config, config, credentials, seen_ids, first_of_day)
+            path = _run_combined_source(source_config, config, credentials, seen_ids, first_of_day,
+                                        publish=publish)
             if path:
                 generated.append(path)
                 first_of_day = False
@@ -891,7 +903,7 @@ def main():
             continue
 
         path = _run_source(source_config, config, credentials, seen_ids,
-                           is_first_of_day=first_of_day)
+                           is_first_of_day=first_of_day, publish=publish)
         if path:
             generated.append(path)
             first_of_day = False  # subsequent sources are mid-day segments

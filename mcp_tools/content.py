@@ -15,7 +15,7 @@ from mcp_tools._utils import (
 
 
 @mcp.tool()
-def gerar_episodios(fontes: list[str], model: str = '') -> str:
+def gerar_episodios(fontes: list[str], model: str = '', publicar: bool = True) -> str:
     """
     Gera episodios de audio para as fontes especificadas.
 
@@ -33,18 +33,20 @@ def gerar_episodios(fontes: list[str], model: str = '') -> str:
         O contexto passado aqui sobrescreve o do config.yaml para aquela chamada.
 
     Args:
-        fontes: Lista de IDs de fontes a gerar. Exemplos:
-                ["youtube"] — so o feed do YouTube
-                ["utilidades", "youtube", "noticias"] — grade completa
-                ["musica:3"] — bloco musical com 3 faixas
-                ["url:https://exemplo.com/artigo"] — episodio a partir de URL
-                ["url:https://youtu.be/ID"] — episodio de video do YouTube (usa transcricao)
-                ["url:https://a.com,https://b.com"] — episodio comparando duas URLs
-                ["url:https://a.com|foca nos impactos economicos"] — URL com contexto
-                ["url:https://a.com,https://b.com|compare as abordagens"] — multi-URL com contexto
-        model:  Modelo LLM para esta geracao (ex: "claude-haiku-4-5-20251001").
-                Sobrescreve o modelo de cada fonte apenas para esta chamada — sem alterar config.yaml.
-                Se vazio, usa o modelo configurado em cada fonte ou em llm.model.
+        fontes:   Lista de IDs de fontes a gerar. Exemplos:
+                  ["youtube"] — so o feed do YouTube
+                  ["utilidades", "youtube", "noticias"] — grade completa
+                  ["musica:3"] — bloco musical com 3 faixas
+                  ["url:https://exemplo.com/artigo"] — episodio a partir de URL
+                  ["url:https://youtu.be/ID"] — episodio de video do YouTube (usa transcricao)
+                  ["url:https://a.com,https://b.com"] — episodio comparando duas URLs
+                  ["url:https://a.com|foca nos impactos economicos"] — URL com contexto
+                  ["url:https://a.com,https://b.com|compare as abordagens"] — multi-URL com contexto
+        model:    Modelo LLM para esta geracao (ex: "claude-haiku-4-5-20251001").
+                  Sobrescreve o modelo de cada fonte apenas para esta chamada — sem alterar config.yaml.
+                  Se vazio, usa o modelo configurado em cada fonte ou em llm.model.
+        publicar: Se False, o episodio e gerado como rascunho (status=draft) e nao aparece no player.
+                  Use publicar_episodio() para publicar depois. Padrao: True.
 
     URLs suportadas:
         - Qualquer pagina web: extrai texto via trafilatura, usa nome real do site e data de publicacao
@@ -126,9 +128,9 @@ def gerar_episodios(fontes: list[str], model: str = '') -> str:
         elif source_type == 'utility':
             path, log, err = _capture(radio_main._run_utility_source, source_cfg, config, first_of_day)
         elif source_type == 'combined':
-            path, log, err = _capture(radio_main._run_combined_source, source_cfg, config, credentials, seen_ids, first_of_day)
+            path, log, err = _capture(radio_main._run_combined_source, source_cfg, config, credentials, seen_ids, first_of_day, publish=publicar)
         else:
-            path, log, err = _capture(radio_main._run_source, source_cfg, config, credentials, seen_ids, first_of_day)
+            path, log, err = _capture(radio_main._run_source, source_cfg, config, credentials, seen_ids, first_of_day, publish=publicar)
 
         logs_all.append(f"[{source_id}]\n{log.strip()}")
 
@@ -142,12 +144,13 @@ def gerar_episodios(fontes: list[str], model: str = '') -> str:
             dur = meta.get('duration_seconds', 0)
             mins, secs = dur // 60, dur % 60
             results.append({
-                'fonte':   source_id,
-                'status':  'ok',
-                'nome':    meta.get('source_name', source_id),
-                'duracao': f"{mins}m {secs}s",
-                'itens':   meta.get('videos_covered', 0),
-                'arquivo': path,
+                'fonte':    source_id,
+                'status':   'ok',
+                'nome':     meta.get('source_name', source_id),
+                'duracao':  f"{mins}m {secs}s",
+                'itens':    meta.get('videos_covered', 0),
+                'arquivo':  path,
+                'publicado': meta.get('status', 'published') == 'published',
             })
             first_of_day = False
             seen_ids = load_seen_ids()
@@ -193,6 +196,86 @@ def limpar_historico() -> str:
         'itens_removidos':     len(dados_anteriores.get('seen_ids', [])),
         'episodios_removidos': len(dados_anteriores.get('episodes', [])),
         'mensagem':            'Historico limpo. Todos os conteudos estao elegiveis novamente.',
+    }, ensure_ascii=False, indent=2)
+
+
+def _update_episode_status(data: str, pasta: str, novo_status: str) -> dict:
+    ep_json = os.path.join(PROJECT_DIR, 'output', data, pasta, 'episode.json')
+    if not os.path.exists(ep_json):
+        return {'status': 'erro', 'mensagem': f"episode.json nao encontrado: {data}/{pasta}"}
+    with open(ep_json, 'r', encoding='utf-8') as f:
+        meta = json.load(f)
+    meta['status'] = novo_status
+    with open(ep_json, 'w', encoding='utf-8') as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+    return {'status': 'ok', 'episodio': f"{data}/{pasta}", 'novo_status': novo_status}
+
+
+@mcp.tool()
+def publicar_episodio(data: str, pasta: str) -> str:
+    """
+    Publica um episodio com status 'draft', tornando-o visivel no player.
+
+    Args:
+        data:  Data do episodio no formato YYYY-MM-DD. Exemplo: "2026-06-21"
+        pasta: Nome da pasta do episodio. Exemplo: "08-30_youtube"
+    """
+    return json.dumps(_update_episode_status(data, pasta, 'published'), ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def despublicar_episodio(data: str, pasta: str) -> str:
+    """
+    Move um episodio publicado para status 'draft', ocultando-o do player.
+
+    Args:
+        data:  Data do episodio no formato YYYY-MM-DD. Exemplo: "2026-06-21"
+        pasta: Nome da pasta do episodio. Exemplo: "08-30_youtube"
+    """
+    return json.dumps(_update_episode_status(data, pasta, 'draft'), ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def remover_episodio(data: str, pasta: str) -> str:
+    """
+    Remove permanentemente um episodio (pasta + audio) e limpa seus itens do historico,
+    tornando o conteudo elegivel para nova geracao.
+
+    Args:
+        data:  Data do episodio no formato YYYY-MM-DD. Exemplo: "2026-06-21"
+        pasta: Nome da pasta do episodio. Exemplo: "08-30_youtube"
+    """
+    import shutil as _shutil
+    ep_dir = os.path.join(PROJECT_DIR, 'output', data, pasta)
+    if not os.path.exists(ep_dir):
+        return json.dumps({'status': 'erro', 'mensagem': f"Episodio nao encontrado: {data}/{pasta}"},
+                          ensure_ascii=False, indent=2)
+
+    ep_id = f"{data}/{pasta}"
+    history_path = os.path.join(PROJECT_DIR, 'history.json')
+    items_removed = 0
+    if os.path.exists(history_path):
+        try:
+            with open(history_path, 'r', encoding='utf-8') as f:
+                hist = json.load(f)
+            ep_entry = next((e for e in hist.get('episodes', []) if e.get('episode_id') == ep_id), None)
+            if ep_entry:
+                id_set = {v['id'] for v in ep_entry.get('videos', [])}
+                hist['seen_ids'] = [i for i in hist.get('seen_ids', []) if i not in id_set]
+                hist['episodes'] = [e for e in hist.get('episodes', []) if e.get('episode_id') != ep_id]
+                items_removed = len(id_set)
+                with open(history_path, 'w', encoding='utf-8') as f:
+                    json.dump(hist, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            return json.dumps({'status': 'erro', 'mensagem': f"Erro ao limpar historico: {e}"},
+                              ensure_ascii=False, indent=2)
+
+    _shutil.rmtree(ep_dir, ignore_errors=True)
+    return json.dumps({
+        'status':         'ok',
+        'removido':       ep_id,
+        'itens_liberados': items_removed,
+        'mensagem':       'Episodio removido. Os itens estao elegiveis novamente.',
     }, ensure_ascii=False, indent=2)
 
 

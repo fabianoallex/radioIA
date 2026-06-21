@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
 import {
   ChevronLeft, ChevronRight, Download, Archive,
   Rss, Music, PlayCircle, BarChart2, TrendingUp,
   MessageSquare, Star, Film, BookOpen, Utensils,
   Book, HelpCircle, Mic, Package, Radio,
+  Eye, EyeOff, Trash2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { api } from "@/lib/api"
@@ -73,35 +74,81 @@ interface Episode {
   duracao_seg: number
   tamanho_bytes: number
   date: string
+  status: "published" | "draft"
 }
 
 // ─── EpisodeCard ────────────────────────────────────────────────
-function EpisodeCard({ ep }: { ep: Episode }) {
-  const streamUrl = `/api/episodes/${ep.date}/${ep.pasta}/stream`
-  const dlUrl     = `/api/episodes/${ep.date}/${ep.pasta}/download`
+function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) {
+  const streamUrl  = `/api/episodes/${ep.date}/${ep.pasta}/stream`
+  const dlUrl      = `/api/episodes/${ep.date}/${ep.pasta}/download`
+  const epPath     = `${ep.date}/${ep.pasta}`
+  const isDraft    = ep.status === "draft"
+
+  const toggleStatus = useMutation({
+    mutationFn: () => api.patch(`/episodes/${epPath}/status`, {
+      status: isDraft ? "published" : "draft",
+    }),
+    onSuccess: onMutated,
+  })
+
+  const remove = useMutation({
+    mutationFn: () => api.delete(`/episodes/${epPath}`),
+    onSuccess: onMutated,
+  })
+
+  const handleDelete = () => {
+    if (confirm(`Remover episódio "${ep.nome}" (${ep.horario})?\nOs itens usados voltarão ao histórico.`)) {
+      remove.mutate()
+    }
+  }
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div className={cn("rounded-lg border bg-card overflow-hidden", isDraft && "border-amber-500/40 opacity-80")}>
       <div className="flex items-center gap-3 px-4 py-3">
         <div className="rounded-md bg-primary/10 p-1.5 shrink-0">
           <EpIcon sourceId={ep.source_id} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground truncate">{ep.nome}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-foreground truncate">{ep.nome}</p>
+            {isDraft && (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 shrink-0">
+                rascunho
+              </span>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">{ep.source_id}</p>
         </div>
         <div className="text-right shrink-0">
           <p className="text-xs font-mono text-muted-foreground">{ep.horario}</p>
           <p className="text-xs text-muted-foreground">{fmtDuration(ep.duracao_seg)}</p>
         </div>
-        <a
-          href={dlUrl}
-          download
-          className="ml-2 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          title="Download"
-        >
-          <Download className="size-3.5" />
-        </a>
+        <div className="flex items-center gap-1 ml-2">
+          <button
+            onClick={() => toggleStatus.mutate()}
+            disabled={toggleStatus.isPending}
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40"
+            title={isDraft ? "Publicar" : "Mover para rascunho"}
+          >
+            {isDraft ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
+          </button>
+          <a
+            href={dlUrl}
+            download
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Download"
+          >
+            <Download className="size-3.5" />
+          </a>
+          <button
+            onClick={handleDelete}
+            disabled={remove.isPending}
+            className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-muted transition-colors disabled:opacity-40"
+            title="Remover episódio"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </div>
       </div>
 
       <div className="px-4 pb-3">
@@ -124,6 +171,8 @@ function EpisodeCard({ ep }: { ep: Episode }) {
 // ─── Page ───────────────────────────────────────────────────────
 export default function Episodes() {
   const [date, setDate] = useState(todayIso())
+  const queryClient = useQueryClient()
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["episodes", date] })
 
   const { data: datesData } = useQuery<{ dates: string[] }>({
     queryKey: ["episode-dates"],
@@ -236,7 +285,7 @@ export default function Episodes() {
         ) : (
           <div className="space-y-3 max-w-3xl">
             {episodes.map((ep) => (
-              <EpisodeCard key={ep.pasta} ep={ep} />
+              <EpisodeCard key={ep.pasta} ep={ep} onMutated={invalidate} />
             ))}
           </div>
         )}
