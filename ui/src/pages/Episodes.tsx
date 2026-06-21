@@ -128,6 +128,24 @@ function fmtNum(n: number | undefined): string {
   return n.toLocaleString("pt-BR")
 }
 
+function fmtHorario(h: string): string {
+  return h.replace(":", "h")
+}
+
+function fmtRelative(date: string, horario: string): string | null {
+  try {
+    const epTime = new Date(`${date}T${horario}:00`)
+    const diffMs = Date.now() - epTime.getTime()
+    if (diffMs < 0 || diffMs >= 12 * 60 * 60 * 1000) return null
+    const diffMin = Math.floor(diffMs / 60_000)
+    if (diffMin < 60) return `há ${diffMin} minuto${diffMin !== 1 ? "s" : ""}`
+    const diffH = Math.floor(diffMin / 60)
+    return `há ${diffH} hora${diffH !== 1 ? "s" : ""}`
+  } catch {
+    return null
+  }
+}
+
 // ─── TextSection (lazy, open controlado pelo pai) ───────────────
 function TextSection({ url, open }: { url: string; open: boolean }) {
   const { data, isFetching, isError } = useQuery<string>({
@@ -218,7 +236,8 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
           )}
         </div>
         <div className="text-right shrink-0">
-          <p className="text-xs font-mono text-muted-foreground">{ep.horario}</p>
+          <p className="text-xs font-mono text-muted-foreground">{fmtHorario(ep.horario)}</p>
+          {(() => { const rel = fmtRelative(ep.date, ep.horario); return rel && <p className="text-[10px] text-muted-foreground/60">({rel})</p> })()}
           <p className="text-xs text-muted-foreground">{fmtDuration(ep.duracao_seg)}</p>
         </div>
         <div className="flex items-center gap-1 ml-2">
