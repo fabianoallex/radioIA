@@ -568,6 +568,19 @@ export default function Schedule() {
                           {r.time} — {r.label || (r.sources ?? []).join(", ")}
                         </button>
                       ))}
+                      <button
+                        onClick={() => {
+                          setNewForm({ time: "", label: slot.label, sources_str: "", slot_id: "", replay_of: String(slot.slot_id) })
+                          setAddingNew(true)
+                          setEditingIdx(null)
+                          setActiveReplayListId(null)
+                          listRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+                        }}
+                        className="text-left text-xs px-2 py-1 rounded flex items-center gap-1.5 text-primary/60 hover:text-primary hover:bg-primary/5 transition-colors border-t border-border/30 mt-0.5 pt-1.5"
+                      >
+                        <Plus className="size-3" />
+                        Novo replay
+                      </button>
                     </div>
                   )}
 
