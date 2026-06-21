@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, Pencil, Trash2, Check, X, RefreshCw } from "lucide-react"
+import { Plus, Pencil, Trash2, Check, X, RefreshCw, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { api } from "@/lib/api"
 
@@ -227,12 +227,14 @@ function SlotRow({
   slot,
   isPast,
   isNext,
+  originalMissing,
   onEdit,
   onDelete,
 }: {
   slot: Slot
   isPast: boolean
   isNext: boolean
+  originalMissing: boolean
   onEdit: () => void
   onDelete: () => void
 }) {
@@ -243,6 +245,7 @@ function SlotRow({
       className={cn(
         "flex items-center gap-3 px-3 py-2 rounded-md group",
         isNext && "ring-1 ring-primary/50 bg-primary/5",
+        isNext && isReplay && originalMissing && "ring-amber-500/50 bg-amber-500/5",
         isPast && "opacity-40",
       )}
     >
@@ -260,9 +263,20 @@ function SlotRow({
       {/* Sources / replay badge */}
       <div className="hidden sm:flex items-center gap-1 shrink-0">
         {isReplay ? (
-          <span className={cn("text-xs px-1.5 py-0.5 rounded", slotBadgeClass(slot))}>
-            replay:{slot.replay_of}
-          </span>
+          <>
+            <span className={cn(
+              "text-xs px-1.5 py-0.5 rounded",
+              originalMissing ? "bg-amber-500/15 text-amber-400" : slotBadgeClass(slot)
+            )}>
+              replay:{slot.replay_of}
+            </span>
+            {originalMissing && (
+              <span className="flex items-center gap-0.5 text-xs text-amber-400/80">
+                <AlertTriangle className="size-3" />
+                original não gerado
+              </span>
+            )}
+          </>
         ) : (
           (slot.sources ?? []).slice(0, 2).map((s) => (
             <span key={s} className={cn("text-xs px-1.5 py-0.5 rounded truncate max-w-28", slotBadgeClass(slot))}>
@@ -324,6 +338,14 @@ export default function Schedule() {
     queryFn: () => api.get("/schedule"),
     staleTime: 30_000,
   })
+
+  const { data: replayStatus } = useQuery<{ date: string; missing: number[] }>({
+    queryKey: ["schedule-replay-status"],
+    queryFn: () => api.get("/schedule/replay-status"),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  })
+  const missingReplays = new Set(replayStatus?.missing ?? [])
 
   const slots = data?.slots ?? []
 
@@ -446,6 +468,7 @@ export default function Schedule() {
                     slot={slot}
                     isPast={isPast}
                     isNext={isNext}
+                    originalMissing={slot.replay_of != null && missingReplays.has(slot.replay_of)}
                     onEdit={() => startEdit(idx)}
                     onDelete={() => handleDelete(idx)}
                   />
