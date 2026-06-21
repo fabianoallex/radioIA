@@ -971,11 +971,10 @@ async function enterFallback() {
     // Só navega para o último dia com episódios se não estamos em hoje
     selectDate(latest, false);
   } else {
-    // Já estamos no lugar certo — apenas rola a playlist para o fim
-    // para que o item "próximo na grade" fique visível
+    // Já estamos no lugar certo — rola para o topo onde fica o próximo na grade
     setTimeout(() => {
       const pl = document.getElementById('playlist');
-      if (pl) pl.scrollTop = pl.scrollHeight;
+      if (pl) pl.scrollTop = 0;
     }, 200);
   }
 
