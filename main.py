@@ -24,6 +24,52 @@ load_dotenv(override=True)
 
 _STATUS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'geracao_status.json')
 
+# ── Log de geração ────────────────────────────────────────────────────────────
+
+class _Tee:
+    def __init__(self, *streams):
+        self._streams = streams
+    def write(self, data):
+        for s in self._streams:
+            try: s.write(data)
+            except Exception: pass
+    def flush(self):
+        for s in self._streams:
+            try: s.flush()
+            except Exception: pass
+
+_log_file = None
+_log_orig = None
+
+
+def _begin_log(output_dir: str):
+    global _log_file, _log_orig
+    _end_log()
+    os.makedirs(output_dir, exist_ok=True)
+    try:
+        _log_file = open(os.path.join(output_dir, 'generation.log'), 'w', encoding='utf-8', buffering=1)
+        _log_orig = sys.stdout
+        sys.stdout = _Tee(_log_orig, _log_file)
+    except Exception:
+        pass
+
+
+def _end_log():
+    global _log_file, _log_orig
+    if _log_orig is not None:
+        sys.stdout = _log_orig
+        _log_orig = None
+    if _log_file is not None:
+        try: _log_file.close()
+        except Exception: pass
+        _log_file = None
+
+
+import atexit as _atexit
+_atexit.register(_end_log)
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 
 def _write_status(source_id: str, source_name: str, etapa: str,
                   progresso: str = '', inicio: str = '', ativo: bool = True,
@@ -322,6 +368,7 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
     all_sources = config.get('sources', [])
     output_dir  = _episode_output_dir(source_id)
     temp_dir    = os.path.join(output_dir, 'temp')
+    _begin_log(output_dir)
 
     print(f"\n{'='*50}")
     print(f"Fonte: {source_name} (combined)")
@@ -362,7 +409,7 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
         print("  Nenhum conteudo novo encontrado.")
         _write_status(source_id, source_name, 'concluido',
                       progresso='sem conteudo novo', ativo=False, inicio=_inicio)
-        return None
+        _end_log(); return None
 
     print(f"  {len(items)} item(s) total.\n")
     _write_status(source_id, source_name, 'llm', progresso=f'{len(items)} itens', inicio=_inicio)
@@ -394,7 +441,7 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
         print("  Roteiro sem falas no formato esperado.")
         _write_status(source_id, source_name, 'erro',
                       progresso='roteiro sem falas', ativo=False, inicio=_inicio)
-        return None
+        _end_log(); return None
 
     _write_status(source_id, source_name, 'tts', progresso=f'{len(lines)} falas', inicio=_inicio)
     locutor_keys = ['LOCUTOR_A', 'LOCUTOR_B', 'LOCUTOR_C']
@@ -456,7 +503,7 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
     for i, item in enumerate(items, 1):
         print(f"  [{i}] {item['title'][:60]}")
         print(f"      {item.get('url', '')}")
-    return episode_path
+    _end_log(); return episode_path
 
 
 def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
@@ -475,6 +522,7 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
     output_dir = _episode_output_dir(source_id)
     temp_dir   = os.path.join(output_dir, 'temp')
     episode_id = '/'.join(output_dir.replace('\\', '/').split('/')[-2:])
+    _begin_log(output_dir)
 
     print(f"\n{'='*50}")
     print(f"Fonte: {source_name} ({source_type})")
@@ -541,7 +589,7 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
         print("  Nenhum conteudo novo encontrado.")
         _write_status(source_id, source_name, 'concluido',
                       progresso='sem conteudo novo', ativo=False, inicio=_inicio)
-        return None
+        _end_log(); return None
 
     print(f"  {len(items)} item(s) novo(s).\n")
     _write_status(source_id, source_name, 'llm',
@@ -571,7 +619,7 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
         print(script[:400])
         _write_status(source_id, source_name, 'erro',
                       progresso='roteiro sem falas', ativo=False, inicio=_inicio)
-        return None
+        _end_log(); return None
     _write_status(source_id, source_name, 'tts',
                   progresso=f'{len(lines)} falas', inicio=_inicio)
 
@@ -632,8 +680,7 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
     for i, item in enumerate(items, 1):
         print(f"  [{i}] {item['title'][:60]}")
         print(f"      {item['url']}")
-
-    return episode_path
+    _end_log(); return episode_path
 
 
 def _cmd_gen_time_clips():
