@@ -324,7 +324,8 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
     print(f"\n{'='*50}")
     print(f"Fonte: {source_name} (combined)")
     print(f"{'='*50}")
-    _inicio = _local_now().strftime('%H:%M:%S')
+    _start_dt = _local_now()
+    _inicio = _start_dt.strftime('%H:%M:%S')
     _write_status(source_id, source_name, 'buscando', inicio=_inicio)
 
     items = []
@@ -371,6 +372,7 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
     api_base   = llm_cfg.get('api_base')
 
     print(f"Gerando roteiro ({model})...")
+    _llm_t0 = _local_now()
     script = generate_script(
         items, narrators,
         {**source_config, 'type': 'combined'},
@@ -381,6 +383,7 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
         generation_time=_inicio[:5],
         prompt_log_path=os.path.join(output_dir, 'prompt.txt'),
     )
+    _llm_t1 = _local_now()
     print(f"  {len(script.split())} palavras.\n")
 
     print("Gerando audio...")
@@ -395,7 +398,9 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
     locutor_keys = ['LOCUTOR_A', 'LOCUTOR_B', 'LOCUTOR_C']
     voices       = {locutor_keys[i]: n['voice'] for i, n in enumerate(narrators)}
     tts_config   = config.get('tts', {})
+    _tts_t0 = _local_now()
     audio_files  = generate_audio_files(lines, voices, temp_dir, tts_config)
+    _tts_t1 = _local_now()
 
     vinheta_config = {**config.get('vinheta', {}), 'station_name': radio_name}
     vinhetas = generate_vinhetas(vinheta_config, temp_dir, tts_config)
@@ -409,6 +414,7 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
     links_text   = ' | '.join(f"[{i}] {v['title']} {v['url']}" for i, v in enumerate(items, 1))
 
     item_timestamps = {}
+    _mix_t0 = _local_now()
     duration = mix_episode(
         audio_files=audio_files,
         lines=lines,
@@ -419,10 +425,22 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
         station_name=radio_name,
         item_timestamps=item_timestamps,
     )
+    _mix_t1 = _local_now()
 
     _write_status(source_id, source_name, 'finalizando', inicio=_inicio)
+    _generation = {
+        'model':         model,
+        'started_at':    _start_dt.isoformat(timespec='seconds'),
+        'finished_at':   _mix_t1.isoformat(timespec='seconds'),
+        'total_seconds': round((_mix_t1 - _start_dt).total_seconds()),
+        'llm_seconds':   round((_llm_t1 - _llm_t0).total_seconds()),
+        'tts_seconds':   round((_tts_t1 - _tts_t0).total_seconds()),
+        'mix_seconds':   round((_mix_t1 - _mix_t0).total_seconds()),
+        'script_words':  len(script.split()),
+        'items_count':   len(items),
+    }
     save_episode_metadata(items, script, output_dir, duration, source_name=source_name,
-                          item_timestamps=item_timestamps)
+                          item_timestamps=item_timestamps, generation=_generation)
     save_episode_to_history(episode_id, items)
     shutil.rmtree(temp_dir, ignore_errors=True)
     _write_status(source_id, source_name, 'concluido', ativo=False, inicio=_inicio)
@@ -456,7 +474,8 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
     print(f"\n{'='*50}")
     print(f"Fonte: {source_name} ({source_type})")
     print(f"{'='*50}")
-    _inicio = _local_now().strftime('%H:%M:%S')
+    _start_dt = _local_now()
+    _inicio = _start_dt.strftime('%H:%M:%S')
     _write_status(source_id, source_name, 'buscando', inicio=_inicio)
 
     # Inject API key for YouTube source
@@ -531,11 +550,13 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
     model = source_config.get('model') or default_model
 
     print(f"Gerando roteiro ({model})...")
+    _llm_t0 = _local_now()
     script = generate_script(items, narrators, source_config,
                              is_first_of_day=is_first_of_day, station_name=radio_name,
                              model=model, api_base=api_base,
                              generation_time=_inicio[:5],
                              prompt_log_path=os.path.join(output_dir, 'prompt.txt'))
+    _llm_t1 = _local_now()
     print(f"  {len(script.split())} palavras.\n")
 
     print("Gerando audio...")
@@ -552,7 +573,9 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
     locutor_keys = ['LOCUTOR_A', 'LOCUTOR_B', 'LOCUTOR_C']
     voices = {locutor_keys[i]: n['voice'] for i, n in enumerate(narrators)}
     tts_config = config.get('tts', {})
+    _tts_t0 = _local_now()
     audio_files = generate_audio_files(lines, voices, temp_dir, tts_config)
+    _tts_t1 = _local_now()
 
     vinheta_config = {**config.get('vinheta', {}), 'station_name': radio_name}
     vinhetas = generate_vinhetas(vinheta_config, temp_dir, tts_config)
@@ -564,6 +587,7 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
     links_text = ' | '.join(f"[{i}] {v['title']} {v['url']}" for i, v in enumerate(items, 1))
 
     item_timestamps = {}
+    _mix_t0 = _local_now()
     duration = mix_episode(
         audio_files=audio_files,
         lines=lines,
@@ -574,10 +598,22 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
         station_name=radio_name,
         item_timestamps=item_timestamps,
     )
+    _mix_t1 = _local_now()
 
     _write_status(source_id, source_name, 'finalizando', inicio=_inicio)
+    _generation = {
+        'model':         model,
+        'started_at':    _start_dt.isoformat(timespec='seconds'),
+        'finished_at':   _mix_t1.isoformat(timespec='seconds'),
+        'total_seconds': round((_mix_t1 - _start_dt).total_seconds()),
+        'llm_seconds':   round((_llm_t1 - _llm_t0).total_seconds()),
+        'tts_seconds':   round((_tts_t1 - _tts_t0).total_seconds()),
+        'mix_seconds':   round((_mix_t1 - _mix_t0).total_seconds()),
+        'script_words':  len(script.split()),
+        'items_count':   len(items),
+    }
     save_episode_metadata(items, script, output_dir, duration, source_name=source_name,
-                          item_timestamps=item_timestamps)
+                          item_timestamps=item_timestamps, generation=_generation)
     save_episode_to_history(episode_id, items)
     shutil.rmtree(temp_dir)
     _write_status(source_id, source_name, 'concluido', ativo=False, inicio=_inicio)
