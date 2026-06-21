@@ -52,8 +52,8 @@ def _scan(dt: str) -> list[dict]:
     for folder in sorted(day_dir.iterdir(), reverse=True):
         if not folder.is_dir():
             continue
-        audio = folder / "episode.mp3"
-        if not audio.exists():
+        audio = _resolve_audio(dt, folder.name)
+        if not audio:
             continue
         meta: dict = {}
         ep_json = folder / "episode.json"
@@ -62,12 +62,11 @@ def _scan(dt: str) -> list[dict]:
                 meta = json.loads(ep_json.read_text(encoding="utf-8"))
             except Exception:
                 pass
-        # Folder format: HH-MM_source_id
         name = folder.name
         parts = name.split("_", 1)
         horario = parts[0].replace("-", ":") if len(parts) == 2 else ""
         source_id = parts[1] if len(parts) == 2 else name
-        result.append({
+        row: dict = {
             "pasta":         name,
             "horario":       horario,
             "source_id":     source_id,
@@ -78,7 +77,10 @@ def _scan(dt: str) -> list[dict]:
             "status":        meta.get("status", "published"),
             "links":         meta.get("links", []),
             "generation":    meta.get("generation"),
-        })
+        }
+        if meta.get("replay_of"):
+            row["replay_of"] = meta["replay_of"]
+        result.append(row)
     return result
 
 
