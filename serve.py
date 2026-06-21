@@ -809,20 +809,25 @@ function updateGeneratingItem(status) {
   // Cobre tanto o caso normal quanto reload de página (onde _genDoneSuppressed foi zerado).
   if (isDone) {
     if (_genDoneSuppressed) return;
-    // status.inicio = "HH:MM:SS"; e.time = "HHhMM" — converte para comparar
-    const inicioHHMM = (status.inicio || '').slice(0, 5).replace(':', 'h');
-    if (inicioHHMM) {
-      const loaded = allEpisodes.some(e =>
-        e.source_id === status.fonte && e.date === today && e.time >= inicioHHMM
-      );
-      if (loaded) { _genDoneSuppressed = true; return; }
-    }
-    // Episódio ainda não chegou: rastreia via IDs para detectar quando chegar
-    if (!_genDoneEpIds) {
-      _genDoneEpIds = new Set(allEpisodes.map(e => e.id));
-    } else if (allEpisodes.some(e => !_genDoneEpIds.has(e.id))) {
+    // Rascunho: mostra feedback brevemente e encerra — draft nunca aparece na playlist
+    if (status.publicar === false) {
       _genDoneSuppressed = true;
-      return;
+    } else {
+      // status.inicio = "HH:MM:SS"; e.time = "HHhMM" — converte para comparar
+      const inicioHHMM = (status.inicio || '').slice(0, 5).replace(':', 'h');
+      if (inicioHHMM) {
+        const loaded = allEpisodes.some(e =>
+          e.source_id === status.fonte && e.date === today && e.time >= inicioHHMM
+        );
+        if (loaded) { _genDoneSuppressed = true; return; }
+      }
+      // Episódio ainda não chegou: rastreia via IDs para detectar quando chegar
+      if (!_genDoneEpIds) {
+        _genDoneEpIds = new Set(allEpisodes.map(e => e.id));
+      } else if (allEpisodes.some(e => !_genDoneEpIds.has(e.id))) {
+        _genDoneSuppressed = true;
+        return;
+      }
     }
   }
 
@@ -832,7 +837,7 @@ function updateGeneratingItem(status) {
     tts:         'sintetizando voz',
     mixando:     'mixando áudio',
     finalizando: 'finalizando',
-    concluido:   'episódio pronto — carregando...',
+    concluido:   status.publicar === false ? 'gerado como rascunho' : 'episódio pronto — carregando...',
     erro:        status.erro || 'erro na geração',
   };
   const etapaText = etapaLabels[status.etapa] || status.etapa || '';
@@ -1647,6 +1652,7 @@ def _add_episode(episodes: list, ep_path: str, ep_id: str, date: str, source_id:
         'duration':       meta.get('duration_seconds', 0),
         'videos_covered': meta.get('videos_covered', 0),
         'links':          meta.get('links', []),
+        'status':         meta.get('status', 'published'),
     })
 
 
@@ -1680,7 +1686,7 @@ def scan_episodes():
             source_id = '_'.join(parts[2:]) if len(parts) > 2 else entry
             _add_episode(episodes, entry_path, entry, date, source_id)
 
-    return episodes
+    return [e for e in episodes if e.get('status', 'published') != 'draft']
 
 
 def _extra_music_paths() -> list[str]:
@@ -2024,6 +2030,56 @@ def api_geracao_status():
 @app.route('/api/episodes')
 def api_episodes():
     return jsonify(scan_episodes())
+
+
+@app.route('/api/episodes/<path:ep_id>/status', methods=['PATCH'])
+def patch_episode_status(ep_id):
+    from flask import request as _req
+    data = _req.get_json(silent=True) or {}
+    new_status = data.get('status')
+    if new_status not in ('published', 'draft'):
+        return jsonify({'error': 'status inválido — use published ou draft'}), 400
+    ep_dir = os.path.join(OUTPUT_DIR, ep_id.replace('/', os.sep))
+    meta_path = os.path.join(ep_dir, 'episode.json')
+    if not os.path.exists(meta_path):
+        return jsonify({'error': 'episódio não encontrado'}), 404
+    try:
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+        meta['status'] = new_status
+        with open(meta_path, 'w', encoding='utf-8') as f:
+            json.dump(meta, f, ensure_ascii=False, indent=2)
+        return jsonify({'status': new_status})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/episodes/<path:ep_id>', methods=['DELETE'])
+def delete_episode(ep_id):
+    ep_dir = os.path.join(OUTPUT_DIR, ep_id.replace('/', os.sep))
+    if not os.path.exists(ep_dir):
+        return jsonify({'error': 'episódio não encontrado'}), 404
+
+    history_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'history.json')
+    items_removed = 0
+    if os.path.exists(history_path):
+        try:
+            with open(history_path, 'r', encoding='utf-8') as f:
+                hist = json.load(f)
+            ep_entry = next((e for e in hist.get('episodes', []) if e.get('episode_id') == ep_id), None)
+            if ep_entry:
+                id_set = {v['id'] for v in ep_entry.get('videos', [])}
+                hist['seen_ids'] = [i for i in hist.get('seen_ids', []) if i not in id_set]
+                hist['episodes'] = [e for e in hist.get('episodes', []) if e.get('episode_id') != ep_id]
+                items_removed = len(id_set)
+                with open(history_path, 'w', encoding='utf-8') as f:
+                    json.dump(hist, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    import shutil as _shutil
+    _shutil.rmtree(ep_dir, ignore_errors=True)
+    return jsonify({'deleted': ep_id, 'items_removed': items_removed})
 
 
 @app.route('/api/script/<path:ep_id>')

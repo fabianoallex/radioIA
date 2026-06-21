@@ -59,6 +59,7 @@ export default function Generator() {
   const [urlContext, setUrlContext] = useState("")
 
   // compartilhado
+  const [publish, setPublish] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const [logLines, setLogLines] = useState<string[]>([])
   const [done, setDone] = useState<boolean | null>(null)
@@ -119,7 +120,7 @@ export default function Generator() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sources: buildSourceArgs() }),
+        body: JSON.stringify({ sources: buildSourceArgs(), publicar: publish }),
       })
 
       if (!res.body) throw new Error("Sem stream")
@@ -348,6 +349,33 @@ export default function Generator() {
               </div>
             </div>
           )}
+
+          {/* Publish toggle — shared footer */}
+          <div className="border-t px-3 py-2.5 shrink-0">
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <div
+                onClick={() => setPublish((v) => !v)}
+                className={cn(
+                  "size-4 rounded border-2 shrink-0 flex items-center justify-center transition-colors",
+                  publish
+                    ? "border-primary bg-primary"
+                    : "border-muted-foreground/40 group-hover:border-muted-foreground",
+                )}
+              >
+                {publish && (
+                  <svg className="size-2.5 text-white" fill="none" viewBox="0 0 10 8">
+                    <path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </div>
+              <span
+                className="text-xs text-muted-foreground group-hover:text-foreground transition-colors select-none"
+                onClick={() => setPublish((v) => !v)}
+              >
+                Publicar ao gerar
+              </span>
+            </label>
+          </div>
         </div>
 
         {/* Right — log */}

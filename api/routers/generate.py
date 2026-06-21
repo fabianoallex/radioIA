@@ -13,6 +13,7 @@ router = APIRouter(tags=["generate"])
 
 class GenerateBody(BaseModel):
     sources: list[str]       # ["youtube", "noticias|foco em tech", "musica:3"]
+    publicar: bool = True    # False → passa --draft para main.py
 
 
 @router.post("/generate")
@@ -23,6 +24,8 @@ async def generate(body: GenerateBody):
         return StreamingResponse(empty(), media_type="text/event-stream")
 
     cmd = [sys.executable, "-u", str(PROJECT_DIR / "main.py")] + body.sources
+    if not body.publicar:
+        cmd.append("--draft")
 
     async def event_stream():
         try:

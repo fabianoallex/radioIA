@@ -95,7 +95,8 @@ def mix_episode(audio_files: list[str], lines: list[dict], output_path: str,
 def save_episode_metadata(videos: list[dict], script: str, output_dir: str,
                           duration_secs: float, source_name: str = '',
                           item_timestamps: dict | None = None,
-                          generation: dict | None = None) -> dict:
+                          generation: dict | None = None,
+                          publish: bool = True) -> dict:
     links = []
     for i, v in enumerate(videos, 1):
         link = {
@@ -110,6 +111,7 @@ def save_episode_metadata(videos: list[dict], script: str, output_dir: str,
             link['start_time_seconds'] = item_timestamps[i]
         links.append(link)
     metadata = {
+        'status': 'published' if publish else 'draft',
         'source_name': source_name,
         'duration_seconds': round(duration_secs),
         'videos_covered': len(videos),
