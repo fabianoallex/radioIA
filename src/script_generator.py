@@ -191,9 +191,12 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
     elif source_type == 'horoscopo':
         cards = [_build_horoscopo_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _horoscopo_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
-    elif source_type == 'rss' or source_type == 'efemerides' or source_type == 'megacurioso':
+    elif source_type == 'rss' or source_type == 'efemerides':
         cards = [_build_news_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _news_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
+    elif source_type == 'megacurioso':
+        cards = [_build_megacurioso_card(i, item) for i, item in enumerate(items, 1)]
+        prompt = _megacurioso_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
     elif source_type == 'reddit':
         cards = [_build_reddit_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _reddit_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
@@ -310,6 +313,87 @@ REGRAS:
 - NÃO invente informacões
 
 VIDEOS DO DIA:
+{content}
+
+Roteiro:"""
+
+
+def _build_megacurioso_card(i: int, item: dict) -> str:
+    age_str  = _format_age(item.get('published_at', ''))
+    category = item.get('channel', item.get('source_name', ''))
+    pub_info = f"\nPublicado: {age_str}" if age_str else ''
+    cat_info = f"\nCategoria: {category}" if category else ''
+    return (
+        f"[Curiosidade {i}]\n"
+        f"Título: {item['title']}"
+        f"{cat_info}"
+        f"{pub_info}\n"
+        f"Conteúdo: {item.get('text', '')}"
+    )
+
+
+def _megacurioso_prompt(narrators: list[dict], names: list[str], source_name: str,
+                        content: str, is_first_of_day: bool = True,
+                        station_name: str = 'RadioIA') -> str:
+    n = len(narrators)
+    narrator_block = _narrator_block(narrators)
+    format_block   = _format_block(narrators)
+    names_str = ', '.join(names[:-1]) + f' e {names[-1]}' if n > 1 else names[0]
+
+    solo_note = (
+        "- Apresentação solo: fale diretamente com o ouvinte, tom curioso e envolvente"
+        if n == 1 else
+        f"- Distribua as falas entre os {n} apresentadores: quem apresenta, quem reage com espanto ou humor"
+    )
+
+    if is_first_of_day:
+        abertura = (
+            f"1. ABERTURA DO DIA: {names_str} dão bom dia, dizem que os ouvintes estão "
+            f'na {station_name} e apresentam o quadro "{source_name}" com curiosidades do dia (2-3 falas)'
+        )
+        encerramento = "4. Encerramento: deixe o ouvinte com vontade de aprender mais e convide a continuar ouvindo (1-2 falas)"
+    else:
+        abertura = (
+            f'1. ENTRADA DO QUADRO: entre direto no clima de curiosidade — '
+            f'"Você sabia que...", "Chegou mais uma do {source_name}!", "Isso é incrível!" ou similar. '
+            f'SEM bom dia, SEM reapresentação. (1-2 falas)'
+        )
+        encerramento = "4. Encerramento rápido sinalizando que a programação continua (1 fala)"
+
+    return f"""Você é um roteirista de rádio FM brasileira especializado em curiosidades e entretenimento.
+Crie o roteiro do quadro "{source_name}".
+
+APRESENTADORES:
+{narrator_block}
+
+{format_block}
+
+ATENÇÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentários fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
+
+PERSONALIDADES: respeite o perfil de cada apresentador — a curiosidade e o espanto devem soar autênticos para cada um.
+
+ESTILO:
+- Tom: leve, curioso, envolvente — como contar uma história fascinante para um amigo
+- Use linguagem como "você sabia que...", "é incrível mas...", "imagina só...", "pesquisadores descobriram que..."
+- Provoque curiosidade antes de revelar o fato principal
+- Reações são bem-vindas: espanto, humor, admiração — conforme a personalidade de cada um
+- NUNCA chame o conteúdo de "notícia" ou "matéria jornalística" — use "curiosidade", "artigo", "assunto"
+
+ESTRUTURA:
+{abertura}
+2. Para cada curiosidade: 3-4 falas — gancho, desenvolvimento, fato surpreendente, reflexão final
+3. Transições com energia ("E olha essa!", "Mudando de assunto, mas igualmente incrível...", "Agora imagina...")
+{encerramento}
+
+REGRAS:
+- Cada fala: máximo 2 sentenças
+- Explore o aspecto mais surpreendente ou contraintuitivo do conteúdo
+- Diga "link do artigo nas notas do episódio" (não "matéria")
+{solo_note}
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Curiosidade 1; [ITEM_2] antes da Curiosidade 2 etc. — NÃO usar na abertura nem no encerramento
+- NÃO invente informações — baseie-se apenas no conteúdo fornecido
+
+CURIOSIDADES:
 {content}
 
 Roteiro:"""
