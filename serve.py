@@ -225,6 +225,9 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
 .ep-item.active { background: #1e1b4b; border-color: #6366f1; }
 .ep-item.played { opacity: .5; }
 .ep-item.new-ep  { border-left-color: #10b981; background: #064e3b22; }
+.ep-new-badge    { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+                   background: #064e3b; color: #6ee7b7; border-radius: 3px;
+                   padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
 .ep-item.ep-replay { border-left-color: #d97706; }
 .ep-replay-meta { color: #9ca3af; }
 .ep-replay-tag  { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
@@ -522,6 +525,7 @@ let fallbackMode  = false;
 let fallbackIdx   = 0;
 let _genDoneEpIds       = null;   // IDs capturados quando geração concluiu
 let _genDoneSuppressed  = false;  // true = episódio já carregou, suprimir item até nova geração
+const _newEpIds         = new Set(); // IDs de episódios novos desta sessão (não persiste em reload)
 let _fallbackTrackCount      = 0;
 let _episodeTransitionCount  = 0;
 let _playingAnnouncement     = false;   // suprime ended global durante qualquer break
@@ -886,16 +890,25 @@ async function pollEpisodes() {
       return;
     }
 
+    if (!newOnes.length) {
+      // Apenas remoção — re-render sem badges novos
+      allEpisodes = fresh;
+      rerenderCurrentDay();
+      return;
+    }
+
+    // Marca novos episódios do dia ANTES do re-render para badge aparecer direto
+    const todayNew = newOnes.filter(e => e.date === currentDate);
+    todayNew.forEach(e => _newEpIds.add(e.id));
+
     allEpisodes = fresh;
     rerenderCurrentDay();
 
-    if (!newOnes.length) return;  // apenas remoção/ocultação — não mostra toast
-
-    const todayNew = newOnes.filter(e => e.date === currentDate);
     if (!todayNew.length) return;
 
+    showToast(`Novo episódio: ${todayNew[0].source_name || todayNew[0].source_id}`, false);
+
     if (fallbackMode) {
-      showToast(`Novo episódio: ${todayNew[0].source_name || todayNew[0].source_id}`, false);
       const audio = document.getElementById('audio');
       if (!audio.paused) {
         exitFallback(todayNew[0]);
@@ -903,11 +916,7 @@ async function pollEpisodes() {
         // Pausado no modo musical — sai do modo mas não inicia o episódio
         fallbackMode = false;
         document.getElementById('music-mode-btn').classList.remove('active');
-        markNewEpisodes(todayNew.map(e => e.id));
       }
-    } else {
-      showToast(`Novo episódio: ${todayNew[0].source_name || todayNew[0].source_id}`, false);
-      markNewEpisodes(todayNew.map(e => e.id));
     }
   } catch (_) {}
 }
@@ -926,10 +935,7 @@ function rerenderCurrentDay() {
 }
 
 function markNewEpisodes(ids) {
-  ids.forEach(id => {
-    const el = document.querySelector(`.ep-item[data-id="${id}"]`);
-    if (el) el.classList.add('new-ep');
-  });
+  ids.forEach(id => _newEpIds.add(id));
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -1313,11 +1319,13 @@ function renderPlaylist(eps) {
         ` · <span class="ep-dl-link" onclick="event.stopPropagation();shareEp('${eid}','${enam}')">compartilhar</span>`
       : '';
     const metaLine2 = [cnt, dlLinks].filter(Boolean).join(' · ');
-    return `<div class="ep-item${ep.replay_of ? ' ep-replay' : ''}" data-id="${ep.id}" onclick="onEpClick('${eid}')">
+    const isNew = _newEpIds.has(ep.id);
+    const newBadge = isNew ? '<span class="ep-new-badge">novo</span>' : '';
+    return `<div class="ep-item${ep.replay_of ? ' ep-replay' : ''}${isNew ? ' new-ep' : ''}" data-id="${ep.id}" onclick="onEpClick('${eid}')">
       ${checkHtml}
       <div class="ep-dot"></div>
       <div style="min-width:0;flex:1">
-        <div class="ep-label">${name}</div>
+        <div class="ep-label">${name}${newBadge}</div>
         ${replayMeta}
         ${metaLine1 ? `<div class="ep-meta">${metaLine1}</div>` : ''}
         ${metaLine2 ? `<div class="ep-meta">${metaLine2}</div>` : ''}
@@ -1339,6 +1347,7 @@ function onEpClick(epId) {
 function playEpisode(ep) {
   if (!ep) return;
   fallbackMode = false;
+  _newEpIds.delete(ep.id);
   currentEp = ep;
   _lastSave = 0;
   localStorage.setItem(S_EP,   ep.id);
