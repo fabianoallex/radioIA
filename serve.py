@@ -1260,7 +1260,7 @@ function _tickCountdown() {
     appendNextScheduled();
     return;
   }
-  const meta = el.querySelector('.ep-meta');
+  const meta = el.querySelector('.ep-next-meta');
   if (meta) meta.textContent = _countdownMeta();
 }
 
@@ -1292,11 +1292,15 @@ function appendNextScheduled() {
         el.style.cursor = 'pointer';
         el.title = 'Ver grade completa do dia';
         el.onclick = showSchedule;
+        const replayRow = next.is_replay
+          ? `<div class="ep-meta ep-replay-meta"><span class="ep-replay-tag">↩ replay</span></div>`
+          : '';
         el.innerHTML =
           `<div class="ep-dot"></div>` +
           `<div style="min-width:0">` +
             `<div class="ep-label">${next.time_display} &mdash; ${next.label}</div>` +
-            `<div class="ep-meta">${_countdownMeta()}</div>` +
+            replayRow +
+            `<div class="ep-meta ep-next-meta">${_countdownMeta()}</div>` +
           `</div>`;
         // Inicia countdown se faltam ≤ 5 min (+ margem de 30s)
         if (next.target_ts) {
@@ -2333,6 +2337,15 @@ def api_next_scheduled():
         now_time   = now.strftime('%H:%M')
         today_wd   = now.weekday()
 
+        # Carrega programacao_map para validar replays
+        pmap_today = {}
+        try:
+            with open('scheduler_state.json', 'r', encoding='utf-8') as _sf:
+                _st = json.load(_sf)
+            pmap_today = _st.get('programacao_map', {}).get(today_str, {})
+        except Exception:
+            pass
+
         upcoming = []
         for entry in schedule:
             entry_date = entry.get('date')
@@ -2344,13 +2357,24 @@ def api_next_scheduled():
             days = entry.get('days')
             if days and not any(_DAYS.get(str(d).lower(), -1) == today_wd for d in days):
                 continue
+            replay_of = entry.get('replay_of')
+            if replay_of is not None:
+                ep_id = pmap_today.get(str(replay_of))
+                if not ep_id:
+                    continue  # original não foi gerado ainda, ignora
+                orig_mp3 = os.path.join(OUTPUT_DIR, ep_id, 'episode.mp3')
+                if not os.path.exists(orig_mp3):
+                    continue  # MP3 original sumiu, ignora
             label = entry.get('label', '')
             if not label:
                 sources = entry.get('sources', [])
-                label = 'Replay' if entry.get('replay_of') else ', '.join(str(s) for s in sources)
+                label = 'Replay' if replay_of is not None else ', '.join(str(s) for s in sources)
             h, m = t.split(':')
-            upcoming.append({'time': t, 'time_display': f"{int(h)}h{m}", 'label': label,
-                             'scheduler_active': True})
+            row = {'time': t, 'time_display': f"{int(h)}h{m}", 'label': label,
+                   'scheduler_active': True}
+            if replay_of is not None:
+                row['is_replay'] = True
+            upcoming.append(row)
 
         if not upcoming:
             return jsonify(None)
