@@ -2092,6 +2092,25 @@ def delete_episode(ep_id):
         except Exception:
             pass
 
+    # Se geracao_status ainda aponta para este episódio como concluído, neutraliza
+    parts = ep_id.split('/', 1)
+    date_part   = parts[0] if len(parts) > 1 else ''
+    folder_part = parts[1] if len(parts) > 1 else ep_id
+    source_id   = folder_part.split('_', 1)[1] if '_' in folder_part else folder_part
+    try:
+        if os.path.exists(_STATUS_FILE):
+            with open(_STATUS_FILE, 'r', encoding='utf-8') as _sf:
+                _st = json.load(_sf)
+            if (not _st.get('ativo')
+                    and _st.get('etapa') == 'concluido'
+                    and _st.get('fonte') == source_id
+                    and _st.get('data') == date_part):
+                _st['etapa'] = 'cancelado'
+                with open(_STATUS_FILE, 'w', encoding='utf-8') as _sf:
+                    json.dump(_st, _sf, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
     import shutil as _shutil
     _shutil.rmtree(ep_dir, ignore_errors=True)
     return jsonify({'deleted': ep_id, 'items_removed': items_removed})

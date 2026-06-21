@@ -10,8 +10,25 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel
 
-OUTPUT_DIR = Path(__file__).parent.parent.parent / "output"
+OUTPUT_DIR   = Path(__file__).parent.parent.parent / "output"
 HISTORY_PATH = Path(__file__).parent.parent.parent / "history.json"
+GEN_STATUS   = Path(__file__).parent.parent.parent / "geracao_status.json"
+
+
+def _clear_gen_status_if_matches(source_id: str, date: str) -> None:
+    """Se geracao_status.json aponta para este episódio como 'concluido', neutraliza o etapa."""
+    if not GEN_STATUS.exists():
+        return
+    try:
+        st = json.loads(GEN_STATUS.read_text(encoding="utf-8"))
+        if (not st.get("ativo")
+                and st.get("etapa") == "concluido"
+                and st.get("fonte") == source_id
+                and st.get("data") == date):
+            st["etapa"] = "cancelado"
+            GEN_STATUS.write_text(json.dumps(st, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 router = APIRouter(tags=["episodes"])
@@ -266,6 +283,9 @@ def delete_episode(dt: str, folder: str):
                 HISTORY_PATH.write_text(json.dumps(hist, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:
             pass
+
+    source_id = folder.split("_", 1)[1] if "_" in folder else folder
+    _clear_gen_status_if_matches(source_id, dt)
 
     shutil.rmtree(str(ep_dir), ignore_errors=True)
     return {"deleted": ep_id, "items_removed": items_removed}
