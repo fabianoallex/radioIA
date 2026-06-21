@@ -2,7 +2,7 @@ import { useState, useMemo } from "react"
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  Download, Archive,
+  Download, Archive, Repeat,
   Rss, Music, PlayCircle, BarChart2, TrendingUp,
   MessageSquare, Star, Film, BookOpen, Utensils,
   Book, HelpCircle, Mic, Package, Radio,
@@ -167,6 +167,11 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
     onSuccess: onMutated,
   })
 
+  const replay = useMutation({
+    mutationFn: () => api.post(`/episodes/${epPath}/replay`),
+    onSuccess: onMutated,
+  })
+
   const remove = useMutation({
     mutationFn: () => api.delete(`/episodes/${epPath}`),
     onSuccess: onMutated,
@@ -212,6 +217,14 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
               {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
             </button>
           )}
+          <button
+            onClick={() => replay.mutate()}
+            disabled={replay.isPending}
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40"
+            title="Replay — republicar no horário atual"
+          >
+            <Repeat className={cn("size-3.5", replay.isPending && "animate-spin")} />
+          </button>
           <button
             onClick={() => toggleStatus.mutate()}
             disabled={toggleStatus.isPending}
@@ -310,8 +323,8 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
                   {gen.started_at && (
                     <span className="flex items-center gap-1 text-muted-foreground">
                       <Clock className="size-3" />
-                      {gen.started_at.slice(11, 19)}
-                      {gen.finished_at && <> → {gen.finished_at.slice(11, 19)}</>}
+                      {gen.started_at.slice(11, 16).replace(":", "h")}
+                      {gen.finished_at && <> → {gen.finished_at.slice(11, 16).replace(":", "h")}</>}
                     </span>
                   )}
                 </div>

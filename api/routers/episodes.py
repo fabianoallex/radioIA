@@ -32,7 +32,7 @@ def _scan(dt: str) -> list[dict]:
     if not day_dir.exists():
         return []
     result = []
-    for folder in sorted(day_dir.iterdir()):
+    for folder in sorted(day_dir.iterdir(), reverse=True):
         if not folder.is_dir():
             continue
         audio = folder / "episode.mp3"
@@ -111,12 +111,31 @@ def export_zip(dt: str):
     )
 
 
+def _resolve_audio(dt: str, folder: str) -> Path | None:
+    """Retorna o Path do MP3, seguindo audio_path em replays."""
+    direct = OUTPUT_DIR / dt / folder / "episode.mp3"
+    if direct.exists():
+        return direct
+    ep_json = OUTPUT_DIR / dt / folder / "episode.json"
+    if ep_json.exists():
+        try:
+            meta = json.loads(ep_json.read_text(encoding="utf-8"))
+            ap = meta.get("audio_path", "")
+            if ap:
+                p = Path(ap)
+                if p.exists():
+                    return p
+        except Exception:
+            pass
+    return None
+
+
 @router.get("/episodes/{dt}/{folder}/stream")
 def stream_audio(dt: str, folder: str):
     _chk_date(dt)
     _chk_folder(folder)
-    audio = OUTPUT_DIR / dt / folder / "episode.mp3"
-    if not audio.exists():
+    audio = _resolve_audio(dt, folder)
+    if not audio:
         raise HTTPException(404, "Áudio não encontrado")
     return FileResponse(str(audio), media_type="audio/mpeg")
 
@@ -125,8 +144,8 @@ def stream_audio(dt: str, folder: str):
 def download_audio(dt: str, folder: str):
     _chk_date(dt)
     _chk_folder(folder)
-    audio = OUTPUT_DIR / dt / folder / "episode.mp3"
-    if not audio.exists():
+    audio = _resolve_audio(dt, folder)
+    if not audio:
         raise HTTPException(404, "Áudio não encontrado")
     return FileResponse(
         str(audio),
@@ -153,6 +172,55 @@ def get_script(dt: str, folder: str):
     if not f.exists():
         raise HTTPException(404, "script.txt não encontrado")
     return PlainTextResponse(f.read_text(encoding="utf-8"))
+
+
+@router.post("/episodes/{dt}/{folder}/replay")
+def replay_episode(dt: str, folder: str, target_dt: str | None = None):
+    _chk_date(dt)
+    _chk_folder(folder)
+
+    orig_dir = OUTPUT_DIR / dt / folder
+    orig_mp3 = orig_dir / "episode.mp3"
+    orig_json = orig_dir / "episode.json"
+
+    if not orig_dir.exists():
+        raise HTTPException(404, "Episódio não encontrado")
+
+    # Aceita replays mesmo quando o áudio está via audio_path (replay de replay)
+    audio_path = _resolve_audio(dt, folder)
+    if not audio_path:
+        raise HTTPException(400, "Episódio sem áudio disponível para replay")
+
+    if target_dt:
+        _chk_date(target_dt)
+    else:
+        target_dt = datetime.now().strftime("%Y-%m-%d")
+
+    now = datetime.now().strftime("%H-%M")
+    source_id = folder.split("_", 1)[1] if "_" in folder else folder
+    replay_folder = f"{now}_{source_id}"
+    replay_dir = OUTPUT_DIR / target_dt / replay_folder
+
+    replay_dir.mkdir(parents=True, exist_ok=True)
+
+    meta: dict = {}
+    if orig_json.exists():
+        try:
+            meta = json.loads(orig_json.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    # Remove campos de geração — o replay não é um novo episódio gerado
+    meta.pop("generation", None)
+    meta["audio_path"] = str(audio_path.resolve())
+    meta["replay_of"] = f"{dt}/{folder}"
+    meta["status"] = "published"
+
+    (replay_dir / "episode.json").write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    return {"replay": f"{target_dt}/{replay_folder}", "original": f"{dt}/{folder}"}
 
 
 class StatusBody(BaseModel):
