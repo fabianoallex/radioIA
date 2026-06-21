@@ -1562,7 +1562,7 @@ async function shareEp(epId, name) {
 }
 
 async function downloadDayConcat() {
-  const ids = [...selectedEpIds];
+  const ids = [...selectedEpIds].sort();
   if (!ids.length) return;
   _resetDlTimer();
   const btn  = document.getElementById('dl-concat-btn');
@@ -1594,7 +1594,7 @@ async function downloadDayConcat() {
 }
 
 async function downloadDayZip() {
-  const ids = [...selectedEpIds];
+  const ids = [...selectedEpIds].sort();
   if (!ids.length) return;
   _resetDlTimer();
   const btn  = document.getElementById('dl-zip-btn');
