@@ -75,7 +75,7 @@ class TestUtilityPrompt:
             [_utility_item()], narrators,
             {'type': 'utility', 'name': 'Resumo', 'context': 'foco no agronegócio'},
         )
-        assert 'INSTRUCAO DO PRODUTOR: foco no agronegócio' in captured['prompt']
+        assert 'INSTRUÇÃO DO PRODUTOR: foco no agronegócio' in captured['prompt']
 
     def test_utility_narrator_names_in_prompt(self, narrators, monkeypatch):
         captured = {}
@@ -107,7 +107,7 @@ class TestCombinedPrompt:
             [_news_item()], narrators,
             {'type': 'combined', 'name': 'Bom Dia', 'context': 'tom animado, foco no dia'},
         )
-        assert 'INSTRUCAO DO PRODUTOR: tom animado, foco no dia' in captured['prompt']
+        assert 'INSTRUÇÃO DO PRODUTOR: tom animado, foco no dia' in captured['prompt']
 
     def test_combined_multiple_items_all_in_prompt(self, narrators, monkeypatch):
         captured = {}

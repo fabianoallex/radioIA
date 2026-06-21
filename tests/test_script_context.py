@@ -1,4 +1,4 @@
-"""Testa a injeção de context (INSTRUCAO DO PRODUTOR) em generate_script().
+"""Testa a injeção de context (INSTRUÇÃO DO PRODUTOR) em generate_script().
 
 O campo source_config['context'] deve aparecer no prompt enviado ao LLM,
 imediatamente antes de 'Roteiro:', para qualquer tipo de source.
@@ -52,7 +52,7 @@ class TestContextInjection:
             {'type': 'rss', 'name': 'Notícias', 'context': 'foca nos impactos econômicos'},
         )
 
-        assert 'INSTRUCAO DO PRODUTOR: foca nos impactos econômicos' in captured['prompt']
+        assert 'INSTRUÇÃO DO PRODUTOR: foca nos impactos econômicos' in captured['prompt']
 
     def test_context_placed_immediately_before_roteiro(self, narrators, item, monkeypatch):
         captured = {}
@@ -64,7 +64,7 @@ class TestContextInjection:
         )
 
         prompt = captured['prompt']
-        instrucao_pos = prompt.index('INSTRUCAO DO PRODUTOR')
+        instrucao_pos = prompt.index('INSTRUÇÃO DO PRODUTOR')
         roteiro_pos   = prompt.rindex('Roteiro:')
         assert instrucao_pos < roteiro_pos
         # Nada entre a instrução e Roteiro: além de espaços/newlines
@@ -78,7 +78,7 @@ class TestContextInjection:
 
         generate_script([item], narrators, {'type': 'rss', 'name': 'Notícias'})
 
-        assert 'INSTRUCAO DO PRODUTOR' not in captured['prompt']
+        assert 'INSTRUÇÃO DO PRODUTOR' not in captured['prompt']
 
     def test_empty_context_string_no_block(self, narrators, item, monkeypatch):
         captured = {}
@@ -89,7 +89,7 @@ class TestContextInjection:
             {'type': 'rss', 'name': 'Notícias', 'context': ''},
         )
 
-        assert 'INSTRUCAO DO PRODUTOR' not in captured['prompt']
+        assert 'INSTRUÇÃO DO PRODUTOR' not in captured['prompt']
 
     def test_context_works_for_url_type(self, narrators, item, monkeypatch):
         captured = {}
@@ -105,7 +105,7 @@ class TestContextInjection:
             },
         )
 
-        assert 'INSTRUCAO DO PRODUTOR: extraia os pontos técnicos' in captured['prompt']
+        assert 'INSTRUÇÃO DO PRODUTOR: extraia os pontos técnicos' in captured['prompt']
 
     def test_context_works_for_reddit_type(self, narrators, item, monkeypatch):
         captured = {}
@@ -117,7 +117,7 @@ class TestContextInjection:
             {'type': 'reddit', 'name': 'Reddit', 'context': 'público tech'},
         )
 
-        assert 'INSTRUCAO DO PRODUTOR: público tech' in captured['prompt']
+        assert 'INSTRUÇÃO DO PRODUTOR: público tech' in captured['prompt']
 
     def test_prompt_still_ends_with_roteiro(self, narrators, item, monkeypatch):
         captured = {}
