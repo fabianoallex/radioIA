@@ -157,7 +157,7 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
                     model: str = DEFAULT_MODEL,
                     api_base: str | None = None,
                     generation_time: str | None = None,
-                    prompt_log_path: str | None = None) -> str:
+                    prompt_log_path: str | None = None) -> tuple[str, dict | None]:
 
     n = min(len(narrators), 3)
     active = narrators[:n]
@@ -251,7 +251,14 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
         max_tokens=4096,
         **kwargs
     )
-    return response.choices[0].message.content
+    usage_obj = getattr(response, 'usage', None)
+    pt = getattr(usage_obj, 'prompt_tokens', None) if usage_obj else None
+    usage = {
+        'prompt_tokens':     pt,
+        'completion_tokens': getattr(usage_obj, 'completion_tokens', None),
+        'total_tokens':      getattr(usage_obj, 'total_tokens', None),
+    } if isinstance(pt, int) else None
+    return response.choices[0].message.content, usage
 
 
 def _radio_prompt(narrators: list[dict], names: list[str], station: str,

@@ -533,7 +533,7 @@ def generate_episode(source_config: dict, output_dir: str,
         'url': '', 'views': 0, 'comments': [], 'channel': source_name, 'published_at': '',
     }]
 
-    script = generate_script(
+    script, _ = generate_script(
         items, narrators_active,
         {**source_config, 'type': 'utility'},
         is_first_of_day=is_first_of_day,

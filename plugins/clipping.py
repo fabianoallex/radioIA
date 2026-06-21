@@ -231,22 +231,39 @@ def fetch(source_config: dict, credentials=None) -> list[dict]:
         return []
 
     mode = 'followup' if followup else 'primeira cobertura'
-    print(f'  Buscando cobertura [{mode}]: "{topic}" via {", ".join(agregadores)}')
 
-    since     = date.today() - timedelta(days=days_lookback)
-    seen_urls: set = set()   # compartilhado — evita o mesmo artigo via URLs distintas
+    # Janelas de busca: tenta lookback configurado; se 0 resultados, amplia progressivamente
+    fallback_windows = [days_lookback] if followup else sorted(set([days_lookback, 7, 30]))
 
-    # Busca em cada agregador independentemente
-    per_agg = []
-    for agg_name in agregadores:
-        url   = AGGREGATORS[agg_name](topic, followup, days_lookback)
-        items = _fetch_entries(url, since, RSS_FETCH_LIMIT, seen_urls,
-                               fetch_full, max_chars, topic, source_config)
-        per_agg.append(items)
-        print(f'  {agg_name}: {len(items)} resultado(s)')
+    merged: list[dict] = []
+    used_window = days_lookback
+    for window in fallback_windows:
+        if window != days_lookback:
+            print(f'  Sem resultados — ampliando busca para os últimos {window} dias...')
 
-    # Intercala em round-robin para não privilegiar nenhum agregador
-    merged = _interleave_balanced(per_agg)
+        print(f'  Buscando cobertura [{mode}]: "{topic}" via {", ".join(agregadores)}')
+        since     = date.today() - timedelta(days=window)
+        seen_urls: set = set()
+
+        per_agg = []
+        for agg_name in agregadores:
+            url   = AGGREGATORS[agg_name](topic, followup, window)
+            items = _fetch_entries(url, since, RSS_FETCH_LIMIT, seen_urls,
+                                   fetch_full, max_chars, topic, source_config)
+            per_agg.append(items)
+            print(f'  {agg_name}: {len(items)} resultado(s)')
+
+        merged = _interleave_balanced(per_agg)
+        used_window = window
+        if merged:
+            break
+
+    if not merged:
+        print(f'  {len(merged)} veículo(s) selecionado(s) sobre "{topic}".')
+        return []
+
+    if used_window != days_lookback:
+        print(f'  (resultados encontrados com janela de {used_window} dias)')
 
     # Remove segundo artigo do mesmo veículo (perspectivas distintas é o objetivo)
     deduped = _dedup_by_source(merged)
