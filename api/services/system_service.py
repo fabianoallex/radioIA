@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import sys
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import yaml
@@ -13,6 +13,18 @@ import yaml
 PROJECT_DIR = Path(__file__).parent.parent.parent
 
 _PLAYER_PORT = int(os.environ.get("PLAYER_PORT", 5000))
+
+
+def _local_now() -> datetime:
+    """Retorna datetime atual no fuso configurado em radio.utc_offset do config.yaml."""
+    try:
+        cfg_path = PROJECT_DIR / "config.yaml"
+        with open(cfg_path, 'r', encoding='utf-8') as _f:
+            _cfg = yaml.safe_load(_f) or {}
+        offset = int((_cfg.get('radio') or {}).get('utc_offset', 0))
+    except Exception:
+        offset = 0
+    return datetime.utcnow() + timedelta(hours=offset)
 
 
 # ── config ────────────────────────────────────────────────────────────────────
@@ -152,7 +164,7 @@ def get_player_status() -> dict:
 # ── episódios ─────────────────────────────────────────────────────────────────
 
 def get_episodes_today() -> dict:
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = _local_now().strftime("%Y-%m-%d")
     day_dir = PROJECT_DIR / "output" / today
     episodes = []
 
@@ -220,8 +232,8 @@ def get_next_scheduled(limit: int = 5) -> list:
         except Exception:
             pass
 
-    today = datetime.now().strftime("%Y-%m-%d")
-    now_time = datetime.now().strftime("%H:%M")
+    today = _local_now().strftime("%Y-%m-%d")
+    now_time = _local_now().strftime("%H:%M")
 
     proximos = []
     for entry in config.get("schedule", []):

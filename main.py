@@ -10,7 +10,7 @@ except Exception:
     pass
 import importlib.util
 import yaml
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 from src.sources import youtube, rss, music as music_source, utility as utility_source
@@ -36,8 +36,8 @@ def _write_status(source_id: str, source_name: str, etapa: str,
                 'etapa':      etapa,
                 'progresso':  progresso,
                 'inicio':     inicio,
-                'data':       datetime.now().strftime('%Y-%m-%d'),
-                'atualizado': datetime.now().strftime('%H:%M:%S'),
+                'data':       _local_now().strftime('%Y-%m-%d'),
+                'atualizado': _local_now().strftime('%H:%M:%S'),
                 'erro':       erro,
             }, _f, ensure_ascii=False, indent=2)
     except Exception:
@@ -100,8 +100,19 @@ def _get_oauth_credentials():
         return None
 
 
+def _local_now() -> datetime:
+    """Retorna datetime atual no fuso configurado em radio.utc_offset do config.yaml."""
+    try:
+        with open('config.yaml', 'r', encoding='utf-8') as _f:
+            _cfg = yaml.safe_load(_f) or {}
+        offset = int((_cfg.get('radio') or {}).get('utc_offset', 0))
+    except Exception:
+        offset = 0
+    return datetime.utcnow() + timedelta(hours=offset)
+
+
 def _has_episodes_today() -> bool:
-    today   = datetime.now().strftime('%Y-%m-%d')
+    today   = _local_now().strftime('%Y-%m-%d')
     day_dir = os.path.join('output', today)
     if not os.path.exists(day_dir):
         return False
@@ -113,7 +124,7 @@ def _has_episodes_today() -> bool:
 
 
 def _episode_output_dir(source_id: str) -> str:
-    now = datetime.now()
+    now = _local_now()
     return os.path.join('output', now.strftime('%Y-%m-%d'), now.strftime('%H-%M') + f'_{source_id}')
 
 
@@ -124,7 +135,7 @@ def _run_replay_cli(partial: str, today: str | None = None) -> list[str]:
     """
     import json as _json
     if not today:
-        today = datetime.now().strftime('%Y-%m-%d')
+        today = _local_now().strftime('%Y-%m-%d')
 
     day_dir = os.path.join('output', today)
     if not os.path.isdir(day_dir):
@@ -148,7 +159,7 @@ def _run_replay_cli(partial: str, today: str | None = None) -> list[str]:
             print(f"  Disponiveis: {', '.join(available)}")
         return []
 
-    now = datetime.now().strftime('%H-%M')
+    now = _local_now().strftime('%H-%M')
     created = []
 
     for folder in matches:
@@ -237,7 +248,7 @@ def _run_music_source(source_config: dict, config: dict, is_first_of_day: bool) 
     print(f"Fonte: {source_name} (music)")
     print(f"{'='*50}")
 
-    _inicio = datetime.now().strftime('%H:%M:%S')
+    _inicio = _local_now().strftime('%H:%M:%S')
     _write_status(source_id, source_name, 'mixando', inicio=_inicio)
 
     narrators = config['narrators'][:1]
@@ -269,7 +280,7 @@ def _run_utility_source(source_config: dict, config: dict, is_first_of_day: bool
     print(f"Fonte: {source_name} (utility)")
     print(f"{'='*50}")
 
-    _inicio   = datetime.now().strftime('%H:%M:%S')
+    _inicio   = _local_now().strftime('%H:%M:%S')
     _write_status(source_id, source_name, 'buscando', inicio=_inicio)
 
     narrators = config['narrators'][:2]
@@ -313,7 +324,7 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
     print(f"\n{'='*50}")
     print(f"Fonte: {source_name} (combined)")
     print(f"{'='*50}")
-    _inicio = datetime.now().strftime('%H:%M:%S')
+    _inicio = _local_now().strftime('%H:%M:%S')
     _write_status(source_id, source_name, 'buscando', inicio=_inicio)
 
     items = []
@@ -445,7 +456,7 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
     print(f"\n{'='*50}")
     print(f"Fonte: {source_name} ({source_type})")
     print(f"{'='*50}")
-    _inicio = datetime.now().strftime('%H:%M:%S')
+    _inicio = _local_now().strftime('%H:%M:%S')
     _write_status(source_id, source_name, 'buscando', inicio=_inicio)
 
     # Inject API key for YouTube source
@@ -650,7 +661,7 @@ def main():
 
     # 'replay' sem parâmetro → lista episódios do dia disponíveis para replay
     if 'replay' in sys.argv[1:] and not any(a.startswith('replay:') for a in sys.argv[1:]):
-        today = datetime.now().strftime('%Y-%m-%d')
+        today = _local_now().strftime('%Y-%m-%d')
         day_dir = os.path.join('output', today)
         if not os.path.isdir(day_dir):
             print(f"Nenhum episodio encontrado para hoje ({today}).")
