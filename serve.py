@@ -1701,7 +1701,7 @@ def scan_episodes():
 
         if _is_date(entry):
             date = entry
-            for ep_folder in sorted(os.listdir(entry_path)):
+            for ep_folder in sorted(os.listdir(entry_path), reverse=True):
                 ep_path = os.path.join(entry_path, ep_folder)
                 if not os.path.isdir(ep_path):
                     continue
