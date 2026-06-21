@@ -32,7 +32,7 @@ def _scan(dt: str) -> list[dict]:
     if not day_dir.exists():
         return []
     result = []
-    for folder in sorted(day_dir.iterdir()):
+    for folder in sorted(day_dir.iterdir(), reverse=True):
         if not folder.is_dir():
             continue
         audio = folder / "episode.mp3"

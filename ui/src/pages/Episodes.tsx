@@ -310,8 +310,8 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
                   {gen.started_at && (
                     <span className="flex items-center gap-1 text-muted-foreground">
                       <Clock className="size-3" />
-                      {gen.started_at.slice(11, 19)}
-                      {gen.finished_at && <> → {gen.finished_at.slice(11, 19)}</>}
+                      {gen.started_at.slice(11, 16).replace(":", "h")}
+                      {gen.finished_at && <> → {gen.finished_at.slice(11, 16).replace(":", "h")}</>}
                     </span>
                   )}
                 </div>
