@@ -94,7 +94,8 @@ def mix_episode(audio_files: list[str], lines: list[dict], output_path: str,
 
 def save_episode_metadata(videos: list[dict], script: str, output_dir: str,
                           duration_secs: float, source_name: str = '',
-                          item_timestamps: dict | None = None) -> dict:
+                          item_timestamps: dict | None = None,
+                          generation: dict | None = None) -> dict:
     links = []
     for i, v in enumerate(videos, 1):
         link = {
@@ -114,6 +115,8 @@ def save_episode_metadata(videos: list[dict], script: str, output_dir: str,
         'videos_covered': len(videos),
         'links': links
     }
+    if generation:
+        metadata['generation'] = generation
 
     with open(os.path.join(output_dir, 'episode.json'), 'w', encoding='utf-8') as f:
         json.dump(metadata, f, ensure_ascii=False, indent=2)

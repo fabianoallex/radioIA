@@ -309,7 +309,8 @@ REGRAS:
 - Varie quem abre cada bloco de video
 - Comentários de inscritos: cite apenas se genuinamente interessante, máximo 1 por video, nomeie o autor
 {solo_note}
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Vídeo 1; [ITEM_2] antes do Vídeo 2 etc. — NÃO usar na abertura nem no encerramento
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES de qualquer fala sobre o Vídeo 1 — inclusive o gancho ou antecipação; [ITEM_2] antes do Vídeo 2 etc. — NÃO usar na abertura nem no encerramento
+- A última fala de cada item deve encerrar aquele item. Ganchos ou antecipações do próximo item NUNCA aparecem antes do marcador — vêm DEPOIS do [ITEM_N] seguinte, como primeira fala daquele item. Se o mesmo locutor abre o próximo item, o gancho e a primeira fala ficam juntos no mesmo bloco [LOCUTOR_X], após o marcador
 - NÃO invente informacões
 
 VIDEOS DO DIA:
@@ -453,7 +454,8 @@ REGRAS:
 - Diga "materia completa nas notas, notícia [número]"
 - Tom informativo — pode ter leveza mas sem exageros
 {solo_note}
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Notícia 1; [ITEM_2] antes da Notícia 2 etc. — NÃO usar na abertura nem no encerramento
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES de qualquer fala sobre a Notícia 1 — inclusive o gancho ou antecipação; [ITEM_2] antes da Notícia 2 etc. — NÃO usar na abertura nem no encerramento
+- A última fala de cada item deve encerrar aquele item. Ganchos ou antecipações do próximo item NUNCA aparecem antes do marcador — vêm DEPOIS do [ITEM_N] seguinte, como primeira fala daquele item. Se o mesmo locutor abre o próximo item, o gancho e a primeira fala ficam juntos no mesmo bloco [LOCUTOR_X], após o marcador
 - NÃO invente informações
 
 NOTICIAS:
@@ -520,7 +522,8 @@ REGRAS:
 - Tom de game show: animado, dinâmico, levemente competitivo
 - Reactions genuínas: surpresa, deboche amigável, admiração
 {solo_note}
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Pergunta 1; [ITEM_2] antes da Pergunta 2 etc. — NÃO usar na abertura nem no encerramento
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES de qualquer fala sobre a Pergunta 1 — inclusive o gancho ou antecipação; [ITEM_2] antes da Pergunta 2 etc. — NÃO usar na abertura nem no encerramento
+- A última fala de cada item deve encerrar aquele item. Ganchos ou antecipações do próximo item NUNCA aparecem antes do marcador — vêm DEPOIS do [ITEM_N] seguinte, como primeira fala daquele item. Se o mesmo locutor abre o próximo item, o gancho e a primeira fala ficam juntos no mesmo bloco [LOCUTOR_X], após o marcador
 - NÃO invente informações além do que está nas perguntas
 
 PERGUNTAS:
@@ -584,7 +587,8 @@ REGRAS:
 - Conecte posts de subreddits diferentes quando houver relação temática
 - Reaja com personalidade: curiosidade, crítica, humor conforme o perfil de cada apresentador
 {solo_note}
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Post 1; [ITEM_2] antes do Post 2 etc. — NÃO usar na abertura nem no encerramento
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES de qualquer fala sobre o Post 1 — inclusive o gancho ou antecipação; [ITEM_2] antes do Post 2 etc. — NÃO usar na abertura nem no encerramento
+- A última fala de cada item deve encerrar aquele item. Ganchos ou antecipações do próximo item NUNCA aparecem antes do marcador — vêm DEPOIS do [ITEM_N] seguinte, como primeira fala daquele item. Se o mesmo locutor abre o próximo item, o gancho e a primeira fala ficam juntos no mesmo bloco [LOCUTOR_X], após o marcador
 - NÃO invente informações
 
 POSTS:
@@ -650,7 +654,8 @@ REGRAS:
 - Baseie-se fielmente no conteúdo das previsões fornecidas
 - Se o conteúdo for escasso, expanda com sabedoria astrologica coerente com o signo
 {solo_note}
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Signo 1; [ITEM_2] antes do Signo 2 etc. — NÃO usar na abertura nem no encerramento
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES de qualquer fala sobre o Signo 1 — inclusive o gancho ou antecipação; [ITEM_2] antes do Signo 2 etc. — NÃO usar na abertura nem no encerramento
+- A última fala de cada item deve encerrar aquele item. Ganchos ou antecipações do próximo item NUNCA aparecem antes do marcador — vêm DEPOIS do [ITEM_N] seguinte, como primeira fala daquele item. Se o mesmo locutor abre o próximo item, o gancho e a primeira fala ficam juntos no mesmo bloco [LOCUTOR_X], após o marcador
 
 PREVISOES DE HOJE:
 {content}
@@ -721,7 +726,8 @@ REGRAS:
 - Mencione nota ou popularidade apenas quando impressionante (ex: "quase 9 de nota!")
 - Traduza generos e termos técnicos para o portugues do dia a dia
 - NÃO invente informações além das fornecidas
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Filme 1; [ITEM_2] antes do Filme 2 etc. — NÃO usar na abertura nem no encerramento
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES de qualquer fala sobre o Filme 1 — inclusive o gancho ou antecipação; [ITEM_2] antes do Filme 2 etc. — NÃO usar na abertura nem no encerramento
+- A última fala de cada item deve encerrar aquele item. Ganchos ou antecipações do próximo item NUNCA aparecem antes do marcador — vêm DEPOIS do [ITEM_N] seguinte, como primeira fala daquele item. Se o mesmo locutor abre o próximo item, o gancho e a primeira fala ficam juntos no mesmo bloco [LOCUTOR_X], após o marcador
 {solo_note}
 
 FILMES:
@@ -802,7 +808,8 @@ REGRAS:
 - Diga "link do episódio nas notas" no encerramento
 - Não invente informações além do conteúdo fornecido
 - Se o conteúdo for escasso, foque na apresentação do podcast e no tema geral
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Episodio 1; [ITEM_2] antes do Episodio 2 etc. — NAO usar na abertura nem no encerramento
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES de qualquer fala sobre o Episodio 1 — inclusive o gancho ou antecipação; [ITEM_2] antes do Episodio 2 etc. — NAO usar na abertura nem no encerramento
+- A última fala de cada item deve encerrar aquele item. Ganchos ou antecipações do próximo item NUNCA aparecem antes do marcador — vêm DEPOIS do [ITEM_N] seguinte, como primeira fala daquele item. Se o mesmo locutor abre o próximo item, o gancho e a primeira fala ficam juntos no mesmo bloco [LOCUTOR_X], após o marcador
 {solo_note}
 
 EPISÓDIO(S):
@@ -904,7 +911,8 @@ REGRAS:
 - Aponte convergências e divergências entre os veículos quando existirem
 - Não leia os artigos na íntegra — sintetize os ângulos e enfoques
 - Não invente informações além do que está nos textos fornecidos
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Fonte 1; [ITEM_2] antes da Fonte 2 etc. — NÃO usar na abertura nem no encerramento
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES de qualquer fala sobre a Fonte 1 — inclusive o gancho ou antecipação; [ITEM_2] antes da Fonte 2 etc. — NÃO usar na abertura nem no encerramento
+- A última fala de cada item deve encerrar aquele item. Ganchos ou antecipações do próximo item NUNCA aparecem antes do marcador — vêm DEPOIS do [ITEM_N] seguinte, como primeira fala daquele item. Se o mesmo locutor abre o próximo item, o gancho e a primeira fala ficam juntos no mesmo bloco [LOCUTOR_X], após o marcador
 {solo_note}
 
 COBERTURA DA MÍDIA:
@@ -1131,7 +1139,8 @@ REGRAS:
 - Cada fala: máximo 2 sentenças
 - Mencione a origem de forma natural quando relevante: "segundo o G1...", "no YouTube..." — nunca diga "vi na internet"
 - NÃO invente informações que não estejam no conteúdo fornecido
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Fonte 1; [ITEM_2] antes da Fonte 2 etc. — NÃO usar na abertura nem no encerramento
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES de qualquer fala sobre a Fonte 1 — inclusive o gancho ou antecipação; [ITEM_2] antes da Fonte 2 etc. — NÃO usar na abertura nem no encerramento
+- A última fala de cada item deve encerrar aquele item. Ganchos ou antecipações do próximo item NUNCA aparecem antes do marcador — vêm DEPOIS do [ITEM_N] seguinte, como primeira fala daquele item. Se o mesmo locutor abre o próximo item, o gancho e a primeira fala ficam juntos no mesmo bloco [LOCUTOR_X], após o marcador
 {solo_note}
 
 CONTEÚDO:
@@ -1204,7 +1213,8 @@ REGRAS:
 - Se o prato for de culinária estrangeira, mencione onde é popular e como os brasileiros podem adaptar
 {solo_note}
 - NÃO invente ingredientes ou passos que não estejam na receita
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Receita 1; [ITEM_2] antes da Receita 2 etc. — NÃO usar na abertura nem no encerramento
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES de qualquer fala sobre a Receita 1 — inclusive o gancho ou antecipação; [ITEM_2] antes da Receita 2 etc. — NÃO usar na abertura nem no encerramento
+- A última fala de cada item deve encerrar aquele item. Ganchos ou antecipações do próximo item NUNCA aparecem antes do marcador — vêm DEPOIS do [ITEM_N] seguinte, como primeira fala daquele item. Se o mesmo locutor abre o próximo item, o gancho e a primeira fala ficam juntos no mesmo bloco [LOCUTOR_X], após o marcador
 
 RECEITA:
 {content}
@@ -1343,7 +1353,8 @@ REGRAS:
 - Busque conexões entre itens de fontes diferentes quando fizer sentido narrativo
 - Tom: informativo mas leve — rádio é conversa, não leitura de boletim
 {solo_note}
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre o Item 1; [ITEM_2] antes do Item 2 etc. — NAO usar na abertura nem no encerramento
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES de qualquer fala sobre o Item 1 — inclusive o gancho ou antecipação; [ITEM_2] antes do Item 2 etc. — NAO usar na abertura nem no encerramento
+- A última fala de cada item deve encerrar aquele item. Ganchos ou antecipações do próximo item NUNCA aparecem antes do marcador — vêm DEPOIS do [ITEM_N] seguinte, como primeira fala daquele item. Se o mesmo locutor abre o próximo item, o gancho e a primeira fala ficam juntos no mesmo bloco [LOCUTOR_X], após o marcador
 - NÃO invente informações
 
 CONTEÚDO:
