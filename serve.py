@@ -860,13 +860,15 @@ function updateGeneratingItem(status) {
 
 async function pollEpisodes() {
   try {
-    const res  = await fetch('/api/episodes');
+    const res   = await fetch('/api/episodes');
     const fresh = await res.json();
-    const knownIds = new Set(allEpisodes.map(e => e.id));
-    const newOnes  = fresh.filter(e => !knownIds.has(e.id));
+    const knownIds  = new Set(allEpisodes.map(e => e.id));
+    const freshIds  = new Set(fresh.map(e => e.id));
+    const newOnes   = fresh.filter(e => !knownIds.has(e.id));
+    const removedAny = allEpisodes.some(e => !freshIds.has(e.id));
 
-    if (!newOnes.length) {
-      // Sem novos episódios, mas atualiza o próximo agendado
+    if (!newOnes.length && !removedAny) {
+      // Sem mudanças de episódios, mas atualiza o próximo agendado
       // (estado do scheduler pode ter mudado desde o último poll)
       appendNextScheduled();
       return;
@@ -874,6 +876,8 @@ async function pollEpisodes() {
 
     allEpisodes = fresh;
     rerenderCurrentDay();
+
+    if (!newOnes.length) return;  // apenas remoção/ocultação — não mostra toast
 
     const todayNew = newOnes.filter(e => e.date === currentDate);
     if (!todayNew.length) return;

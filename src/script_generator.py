@@ -177,7 +177,8 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
         prompt = _whatsapp_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
     elif source_type == 'biblia':
         cards = [_build_biblia_card(i, item) for i, item in enumerate(items, 1)]
-        prompt = _biblia_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
+        prompt = _biblia_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name,
+                                num_items=len(items))
     elif source_type == 'filmes':
         cards = [_build_filmes_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _filmes_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
@@ -1003,14 +1004,14 @@ def _build_biblia_card(i: int, item: dict) -> str:
 
 def _biblia_prompt(narrators: list[dict], names: list[str], source_name: str,
                    content: str, is_first_of_day: bool = True,
-                   station_name: str = 'RadioIA') -> str:
+                   station_name: str = 'RadioIA', num_items: int = 1) -> str:
     n = len(narrators)
     narrator_block = _narrator_block(narrators)
     format_block   = _format_block(narrators)
     names_str = ', '.join(names[:-1]) + f' e {names[-1]}' if n > 1 else names[0]
 
     solo_note = (
-        "- Apresentação solo: conduza a reflexão diretamente com o ouvinte, tom intimo e acolhedor"
+        "- Apresentação solo: conduza a reflexão diretamente com o ouvinte, tom íntimo e acolhedor"
         if n == 1 else
         f"- Distribua as falas entre os {n} apresentadores de forma equilibrada"
     )
@@ -1020,43 +1021,66 @@ def _biblia_prompt(narrators: list[dict], names: list[str], source_name: str,
             f"1. ABERTURA: {names_str} dão bom dia, dizem que os ouvintes estão na {station_name} "
             f'e apresentam o quadro "{source_name}" com tom acolhedor e espiritualizado (2-3 falas)'
         )
-        encerramento = "4. Encerramento: deseje uma reflexão proveitosa ao ouvinte e convide a continuar na programação (2 falas)"
+        encerramento_num = num_items + 2
+        encerramento = f"{encerramento_num}. Encerramento: deseje uma reflexão proveitosa ao ouvinte e convide a continuar na programação (2 falas)"
     else:
         abertura = (
             f'1. ENTRADA: entre com leveza espiritual — "Chegou o momento da nossa Palavra do Dia...", '
-            f'"Paramos um instante para uma reflexao especial..." ou similar. SEM bom dia. (1-2 falas)'
+            f'"Paramos um instante para uma reflexão especial..." ou similar. SEM bom dia. (1-2 falas)'
         )
-        encerramento = "4. Encerramento curto desejando paz e bencaos ao ouvinte (1-2 falas)"
+        encerramento_num = num_items + 2
+        encerramento = f"{encerramento_num}. Encerramento curto desejando paz e bênçãos ao ouvinte (1-2 falas)"
+
+    if num_items == 1:
+        passagens_estrutura = (
+            "[ITEM_1]  ← linha sozinha, coloque AQUI antes de qualquer fala sobre a Passagem 1\n"
+            "2. Leia a passagem bíblica com calma e reverência, citando livro e referência por extenso (1-2 falas)\n"
+            "3. Reflexão sobre o significado e aplicação prática na vida cotidiana do ouvinte (3-5 falas)"
+        )
+        marcador_regra = (
+            "- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES de qualquer fala sobre a Passagem 1 — NÃO usar na abertura nem no encerramento"
+        )
+    else:
+        passagens_estrutura = (
+            f"Para cada uma das {num_items} passagens bíblicas:\n"
+            "   [ITEM_N]  ← linha sozinha com o número da passagem (ex: [ITEM_1], [ITEM_2]) ANTES de qualquer fala sobre ela\n"
+            "   - Leia o trecho com calma e reverência, citando livro e referência por extenso (1-2 falas)\n"
+            "   - Reflexão sobre o significado e aplicação prática para o ouvinte (2-3 falas)\n"
+            f"   - Breve transição espiritual para a próxima passagem (exceto na Passagem {num_items})"
+        )
+        marcador_regra = (
+            f"- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES de qualquer fala sobre a Passagem 1 — inclusive gancho ou antecipação; [ITEM_2] antes da Passagem 2 etc. — NÃO usar na abertura nem no encerramento"
+        )
 
     return f"""Você é um roteirista de quadro espiritual para rádio FM brasileira.
-Crie o roteiro do segmento "{source_name}" — uma reflexão sobre uma passagem bíblica.
+Crie o roteiro do segmento "{source_name}" — uma reflexão sobre {"uma passagem bíblica" if num_items == 1 else f"{num_items} passagens bíblicas"}.
 
 APRESENTADORES:
 {narrator_block}
 
 {format_block}
 
-ATENCÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentarios fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
+ATENÇÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentários fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
 
 PERSONALIDADES: respeite o perfil de cada apresentador mesmo no tom espiritualizado.
 
 ESTRUTURA:
 {abertura}
-2. Leia a passagem bíblica com calma e reverência (1-2 falas)
-3. Reflexão sobre o significado e aplicação prática na vida cotidiana (3-5 falas)
-4. Convide o ouvinte a guardar essa mensagem no coração durante o dia
+{passagens_estrutura}
 {encerramento}
 
 REGRAS CRITICAS:
-- Refira-se ao trecho sempre pela forma por extenso: "capitulo X, versiculo Y" — NUNCA use o formato numerico "X:Y" pois o audio não lê corretamente
-- Cada fala: máximo 2-3 sentencas
+- Refira-se ao trecho sempre pela forma por extenso: "capítulo X, versículo Y" — NUNCA use o formato numérico "X:Y" pois o áudio não lê corretamente
+- Cada fala: máximo 2-3 sentenças
 - Tom: acolhedor, reflexivo, espiritualizado — como um pastor ou capelão de rádio
-- Não mencione links, notas de episódio ou fontes externas — o conteúdo e a própria passagem
+- Não mencione links, notas de episódio ou fontes externas — o conteúdo é a própria passagem
 - Conecte a mensagem bíblica a situações concretas do dia a dia do ouvinte brasileiro
 - NÃO invente versos ou trechos que não estejam na passagem fornecida
 {solo_note}
+{marcador_regra}
+- A última fala de cada passagem deve encerrar aquela passagem. Ganchos ou antecipações da próxima passagem NUNCA aparecem antes do marcador — vêm DEPOIS do [ITEM_N] seguinte, como primeira fala daquela passagem. Se o mesmo locutor abre a próxima passagem, o gancho e a primeira fala ficam juntos no mesmo bloco [LOCUTOR_X], após o marcador
 
-PASSAGEM BIBLICA:
+PASSAGENS BIBLICAS:
 {content}
 
 Roteiro:"""
