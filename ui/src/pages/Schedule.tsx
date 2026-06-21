@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plus, Pencil, Trash2, Check, X, RefreshCw, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -229,6 +229,8 @@ function SlotRow({
   isNext,
   originalMissing,
   highlighted,
+  replayCount,
+  onToggleReplays,
   onGoToOriginal,
   onEdit,
   onDelete,
@@ -238,6 +240,8 @@ function SlotRow({
   isNext: boolean
   originalMissing: boolean
   highlighted: boolean
+  replayCount: number
+  onToggleReplays?: () => void
   onGoToOriginal?: () => void
   onEdit: () => void
   onDelete: () => void
@@ -300,7 +304,18 @@ function SlotRow({
           <span className="text-xs text-muted-foreground">+{(slot.sources ?? []).length - 2}</span>
         )}
         {slot.slot_id != null && (
-          <span className="text-xs text-zinc-600 ml-1">#{slot.slot_id}</span>
+          <span className="flex items-center gap-0.5 ml-1">
+            <span className="text-xs text-zinc-600">#{slot.slot_id}</span>
+            {replayCount > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggleReplays?.() }}
+                className="text-xs text-zinc-500 hover:text-primary px-1 rounded transition-colors"
+                title={`${replayCount} replay(s) — ver horários`}
+              >
+                ↺{replayCount}
+              </button>
+            )}
+          </span>
         )}
       </div>
 
@@ -337,10 +352,12 @@ export default function Schedule() {
   const [editForm, setEditForm] = useState<SlotForm>(emptyForm())
   const [addingNew, setAddingNew] = useState(false)
   const [newForm, setNewForm] = useState<SlotForm>(emptyForm())
-  const [highlightedSlotId, setHighlightedSlotId] = useState<number | null>(null)
+  const [highlightedTime, setHighlightedTime]       = useState<string | null>(null)
+  const [activeReplayListId, setActiveReplayListId] = useState<number | null>(null)
   const nowRowRef  = useRef<HTMLDivElement>(null)
   const listRef    = useRef<HTMLDivElement>(null)
   const slotRefs   = useRef<Map<number, HTMLDivElement>>(new Map())
+  const timeRefs   = useRef<Map<string,  HTMLDivElement>>(new Map())
 
   // Tick every minute
   useEffect(() => {
@@ -401,12 +418,36 @@ export default function Schedule() {
     setAddingNew(false)
   }
 
+  const replaysBySlotId = useMemo(() => {
+    const map = new Map<number, Slot[]>()
+    for (const { slot } of visibleSlots) {
+      if (slot.replay_of != null) {
+        const arr = map.get(slot.replay_of) ?? []
+        arr.push(slot)
+        map.set(slot.replay_of, arr)
+      }
+    }
+    return map
+  }, [visibleSlots])
+
+  const _highlight = (time: string) => {
+    setHighlightedTime(time)
+    setTimeout(() => setHighlightedTime(null), 1500)
+  }
+
   const scrollToOriginal = (replayOf: number) => {
     const el = slotRefs.current.get(replayOf)
     if (!el) return
     el.scrollIntoView({ behavior: "smooth", block: "center" })
-    setHighlightedSlotId(replayOf)
-    setTimeout(() => setHighlightedSlotId(null), 1500)
+    const origTime = visibleSlots.find(v => v.slot.slot_id === replayOf)?.slot.time
+    if (origTime) _highlight(origTime)
+  }
+
+  const scrollToTime = (time: string) => {
+    const el = timeRefs.current.get(time)
+    if (!el) return
+    el.scrollIntoView({ behavior: "smooth", block: "center" })
+    _highlight(time)
   }
 
   // Find "next" slot index within visible slots (first whose time > now)
@@ -481,10 +522,16 @@ export default function Schedule() {
               const isPast = slot.time < now && vIdx !== nextIdx - 1
               const isNext = vIdx === nextIdx
 
+              const replaysOf = slot.slot_id != null ? (replaysBySlotId.get(slot.slot_id) ?? []) : []
+
               return (
                 <div
                   key={`${slot.time}-${idx}`}
-                  ref={el => { if (el && slot.slot_id != null) slotRefs.current.set(slot.slot_id, el) }}
+                  ref={el => {
+                    if (!el) return
+                    timeRefs.current.set(slot.time, el)
+                    if (slot.slot_id != null) slotRefs.current.set(slot.slot_id, el)
+                  }}
                 >
                   {/* "now" separator */}
                   {isNext && (
@@ -500,11 +547,29 @@ export default function Schedule() {
                     isPast={isPast}
                     isNext={isNext}
                     originalMissing={slot.replay_of != null && missingReplays.has(slot.replay_of)}
-                    highlighted={slot.slot_id != null && highlightedSlotId === slot.slot_id}
+                    highlighted={slot.time === highlightedTime}
+                    replayCount={replaysOf.length}
+                    onToggleReplays={replaysOf.length > 0 ? () => setActiveReplayListId(id => id === slot.slot_id ? null : slot.slot_id!) : undefined}
                     onGoToOriginal={slot.replay_of != null ? () => scrollToOriginal(slot.replay_of!) : undefined}
                     onEdit={() => startEdit(idx)}
                     onDelete={() => handleDelete(idx)}
                   />
+
+                  {/* Lista de replays do slot original */}
+                  {activeReplayListId === slot.slot_id && replaysOf.length > 0 && (
+                    <div className="ml-14 mb-1 flex flex-col">
+                      {replaysOf.map(r => (
+                        <button
+                          key={r.time}
+                          onClick={() => { scrollToTime(r.time); setActiveReplayListId(null) }}
+                          className="text-left text-xs px-2 py-1 rounded flex items-center gap-1.5 text-zinc-400 hover:text-foreground hover:bg-muted transition-colors"
+                        >
+                          <span className="text-zinc-600">↩</span>
+                          {r.time} — {r.label || (r.sources ?? []).join(", ")}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   {editingIdx === idx && (
                     <div className="ml-4 mt-1 mb-2">
