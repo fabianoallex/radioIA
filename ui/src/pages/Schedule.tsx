@@ -327,6 +327,11 @@ export default function Schedule() {
 
   const slots = data?.slots ?? []
 
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const visibleSlots = slots
+    .map((slot, idx) => ({ slot, idx }))
+    .filter(({ slot }) => !slot.date || slot.date >= todayStr)
+
   const saveMutation = useMutation({
     mutationFn: (next: Slot[]) => api.put("/schedule", { slots: next }),
     onSuccess: () => {
@@ -359,8 +364,8 @@ export default function Schedule() {
     setAddingNew(false)
   }
 
-  // Find "next" slot index (first slot whose time > now)
-  const nextIdx = slots.findIndex((s) => s.time > now)
+  // Find "next" slot index within visible slots (first whose time > now)
+  const nextIdx = visibleSlots.findIndex(({ slot }) => slot.time > now)
 
   // Scroll to now-row
   useEffect(() => {
@@ -376,7 +381,7 @@ export default function Schedule() {
         <div>
           <h1 className="text-lg font-semibold text-foreground">Grade de Programação</h1>
           <p className="text-xs text-muted-foreground">
-            {slots.length} slot(s) · agora {now}
+            {visibleSlots.length} slot(s) · agora {now}
             {saveMutation.isSuccess && (
               <span className="ml-2 text-emerald-400">✓ salvo</span>
             )}
@@ -396,7 +401,7 @@ export default function Schedule() {
 
       {/* Timeline strip */}
       <div className="px-6 py-2 border-b shrink-0">
-        <TimelineStrip slots={slots} now={now} />
+        <TimelineStrip slots={visibleSlots.map(v => v.slot)} now={now} />
       </div>
 
       {/* List */}
@@ -422,9 +427,9 @@ export default function Schedule() {
               </div>
             )}
 
-            {slots.map((slot, idx) => {
-              const isPast = slot.time < now && idx !== nextIdx - 1
-              const isNext = idx === nextIdx
+            {visibleSlots.map(({ slot, idx }, vIdx) => {
+              const isPast = slot.time < now && vIdx !== nextIdx - 1
+              const isNext = vIdx === nextIdx
 
               return (
                 <div key={`${slot.time}-${idx}`}>
