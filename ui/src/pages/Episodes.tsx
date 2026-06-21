@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react"
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
 import {
-  ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
+  ChevronLeft, ChevronRight,
   Download, Archive, Repeat,
   Rss, Music, PlayCircle, BarChart2, TrendingUp,
   MessageSquare, Star, Film, BookOpen, Utensils,
@@ -128,42 +128,33 @@ function fmtNum(n: number | undefined): string {
   return n.toLocaleString("pt-BR")
 }
 
-// ─── TextSection (lazy) ─────────────────────────────────────────
-function TextSection({ label, url }: { label: string; url: string }) {
-  const [open, setOpen] = useState(false)
+// ─── TextSection (lazy, open controlado pelo pai) ───────────────
+function TextSection({ url, open }: { url: string; open: boolean }) {
   const { data, isFetching, isError } = useQuery<string>({
     queryKey: ["ep-text", url],
     queryFn:  () => api.getText(url),
     enabled:  open,
     staleTime: Infinity,
   })
+  if (!open) return null
   return (
-    <div>
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {open ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-        {label}
-      </button>
-      {open && (
-        <div className="mt-2">
-          {isFetching && <p className="text-xs text-muted-foreground">Carregando...</p>}
-          {isError   && <p className="text-xs text-destructive">Erro ao carregar.</p>}
-          {data && (
-            <pre className="text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap break-words bg-muted/40 rounded p-3 max-h-72 overflow-y-auto font-mono">
-              {data}
-            </pre>
-          )}
-        </div>
+    <div className="px-4 pb-3">
+      {isFetching && <p className="text-xs text-muted-foreground">Carregando...</p>}
+      {isError   && <p className="text-xs text-destructive">Erro ao carregar.</p>}
+      {data && (
+        <pre className="text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap break-words bg-muted/40 rounded p-3 max-h-72 overflow-y-auto font-mono">
+          {data}
+        </pre>
       )}
     </div>
   )
 }
 
 // ─── EpisodeCard ────────────────────────────────────────────────
+type Section = "details" | "prompt" | "script" | "log"
+
 function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) {
-  const [expanded, setExpanded] = useState(false)
+  const [activeSection, setActiveSection] = useState<Section | null>(null)
   const streamUrl  = `/api/episodes/${ep.date}/${ep.pasta}/stream`
   const dlUrl      = `/api/episodes/${ep.date}/${ep.pasta}/download`
   const promptUrl  = `/episodes/${ep.date}/${ep.pasta}/prompt`
@@ -172,6 +163,8 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
   const epPath     = `${ep.date}/${ep.pasta}`
   const isDraft    = ep.status === "draft"
   const hasDetails = (ep.links && ep.links.length > 0) || ep.generation
+
+  const toggle = (s: Section) => setActiveSection(prev => prev === s ? null : s)
 
   const toggleStatus = useMutation({
     mutationFn: () => api.patch(`/episodes/${epPath}/status`, {
@@ -229,15 +222,6 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
           <p className="text-xs text-muted-foreground">{fmtDuration(ep.duracao_seg)}</p>
         </div>
         <div className="flex items-center gap-1 ml-2">
-          {hasDetails && (
-            <button
-              onClick={() => setExpanded(v => !v)}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title={expanded ? "Ocultar detalhes" : "Ver detalhes"}
-            >
-              {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-            </button>
-          )}
           <button
             onClick={() => replay.mutate()}
             disabled={replay.isPending}
@@ -283,11 +267,40 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
         )}
       </div>
 
-      {/* Details panel */}
-      {expanded && (
-        <div className="border-t px-4 py-3 space-y-4 text-xs">
+      {/* Footer — botões de seção */}
+      <div className="flex items-center gap-0.5 px-3 py-1.5 border-t">
+        {hasDetails && (
+          <button
+            onClick={() => toggle("details")}
+            className={cn(
+              "text-[11px] px-2.5 py-1 rounded transition-colors",
+              activeSection === "details"
+                ? "bg-muted text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            )}
+          >
+            Detalhes
+          </button>
+        )}
+        {(["prompt", "script", "log"] as const).map(s => (
+          <button
+            key={s}
+            onClick={() => toggle(s)}
+            className={cn(
+              "text-[11px] px-2.5 py-1 rounded transition-colors capitalize",
+              activeSection === s
+                ? "bg-muted text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            )}
+          >
+            {s === "script" ? "Roteiro" : s === "prompt" ? "Prompt" : "Log"}
+          </button>
+        ))}
+      </div>
 
-          {/* Links / itens */}
+      {/* Seção: Detalhes */}
+      {activeSection === "details" && hasDetails && (
+        <div className="border-t px-4 py-3 space-y-4 text-xs">
           {ep.links && ep.links.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
@@ -325,15 +338,12 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
               </ol>
             </div>
           )}
-
-          {/* Generation metadata */}
           {gen && (
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
                 Geração
               </p>
               <div className="space-y-2">
-                {/* Model + timing */}
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   {gen.model && (
                     <span className="flex items-center gap-1 text-muted-foreground">
@@ -349,8 +359,6 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
                     </span>
                   )}
                 </div>
-
-                {/* Timing breakdown */}
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
                   {gen.total_seconds !== undefined && (
                     <span>Total: <strong className="text-foreground">{fmtSecs(gen.total_seconds)}</strong></span>
@@ -365,8 +373,6 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
                     <span>Mix: <strong className="text-foreground">{fmtSecs(gen.mix_seconds)}</strong></span>
                   )}
                 </div>
-
-                {/* Tokens */}
                 {gen.total_tokens !== undefined && (
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
                     <span>
@@ -379,8 +385,6 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
                     </span>
                   </div>
                 )}
-
-                {/* Words / items */}
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
                   {gen.script_words !== undefined && (
                     <span>Roteiro: <strong className="text-foreground">{fmtNum(gen.script_words)}</strong> palavras</span>
@@ -392,13 +396,13 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
               </div>
             </div>
           )}
-
-          {/* Prompt, Roteiro e Log */}
-          <TextSection label="Prompt" url={promptUrl} />
-          <TextSection label="Roteiro" url={scriptUrl} />
-          <TextSection label="Log" url={logUrl} />
         </div>
       )}
+
+      {/* Seções: Prompt / Roteiro / Log */}
+      <TextSection url={promptUrl} open={activeSection === "prompt"} />
+      <TextSection url={scriptUrl} open={activeSection === "script"} />
+      <TextSection url={logUrl}    open={activeSection === "log"} />
     </div>
   )
 }
