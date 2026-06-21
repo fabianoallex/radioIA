@@ -306,15 +306,13 @@ function SlotRow({
         {slot.slot_id != null && (
           <span className="flex items-center gap-0.5 ml-1">
             <span className="text-xs text-zinc-600">#{slot.slot_id}</span>
-            {replayCount > 0 && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onToggleReplays?.() }}
-                className="text-xs text-zinc-500 hover:text-primary px-1 rounded transition-colors"
-                title={`${replayCount} replay(s) — ver horários`}
-              >
-                ↺{replayCount}
-              </button>
-            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleReplays?.() }}
+              className="text-xs text-zinc-500 hover:text-primary px-1 rounded transition-colors"
+              title={`${replayCount} replay(s) — ver horários`}
+            >
+              ↺{replayCount}
+            </button>
           </span>
         )}
       </div>
@@ -549,14 +547,14 @@ export default function Schedule() {
                     originalMissing={slot.replay_of != null && missingReplays.has(slot.replay_of)}
                     highlighted={slot.time === highlightedTime}
                     replayCount={replaysOf.length}
-                    onToggleReplays={replaysOf.length > 0 ? () => setActiveReplayListId(id => id === slot.slot_id ? null : slot.slot_id!) : undefined}
+                    onToggleReplays={slot.slot_id != null ? () => setActiveReplayListId(id => id === slot.slot_id ? null : slot.slot_id!) : undefined}
                     onGoToOriginal={slot.replay_of != null ? () => scrollToOriginal(slot.replay_of!) : undefined}
                     onEdit={() => startEdit(idx)}
                     onDelete={() => handleDelete(idx)}
                   />
 
                   {/* Lista de replays do slot original */}
-                  {activeReplayListId === slot.slot_id && replaysOf.length > 0 && (
+                  {activeReplayListId === slot.slot_id && (
                     <div className="ml-14 mb-1 flex flex-col">
                       {replaysOf.map(r => (
                         <button
