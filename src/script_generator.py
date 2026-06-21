@@ -355,8 +355,8 @@ def _megacurioso_prompt(narrators: list[dict], names: list[str], source_name: st
     else:
         abertura = (
             f'1. ENTRADA DO QUADRO: entre direto no clima de curiosidade — '
-            f'"Você sabia que...", "Chegou mais uma do {source_name}!", "Isso é incrível!" ou similar. '
-            f'SEM bom dia, SEM reapresentação. (1-2 falas)'
+            f'"Chegou mais uma do {source_name}!", "Isso é incrível!", "Prepare-se!" ou similar. '
+            f'SEM bom dia, SEM reapresentação, SEM mencionar o conteúdo de nenhuma curiosidade ainda. (1-2 falas)'
         )
         encerramento = "4. Encerramento rápido sinalizando que a programação continua (1 fala)"
 
@@ -390,7 +390,8 @@ REGRAS:
 - Explore o aspecto mais surpreendente ou contraintuitivo do conteúdo
 - Diga "link do artigo nas notas do episódio" (não "matéria")
 {solo_note}
-- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES da primeira fala sobre a Curiosidade 1; [ITEM_2] antes da Curiosidade 2 etc. — NÃO usar na abertura nem no encerramento
+- Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES de qualquer fala sobre a Curiosidade 1 — inclusive o gancho ou antecipação; [ITEM_2] antes de qualquer fala sobre a Curiosidade 2 etc. — NÃO usar na abertura nem no encerramento
+- A última fala de cada item deve encerrar aquele item (pode incluir "link do artigo nas notas"). Ganchos ou antecipações do próximo item NUNCA aparecem antes do marcador — vêm DEPOIS do [ITEM_N] seguinte, como primeira fala daquele item. Se o mesmo locutor abre o próximo item, o gancho e a primeira fala ficam juntos no mesmo bloco [LOCUTOR_X], após o marcador
 - NÃO invente informações — baseie-se apenas no conteúdo fornecido
 
 CURIOSIDADES:
