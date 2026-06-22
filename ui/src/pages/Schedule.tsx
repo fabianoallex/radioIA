@@ -493,6 +493,8 @@ export default function Schedule() {
     .filter((s: { id: string; name: string; enabled?: boolean }) => s.enabled !== false)
     .map((s) => ({ id: s.id, name: s.name }))
 
+  const todayStr = new Date().toISOString().slice(0, 10)
+
   const { data: todayEpisodes } = useQuery<{ episodios: { horario: string }[] }>({
     queryKey: ["episodes", todayStr],
     queryFn: () => api.get(`/episodes?date=${todayStr}`),
@@ -505,8 +507,6 @@ export default function Schedule() {
   )
 
   const slots = data?.slots ?? []
-
-  const todayStr = new Date().toISOString().slice(0, 10)
   const visibleSlots = slots
     .map((slot, idx) => ({ slot, idx }))
     .filter(({ slot }) => !slot.date || slot.date >= todayStr)
