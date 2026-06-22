@@ -94,6 +94,7 @@ class DownloadsBody(BaseModel):
     individual: bool = True
     concatenated: bool = True
     zip: bool = True
+    mp4: bool = True
 
 
 @router.put("/settings/downloads")

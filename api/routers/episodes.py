@@ -2,11 +2,13 @@ import io
 import json
 import re
 import shutil
+import subprocess
+import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -159,6 +161,91 @@ def stream_audio(dt: str, folder: str):
     return FileResponse(str(audio), media_type="audio/mpeg")
 
 
+def _load_pil_font(size: int):
+    from PIL import ImageFont
+    candidates = [
+        "C:/Windows/Fonts/segoeui.ttf",
+        "C:/Windows/Fonts/calibri.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+    ]
+    for path in candidates:
+        if Path(path).exists():
+            try:
+                return ImageFont.truetype(path, size)
+            except Exception:
+                continue
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
+
+def _wrap_text(draw, text: str, font, max_width: int) -> list[str]:
+    words = text.split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = (current + " " + word).strip()
+        w = draw.textbbox((0, 0), candidate, font=font)[2]
+        if w <= max_width:
+            current = candidate
+        else:
+            if current:
+                lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    return lines or [text]
+
+
+def _build_cover(radio_name: str, ep_name: str, horario: str, date: str,
+                 duracao_seg: int, out: Path) -> None:
+    from PIL import Image, ImageDraw
+
+    W, H = 1280, 720
+    img = Image.new("RGB", (W, H), "#18181b")
+    draw = ImageDraw.Draw(img)
+
+    font_title = _load_pil_font(64)
+    font_name  = _load_pil_font(42)
+    font_meta  = _load_pil_font(28)
+
+    # Radio name — top center
+    bbox = draw.textbbox((0, 0), radio_name, font=font_title)
+    draw.text(((W - (bbox[2] - bbox[0])) // 2, 130), radio_name,
+              font=font_title, fill="#ffffff")
+
+    # Separator
+    draw.rectangle([(140, 240), (W - 140, 243)], fill="#3f3f46")
+
+    # Episode name — center, wrapped
+    lines = _wrap_text(draw, ep_name, font_name, W - 200)
+    y = 290
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font_name)
+        lw, lh = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        draw.text(((W - lw) // 2, y), line, font=font_name, fill="#d4d4d8")
+        y += lh + 14
+
+    # Bottom metadata
+    date_str = f"{date}  {horario}" if horario else date
+    draw.text((100, H - 80), date_str, font=font_meta, fill="#71717a")
+
+    if duracao_seg:
+        m, s = divmod(duracao_seg, 60)
+        h, m = divmod(m, 60)
+        dur = f"{h}h {m:02d}min" if h else f"{m}min {s:02d}s"
+        dur_w = draw.textbbox((0, 0), dur, font=font_meta)[2]
+        draw.text((W - 100 - dur_w, H - 80), dur, font=font_meta, fill="#71717a")
+
+    # Accent bar at bottom
+    draw.rectangle([(0, H - 6), (W, H)], fill="#52525b")
+
+    img.save(str(out))
+
+
 @router.get("/episodes/{dt}/{folder}/download")
 def download_audio(dt: str, folder: str):
     _chk_date(dt)
@@ -170,6 +257,68 @@ def download_audio(dt: str, folder: str):
         str(audio),
         media_type="audio/mpeg",
         headers={"Content-Disposition": f'attachment; filename="{folder}.mp3"'},
+    )
+
+
+@router.get("/episodes/{dt}/{folder}/download/mp4")
+def download_mp4(dt: str, folder: str, background_tasks: BackgroundTasks):
+    _chk_date(dt)
+    _chk_folder(folder)
+
+    from api.services.system_service import load_config
+    cfg = load_config()
+    dl = cfg.get("downloads", {})
+    if not dl.get("enabled", True) or not dl.get("mp4", True):
+        raise HTTPException(404, "Download MP4 não está habilitado")
+
+    audio = _resolve_audio(dt, folder)
+    if not audio:
+        raise HTTPException(404, "Áudio não encontrado")
+
+    ep_json = OUTPUT_DIR / dt / folder / "episode.json"
+    meta: dict = {}
+    if ep_json.exists():
+        try:
+            meta = json.loads(ep_json.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    radio_name = cfg.get("radio", {}).get("name", "RadioIA")
+    ep_name    = meta.get("source_name") or folder.split("_", 1)[-1]
+    parts      = folder.split("_", 1)
+    horario    = parts[0].replace("-", ":") if len(parts) == 2 else ""
+    duracao    = int(meta.get("duration_seconds") or 0)
+
+    tmp = tempfile.mkdtemp()
+    cover_path = Path(tmp) / "cover.png"
+    mp4_path   = Path(tmp) / f"{folder}.mp4"
+
+    try:
+        _build_cover(radio_name, ep_name, horario, dt, duracao, cover_path)
+    except Exception as exc:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise HTTPException(500, f"Erro ao gerar capa: {exc}")
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-loop", "1", "-i", str(cover_path),
+        "-i", str(audio),
+        "-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage",
+        "-c:a", "aac", "-b:a", "192k",
+        "-pix_fmt", "yuv420p",
+        "-shortest",
+        str(mp4_path),
+    ]
+    result = subprocess.run(cmd, capture_output=True)
+    if result.returncode != 0:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise HTTPException(500, "Erro ao gerar MP4 via ffmpeg")
+
+    background_tasks.add_task(shutil.rmtree, tmp, True)
+    return FileResponse(
+        str(mp4_path),
+        media_type="video/mp4",
+        headers={"Content-Disposition": f'attachment; filename="{folder}.mp4"'},
     )
 
 

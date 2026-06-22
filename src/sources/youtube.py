@@ -1,10 +1,95 @@
+import re
 import random
 from datetime import datetime, timedelta, timezone
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
 
 MAX_TRANSCRIPT_CHARS = 600
+MAX_DESCRIPTION_CHARS = 400   # limite final após limpeza
+_RAW_DESCRIPTION_CHARS = 800  # captura mais para sobrar conteúdo após remover boilerplate
+
 _transcript_api = YouTubeTranscriptApi()
+
+
+# ── Filtros de descrição ───────────────────────────────────────────────────────
+
+_URL_RE          = re.compile(r'https?://\S+', re.IGNORECASE)
+_HASHTAG_LINE_RE = re.compile(r'^(\s*#\w+\s*)+$')
+_SEPARATOR_RE    = re.compile(r'^[\~\-\=\*\_]{3,}\s*$')
+_EMAIL_RE        = re.compile(r'\b\S+@\S+\.\S+\b')
+_SOCIAL_LABEL_RE = re.compile(
+    r'^(Site|Facebook|Twitter|Instagram|TikTok|YouTube|LinkedIn|Telegram|WhatsApp|Pinterest|Discord)\s*:',
+    re.IGNORECASE,
+)
+# Cabeçalhos que iniciam um bloco de boilerplate — ignora até a próxima linha em branco
+_BLOCK_HEADER_RE = re.compile(
+    r'(REDES SOCIAIS|SIGA[- ]?NOS|ACOMPANHE.{0,50}PLATAFORMA|NAS NOSSAS REDES|'
+    r'NOSSAS REDES|MANDE SUA MENSAGEM|LIVE PIX|VIRE MEMBRO|SEJA MEMBRO|'
+    r'CAIXA POSTAL|INSCREVA.SE NO CANAL|TODO O ESPORTE.{0,50}DISNEY|'
+    r'LEIA MAIS\s*:|SAIBA MAIS\s*:)',
+    re.IGNORECASE,
+)
+# Remove hashtags isolados no final do texto limpo
+_TRAILING_HASHTAGS_RE = re.compile(r'(\s+#\w+)+\s*$')
+
+
+def _clean_description(text: str) -> str:
+    if not text:
+        return ''
+    lines = text.splitlines()
+    out = []
+    skip_block = False
+    for line in lines:
+        s = line.strip()
+        if _BLOCK_HEADER_RE.search(s):
+            skip_block = True
+            continue
+        if skip_block:
+            if not s:
+                skip_block = False
+            continue
+        if _URL_RE.search(s):
+            continue
+        if _HASHTAG_LINE_RE.match(s):
+            continue
+        if _SEPARATOR_RE.match(s):
+            continue
+        if _EMAIL_RE.search(s):
+            continue
+        if _SOCIAL_LABEL_RE.match(s):
+            continue
+        out.append(line)
+    # Colapsa linhas em branco consecutivas
+    result = []
+    prev_blank = False
+    for line in out:
+        blank = not line.strip()
+        if blank and prev_blank:
+            continue
+        result.append(line)
+        prev_blank = blank
+    cleaned = _TRAILING_HASHTAGS_RE.sub('', '\n'.join(result)).strip()
+    return cleaned if len(cleaned) >= 15 else ''
+
+
+# ── Filtros de comentários ─────────────────────────────────────────────────────
+
+_ORDINAL_RE = re.compile(
+    r'^(?:(?:primeiro|segundo|terceiro|quarto|quinto|sexto|s[eé]timo|oitavo|nono|d[eé]cimo|'
+    r'first|second|third|primero|1st|2nd|3rd)\b|1[°º])',
+    re.IGNORECASE,
+)
+
+
+def _is_worthless_comment(text: str) -> bool:
+    s = text.strip()
+    if len(s) < 15:
+        return True
+    if not re.search(r'[A-Za-záàâãéèêíïóôõúüçÁÀÂÃÉÈÊÍÏÓÔÕÚÜÇ]', s):
+        return True
+    if _ORDINAL_RE.match(s):
+        return True
+    return False
 
 
 def _build_client(api_key: str, credentials=None):
@@ -57,9 +142,10 @@ def _enrich_with_stats(youtube, videos: list[dict]) -> list[dict]:
     stats_map = {}
     for item in response.get('items', []):
         stats = item.get('statistics', {})
+        raw_desc = item['snippet'].get('description', '')[:_RAW_DESCRIPTION_CHARS]
         stats_map[item['id']] = {
             'views': int(stats.get('viewCount', 0)),
-            'description': item['snippet'].get('description', '')[:400],
+            'description': _clean_description(raw_desc)[:MAX_DESCRIPTION_CHARS],
         }
 
     for video in videos:
@@ -87,7 +173,7 @@ def _get_top_comments(api_key: str, video_id: str, max_comments: int = 5) -> lis
         text = c.get('textDisplay', '').strip()
         likes = c.get('likeCount', 0)
         author = c.get('authorDisplayName', '')
-        if text and len(text) <= 220 and not text.startswith('http'):
+        if text and len(text) <= 220 and not text.startswith('http') and not _is_worthless_comment(text):
             comments.append({'author': author, 'text': text, 'likes': likes})
 
     comments.sort(key=lambda x: x['likes'], reverse=True)

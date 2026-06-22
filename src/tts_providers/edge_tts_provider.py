@@ -10,12 +10,17 @@ class EdgeTTSProvider:
     def __init__(self, config: dict):
         self._config = config or {}
 
+    _CALL_TIMEOUT = 30  # segundos por chamada — evita hang silencioso da API
+
     async def synthesize(self, text: str, voice: str, output_path: str,
                          rate: str = '+0%', retries: int = 4) -> None:
         text = text[:MAX_CHARS]
         for attempt in range(retries):
             try:
-                await edge_tts.Communicate(text, voice, rate=rate).save(output_path)
+                await asyncio.wait_for(
+                    edge_tts.Communicate(text, voice, rate=rate).save(output_path),
+                    timeout=self._CALL_TIMEOUT,
+                )
                 return
             except BaseException as e:
                 if attempt < retries - 1:
@@ -23,7 +28,10 @@ class EdgeTTSProvider:
                 else:
                     # Última tentativa com texto reduzido
                     try:
-                        await edge_tts.Communicate(text[:200], voice, rate=rate).save(output_path)
+                        await asyncio.wait_for(
+                            edge_tts.Communicate(text[:200], voice, rate=rate).save(output_path),
+                            timeout=self._CALL_TIMEOUT,
+                        )
                         return
                     except BaseException:
                         raise RuntimeError(

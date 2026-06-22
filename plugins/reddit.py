@@ -1,3 +1,4 @@
+import html
 import random
 import re
 from datetime import datetime, timezone, timedelta
@@ -8,7 +9,8 @@ REDDIT_RSS = 'https://www.reddit.com/r/{subreddit}/top/.rss?t={timeframe}'
 
 
 def _clean_summary(summary: str) -> str:
-    text = re.sub(r'<[^>]+>', ' ', summary)
+    text = html.unescape(summary)
+    text = re.sub(r'<[^>]+>', ' ', text)
     text = re.sub(r'submitted by.*', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\[link\]|\[comments\]', '', text)
     text = re.sub(r'\s+', ' ', text).strip()
