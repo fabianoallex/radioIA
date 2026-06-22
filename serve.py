@@ -521,6 +521,7 @@ const BETWEEN_EPISODES_EVERY     = {{ between_episodes_every }}; // break entre 
 const DL_INDIVIDUAL   = {{ 'true' if dl_individual   else 'false' }};
 const DL_CONCATENATED = {{ 'true' if dl_concatenated else 'false' }};
 const DL_ZIP          = {{ 'true' if dl_zip          else 'false' }};
+const DL_MP4          = {{ 'true' if dl_mp4          else 'false' }};
 let currentEp     = null;
 let fallbackMode  = false;
 let fallbackIdx   = 0;
@@ -1359,7 +1360,8 @@ function renderPlaylist(eps) {
       : '';
     const dlLinks = DL_INDIVIDUAL
       ? `<span class="ep-dl-link" onclick="event.stopPropagation();downloadEp('${eid}')">baixar</span>` +
-        ` · <span class="ep-dl-link" onclick="event.stopPropagation();shareEp('${eid}','${enam}')">compartilhar</span>`
+        ` · <span class="ep-dl-link" onclick="event.stopPropagation();shareEp('${eid}','${enam}')">compartilhar</span>` +
+        (DL_MP4 ? ` · <span class="ep-dl-link" onclick="event.stopPropagation();downloadEpMp4('${eid}')">↓ mp4</span>` : '')
       : '';
     const metaLine2 = [cnt, dlLinks].filter(Boolean).join(' · ');
     const isNew = _newEpIds.has(ep.id);
@@ -1575,6 +1577,26 @@ function downloadEp(epId) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+async function downloadEpMp4(epId) {
+  showToast('Gerando MP4, aguarde...', false);
+  try {
+    const res = await fetch('/download/episode/' + epId + '/mp4');
+    if (!res.ok) { showToast('Erro ao gerar MP4', false); return; }
+    const blob   = await res.blob();
+    const cd     = res.headers.get('Content-Disposition') || '';
+    const m      = cd.match(/filename="([^"]+)"/);
+    const fname  = m ? m[1] : epId.replace('/', '_') + '.mp4';
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl; a.download = fname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(objUrl);
+    showToast('MP4 gerado!', false);
+  } catch (_) {
+    showToast('Erro ao gerar MP4', false);
+  }
 }
 
 async function shareEp(epId, name) {
@@ -1987,18 +2009,91 @@ def _get_downloads_config() -> dict:
             cfg = yaml.safe_load(f)
         dl = cfg.get('downloads', {})
         if not dl.get('enabled', True):
-            return {'individual': False, 'concatenated': False, 'zip': False}
+            return {'individual': False, 'concatenated': False, 'zip': False, 'mp4': False}
         return {
             'individual':   dl.get('individual',   True),
             'concatenated': dl.get('concatenated', True),
             'zip':          dl.get('zip',          True),
+            'mp4':          dl.get('mp4',          True),
         }
     except Exception:
-        return {'individual': False, 'concatenated': False, 'zip': False}
+        return {'individual': False, 'concatenated': False, 'zip': False, 'mp4': False}
 
 
 def _safe_filename(s: str) -> str:
     return re.sub(r'[^\w\-.]', '_', s.replace(' ', '_')).strip('_')
+
+
+def _pil_font(size: int):
+    from PIL import ImageFont
+    candidates = [
+        'C:/Windows/Fonts/segoeui.ttf',
+        'C:/Windows/Fonts/calibri.ttf',
+        'C:/Windows/Fonts/arial.ttf',
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+        '/System/Library/Fonts/Helvetica.ttc',
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size)
+            except Exception:
+                continue
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
+
+def _wrap_text_pil(draw, text: str, font, max_width: int) -> list:
+    words = text.split()
+    lines, current = [], ''
+    for word in words:
+        candidate = (current + ' ' + word).strip()
+        if draw.textbbox((0, 0), candidate, font=font)[2] <= max_width:
+            current = candidate
+        else:
+            if current:
+                lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    return lines or [text]
+
+
+def _build_mp4_cover(radio_name: str, ep_name: str, horario: str, date: str,
+                     duracao_seg: int, out_path: str) -> None:
+    from PIL import Image, ImageDraw
+    W, H = 1280, 720
+    img  = Image.new('RGB', (W, H), '#18181b')
+    draw = ImageDraw.Draw(img)
+
+    f_title = _pil_font(64)
+    f_name  = _pil_font(42)
+    f_meta  = _pil_font(28)
+
+    bbox = draw.textbbox((0, 0), radio_name, font=f_title)
+    draw.text(((W - (bbox[2] - bbox[0])) // 2, 130), radio_name, font=f_title, fill='#ffffff')
+    draw.rectangle([(140, 240), (W - 140, 243)], fill='#3f3f46')
+
+    lines = _wrap_text_pil(draw, ep_name, f_name, W - 200)
+    y = 290
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=f_name)
+        lw, lh = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        draw.text(((W - lw) // 2, y), line, font=f_name, fill='#d4d4d8')
+        y += lh + 14
+
+    date_str = f'{date}  {horario}' if horario else date
+    draw.text((100, H - 80), date_str, font=f_meta, fill='#71717a')
+    if duracao_seg:
+        m, s = divmod(duracao_seg, 60)
+        h, m = divmod(m, 60)
+        dur   = f'{h}h {m:02d}min' if h else f'{m}min {s:02d}s'
+        dur_w = draw.textbbox((0, 0), dur, font=f_meta)[2]
+        draw.text((W - 100 - dur_w, H - 80), dur, font=f_meta, fill='#71717a')
+    draw.rectangle([(0, H - 6), (W, H)], fill='#52525b')
+    img.save(out_path)
 
 
 def _resolve_audio_path(episode_id: str) -> str | None:
@@ -2029,6 +2124,7 @@ def index():
         dl_individual=dl['individual'],
         dl_concatenated=dl['concatenated'],
         dl_zip=dl['zip'],
+        dl_mp4=dl['mp4'],
     )
 
 @app.route('/api/grade')
@@ -2477,6 +2573,74 @@ def download_episode(episode_id):
         download_name=filename,
         mimetype='audio/mpeg',
     )
+
+
+@app.route('/download/episode/<path:episode_id>/mp4')
+def download_episode_mp4(episode_id):
+    import subprocess as _sp, tempfile as _tmp, shutil as _sh
+    from flask import Response as _Resp
+
+    dl = _get_downloads_config()
+    if not dl.get('mp4', True):
+        return jsonify({'error': 'Download MP4 não habilitado'}), 404
+
+    audio_path = _resolve_audio_path(episode_id)
+    if not audio_path:
+        return '', 404
+
+    ep_path   = os.path.join(OUTPUT_DIR, episode_id)
+    meta_path = os.path.join(ep_path, 'episode.json')
+    meta = {}
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+        except Exception:
+            pass
+
+    radio_name = _get_radio_name()
+    folder     = episode_id.split('/')[-1] if '/' in episode_id else episode_id
+    date_part  = episode_id.split('/')[0]  if '/' in episode_id else ''
+    parts      = folder.split('_', 1)
+    horario    = parts[0].replace('-', ':') if len(parts) == 2 else ''
+    ep_name    = meta.get('source_name') or (parts[1] if len(parts) == 2 else folder)
+    duracao    = int(meta.get('duration_seconds') or 0)
+
+    tmp = _tmp.mkdtemp()
+    cover_path = os.path.join(tmp, 'cover.png')
+    mp4_path   = os.path.join(tmp, folder + '.mp4')
+    try:
+        _build_mp4_cover(radio_name, ep_name, horario, date_part, duracao, cover_path)
+    except Exception as exc:
+        _sh.rmtree(tmp, ignore_errors=True)
+        return jsonify({'error': f'Erro ao gerar capa: {exc}'}), 500
+
+    cmd = [
+        'ffmpeg', '-y',
+        '-loop', '1', '-i', cover_path,
+        '-i', audio_path,
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'stillimage',
+        '-c:a', 'aac', '-b:a', '192k',
+        '-pix_fmt', 'yuv420p',
+        '-shortest',
+        mp4_path,
+    ]
+    result = _sp.run(cmd, capture_output=True)
+    if result.returncode != 0:
+        _sh.rmtree(tmp, ignore_errors=True)
+        return jsonify({'error': 'Erro ao gerar MP4 via ffmpeg'}), 500
+
+    try:
+        with open(mp4_path, 'rb') as f:
+            mp4_bytes = f.read()
+    finally:
+        _sh.rmtree(tmp, ignore_errors=True)
+
+    filename = _safe_filename(f'{date_part}_{folder}') + '.mp4'
+    return _Resp(mp4_bytes, mimetype='video/mp4', headers={
+        'Content-Disposition': f'attachment; filename="{filename}"',
+        'Cache-Control':       'no-cache',
+    })
 
 
 @app.route('/download/day/<date>/concat', methods=['POST'])
