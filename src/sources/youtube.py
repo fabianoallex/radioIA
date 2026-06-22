@@ -75,8 +75,8 @@ def _clean_description(text: str) -> str:
 # ── Filtros de comentários ─────────────────────────────────────────────────────
 
 _ORDINAL_RE = re.compile(
-    r'^(primeiro|segundo|terceiro|quarto|quinto|sexto|s[eé]timo|oitavo|nono|d[eé]cimo|'
-    r'first|second|third|primero|1[°º]|1st|2nd|3rd)\b',
+    r'^(?:(?:primeiro|segundo|terceiro|quarto|quinto|sexto|s[eé]timo|oitavo|nono|d[eé]cimo|'
+    r'first|second|third|primero|1st|2nd|3rd)\b|1[°º])',
     re.IGNORECASE,
 )
 
