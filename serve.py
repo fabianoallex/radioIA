@@ -2024,6 +2024,53 @@ def _safe_filename(s: str) -> str:
     return re.sub(r'[^\w\-.]', '_', s.replace(' ', '_')).strip('_')
 
 
+def _script_to_srt(script_path: str, duration_seconds: int) -> str:
+    import re as _re
+    try:
+        with open(script_path, 'r', encoding='utf-8') as f:
+            raw = f.readlines()
+    except Exception:
+        return ''
+
+    lines = []
+    for line in raw:
+        line = line.strip()
+        if not line:
+            continue
+        line = _re.sub(r'^\[LOCUTOR_\w+\]:\s*', '', line)
+        if line:
+            lines.append(line)
+
+    if not lines:
+        return ''
+
+    word_counts = [len(l.split()) for l in lines]
+    total_words = sum(word_counts)
+    if not total_words or not duration_seconds:
+        return ''
+
+    wps = total_words / duration_seconds
+    GAP = 0.1
+
+    def _fmt(s: float) -> str:
+        h = int(s // 3600)
+        m = int((s % 3600) // 60)
+        sec = int(s % 60)
+        ms = int((s % 1) * 1000)
+        return f'{h:02d}:{m:02d}:{sec:02d},{ms:03d}'
+
+    entries = []
+    cursor = 0.0
+    for i, (line, wc) in enumerate(zip(lines, word_counts), 1):
+        start = cursor
+        dur = wc / wps
+        end = start + dur - GAP
+        entries.append(f'{i}\n{_fmt(start)} --> {_fmt(end)}\n{line}\n')
+        cursor += dur
+
+    return '\n'.join(entries)
+
+
 def _pil_font(size: int):
     from PIL import ImageFont
     candidates = [
@@ -2615,11 +2662,36 @@ def download_episode_mp4(episode_id):
         _sh.rmtree(tmp, ignore_errors=True)
         return jsonify({'error': f'Erro ao gerar capa: {exc}'}), 500
 
-    filt = (
-        '[1:a]showwaves=s=1280x160:mode=cline:rate=25:colors=#a1a1aa[wv];'
-        '[wv]colorkey=color=black:similarity=0.3:blend=0.05[wv_key];'
-        '[0:v][wv_key]overlay=0:440:shortest=1[out]'
-    )
+    # SRT de legenda — gerado a partir do script.txt quando disponível
+    srt_content = ''
+    script_path = os.path.join(OUTPUT_DIR, episode_id, 'script.txt')
+    if os.path.exists(script_path) and duracao:
+        srt_content = _script_to_srt(script_path, duracao)
+    srt_path = None
+    if srt_content:
+        srt_path = os.path.join(tmp, 'sub.srt')
+        with open(srt_path, 'w', encoding='utf-8') as _f:
+            _f.write(srt_content)
+
+    if srt_path:
+        srt_esc = srt_path.replace('\\', '/').replace(':', '\\:')
+        sub_style = (
+            'FontName=Segoe UI,FontSize=24,PrimaryColour=&H00FFFFFF,'
+            'OutlineColour=&H00000000,Outline=2,Shadow=1,Bold=0,'
+            'Alignment=2,MarginV=130'
+        )
+        filt = (
+            '[1:a]showwaves=s=1280x160:mode=cline:rate=25:colors=#a1a1aa[wv];'
+            '[wv]colorkey=color=black:similarity=0.3:blend=0.05[wv_key];'
+            f'[0:v][wv_key]overlay=0:440:shortest=1[with_wave];'
+            f"[with_wave]subtitles='{srt_esc}':force_style='{sub_style}'[out]"
+        )
+    else:
+        filt = (
+            '[1:a]showwaves=s=1280x160:mode=cline:rate=25:colors=#a1a1aa[wv];'
+            '[wv]colorkey=color=black:similarity=0.3:blend=0.05[wv_key];'
+            '[0:v][wv_key]overlay=0:440:shortest=1[out]'
+        )
     cmd = [
         'ffmpeg', '-y',
         '-loop', '1', '-i', cover_path,
