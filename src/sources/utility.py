@@ -551,8 +551,8 @@ def generate_episode(source_config: dict, output_dir: str,
     os.makedirs(output_dir, exist_ok=True)
     temp_dir = os.path.join(output_dir, 'temp')
 
-    keys   = ['LOCUTOR_A', 'LOCUTOR_B']
-    voices = {keys[i]: n['voice'] for i, n in enumerate(narrators_active)}
+    keys   = ['LOCUTOR_A', 'LOCUTOR_B', 'LOCUTOR_C']
+    voices = {key: narrators_active[min(i, len(narrators_active) - 1)]['voice'] for i, key in enumerate(keys)}
     audio_files = generate_audio_files(lines, voices, temp_dir, tts_config or {})
 
     _status('mixando')

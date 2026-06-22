@@ -445,7 +445,7 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
 
     _write_status(source_id, source_name, 'tts', progresso=f'{len(lines)} falas', inicio=_inicio)
     locutor_keys = ['LOCUTOR_A', 'LOCUTOR_B', 'LOCUTOR_C']
-    voices       = {locutor_keys[i]: n['voice'] for i, n in enumerate(narrators)}
+    voices       = {key: narrators[min(i, len(narrators) - 1)]['voice'] for i, key in enumerate(locutor_keys)}
     tts_config   = config.get('tts', {})
     _tts_t0 = _local_now()
     try:
