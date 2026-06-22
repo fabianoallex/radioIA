@@ -161,6 +161,51 @@ def stream_audio(dt: str, folder: str):
     return FileResponse(str(audio), media_type="audio/mpeg")
 
 
+def _script_to_srt(script_path: Path, duration_seconds: int) -> str:
+    try:
+        raw = script_path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return ""
+
+    lines = []
+    for line in raw:
+        line = line.strip()
+        if not line:
+            continue
+        line = re.sub(r"^\[LOCUTOR_\w+\]:\s*", "", line)
+        if line:
+            lines.append(line)
+
+    if not lines:
+        return ""
+
+    word_counts = [len(l.split()) for l in lines]
+    total_words = sum(word_counts)
+    if not total_words or not duration_seconds:
+        return ""
+
+    wps = total_words / duration_seconds
+    GAP = 0.1
+
+    def _fmt(s: float) -> str:
+        h = int(s // 3600)
+        m = int((s % 3600) // 60)
+        sec = int(s % 60)
+        ms = int((s % 1) * 1000)
+        return f"{h:02d}:{m:02d}:{sec:02d},{ms:03d}"
+
+    entries = []
+    cursor = 0.0
+    for i, (line, wc) in enumerate(zip(lines, word_counts), 1):
+        start = cursor
+        dur = wc / wps
+        end = start + dur - GAP
+        entries.append(f"{i}\n{_fmt(start)} --> {_fmt(end)}\n{line}\n")
+        cursor += dur
+
+    return "\n".join(entries)
+
+
 def _load_pil_font(size: int):
     from PIL import ImageFont
     candidates = [
@@ -299,11 +344,35 @@ def download_mp4(dt: str, folder: str, background_tasks: BackgroundTasks):
         shutil.rmtree(tmp, ignore_errors=True)
         raise HTTPException(500, f"Erro ao gerar capa: {exc}")
 
-    filt = (
-        "[1:a]showwaves=s=1280x160:mode=cline:rate=25:colors=#a1a1aa[wv];"
-        "[wv]colorkey=color=black:similarity=0.3:blend=0.05[wv_key];"
-        "[0:v][wv_key]overlay=0:440:shortest=1[out]"
-    )
+    # SRT de legenda — gerado a partir do script.txt quando disponível
+    srt_content = ""
+    script_path_file = OUTPUT_DIR / dt / folder / "script.txt"
+    if script_path_file.exists() and duracao:
+        srt_content = _script_to_srt(script_path_file, duracao)
+    srt_file: Path | None = None
+    if srt_content:
+        srt_file = Path(tmp) / "sub.srt"
+        srt_file.write_text(srt_content, encoding="utf-8")
+
+    if srt_file:
+        srt_esc = str(srt_file).replace("\\", "/").replace(":", "\\:")
+        sub_style = (
+            "FontName=Segoe UI,FontSize=24,PrimaryColour=&H00FFFFFF,"
+            "OutlineColour=&H00000000,Outline=2,Shadow=1,Bold=0,"
+            "Alignment=2,MarginV=130"
+        )
+        filt = (
+            "[1:a]showwaves=s=1280x160:mode=cline:rate=25:colors=#a1a1aa[wv];"
+            "[wv]colorkey=color=black:similarity=0.3:blend=0.05[wv_key];"
+            f"[0:v][wv_key]overlay=0:440:shortest=1[with_wave];"
+            f"[with_wave]subtitles='{srt_esc}':force_style='{sub_style}'[out]"
+        )
+    else:
+        filt = (
+            "[1:a]showwaves=s=1280x160:mode=cline:rate=25:colors=#a1a1aa[wv];"
+            "[wv]colorkey=color=black:similarity=0.3:blend=0.05[wv_key];"
+            "[0:v][wv_key]overlay=0:440:shortest=1[out]"
+        )
     cmd = [
         "ffmpeg", "-y",
         "-loop", "1", "-i", str(cover_path),
