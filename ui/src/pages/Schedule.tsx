@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, Pencil, Trash2, Check, X, RefreshCw, AlertTriangle } from "lucide-react"
+import { Plus, Pencil, Trash2, Check, X, RefreshCw, AlertTriangle, Clock, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { api } from "@/lib/api"
 
@@ -21,6 +21,13 @@ interface SlotForm {
   slot_id: string
   replay_of: string
 }
+
+interface SourceOption {
+  id: string
+  name: string
+}
+
+type ReplayState = "generated" | "awaiting" | "missing" | null
 
 // ─── helpers ────────────────────────────────────────────────────
 function nowHHMM(): string {
@@ -137,15 +144,32 @@ function SlotForm({
   onSave,
   onCancel,
   saving,
+  isNew = false,
+  availableSources = [],
+  slotsWithId = [],
+  suggestedSlotId,
 }: {
   form: SlotForm
   onChange: (f: SlotForm) => void
   onSave: () => void
   onCancel: () => void
   saving: boolean
+  isNew?: boolean
+  availableSources?: SourceOption[]
+  slotsWithId?: Slot[]
+  suggestedSlotId?: number
 }) {
   const inputCls =
     "w-full text-xs rounded border bg-input px-2 py-1.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+
+  const currentSources = form.sources_str.split(",").map(s => s.trim()).filter(Boolean)
+
+  const toggleSource = (id: string) => {
+    const next = currentSources.includes(id)
+      ? currentSources.filter(s => s !== id)
+      : [...currentSources, id]
+    onChange({ ...form, sources_str: next.join(", ") })
+  }
 
   return (
     <div className="grid grid-cols-2 gap-2 p-3 bg-muted/30 rounded-md border border-border/50">
@@ -168,40 +192,97 @@ function SlotForm({
           className={inputCls}
         />
       </div>
+
+      {/* Sources — chips se disponíveis, fallback para input texto */}
       <div className="col-span-2">
-        <label className="text-xs text-muted-foreground mb-0.5 block">
-          Fontes <span className="text-zinc-600">(separadas por vírgula)</span>
-        </label>
-        <input
-          type="text"
-          placeholder="youtube, noticias, musica"
-          value={form.sources_str}
-          onChange={(e) => onChange({ ...form, sources_str: e.target.value })}
-          className={inputCls}
-        />
+        <label className="text-xs text-muted-foreground mb-1 block">Fontes</label>
+        {availableSources.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {availableSources.map(src => {
+              const active = currentSources.includes(src.id)
+              return (
+                <button
+                  key={src.id}
+                  type="button"
+                  onClick={() => toggleSource(src.id)}
+                  className={cn(
+                    "text-xs px-2 py-0.5 rounded border transition-colors",
+                    active
+                      ? "bg-primary/20 border-primary text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
+                >
+                  {src.name || src.id}
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <input
+            type="text"
+            placeholder="youtube, noticias, musica"
+            value={form.sources_str}
+            onChange={(e) => onChange({ ...form, sources_str: e.target.value })}
+            className={inputCls}
+          />
+        )}
       </div>
-      <div>
-        <label className="text-xs text-muted-foreground mb-0.5 block">
-          slot_id <span className="text-zinc-600">(para replay)</span>
-        </label>
-        <input
-          type="number"
-          placeholder="opcional"
-          value={form.slot_id}
-          onChange={(e) => onChange({ ...form, slot_id: e.target.value })}
-          className={inputCls}
-        />
-      </div>
-      <div>
+
+      {/* slot_id — somente ao criar novo slot */}
+      {isNew && (
+        <div>
+          <label className="text-xs text-muted-foreground mb-0.5 block">
+            slot_id <span className="text-zinc-600">— ID único para replay</span>
+          </label>
+          <div className="flex gap-1.5 items-center">
+            <input
+              type="number"
+              placeholder="opcional"
+              value={form.slot_id}
+              onChange={(e) => onChange({ ...form, slot_id: e.target.value })}
+              className={cn(inputCls, "flex-1")}
+            />
+            {suggestedSlotId && !form.slot_id && (
+              <button
+                type="button"
+                onClick={() => onChange({ ...form, slot_id: String(suggestedSlotId) })}
+                className="shrink-0 text-xs px-2 py-1.5 rounded border border-border text-muted-foreground hover:text-foreground transition-colors"
+                title="Usar próximo ID livre"
+              >
+                #{suggestedSlotId}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* replay_of — select de slots com slot_id */}
+      <div className={isNew ? "" : "col-span-2"}>
         <label className="text-xs text-muted-foreground mb-0.5 block">replay_of</label>
-        <input
-          type="number"
-          placeholder="opcional"
-          value={form.replay_of}
-          onChange={(e) => onChange({ ...form, replay_of: e.target.value })}
-          className={inputCls}
-        />
+        {slotsWithId.length > 0 ? (
+          <select
+            value={form.replay_of}
+            onChange={(e) => onChange({ ...form, replay_of: e.target.value })}
+            className={cn(inputCls, "cursor-pointer")}
+          >
+            <option value="">— sem replay —</option>
+            {slotsWithId.map(s => (
+              <option key={s.slot_id} value={String(s.slot_id)}>
+                #{s.slot_id} · {s.time} — {s.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="number"
+            placeholder="opcional"
+            value={form.replay_of}
+            onChange={(e) => onChange({ ...form, replay_of: e.target.value })}
+            className={inputCls}
+          />
+        )}
       </div>
+
       <div className="col-span-2 flex justify-end gap-2 pt-1">
         <button
           onClick={onCancel}
@@ -227,7 +308,8 @@ function SlotRow({
   slot,
   isPast,
   isNext,
-  originalMissing,
+  replayState,
+  episodeGenerated,
   highlighted,
   replayCount,
   onToggleReplays,
@@ -238,7 +320,8 @@ function SlotRow({
   slot: Slot
   isPast: boolean
   isNext: boolean
-  originalMissing: boolean
+  replayState: ReplayState
+  episodeGenerated: boolean
   highlighted: boolean
   replayCount: number
   onToggleReplays?: () => void
@@ -247,6 +330,8 @@ function SlotRow({
   onDelete: () => void
 }) {
   const isReplay = slot.replay_of != null
+  const originalMissing = replayState === "missing"
+  const originalAwaiting = replayState === "awaiting"
 
   return (
     <div
@@ -269,7 +354,7 @@ function SlotRow({
         {slot.label}
       </span>
 
-      {/* Sources / replay badge */}
+      {/* Sources / replay badge + episode status */}
       <div className="hidden sm:flex items-center gap-1 shrink-0">
         {isReplay ? (
           <>
@@ -286,22 +371,44 @@ function SlotRow({
             >
               replay:{slot.replay_of}
             </button>
+            {replayState === "generated" && (
+              <span className="flex items-center gap-0.5 text-xs text-emerald-400">
+                <CheckCircle2 className="size-3" />
+                episódio gerado
+              </span>
+            )}
             {originalMissing && (
               <span className="flex items-center gap-0.5 text-xs text-amber-400/80">
                 <AlertTriangle className="size-3" />
                 original não gerado
               </span>
             )}
+            {originalAwaiting && (
+              <span className="flex items-center gap-0.5 text-xs text-zinc-400">
+                <Clock className="size-3" />
+                aguardando original
+              </span>
+            )}
           </>
         ) : (
-          (slot.sources ?? []).slice(0, 2).map((s) => (
-            <span key={s} className={cn("text-xs px-1.5 py-0.5 rounded truncate max-w-28", slotBadgeClass(slot))}>
-              {s}
-            </span>
-          ))
-        )}
-        {!isReplay && (slot.sources ?? []).length > 2 && (
-          <span className="text-xs text-muted-foreground">+{(slot.sources ?? []).length - 2}</span>
+          <>
+            {(slot.sources ?? []).slice(0, 2).map((s) => (
+              <span key={s} className={cn("text-xs px-1.5 py-0.5 rounded truncate max-w-28", slotBadgeClass(slot))}>
+                {s}
+              </span>
+            ))}
+            {(slot.sources ?? []).length > 2 && (
+              <span className="text-xs text-muted-foreground">+{(slot.sources ?? []).length - 2}</span>
+            )}
+            {/* indicador de episódio gerado */}
+            {episodeGenerated ? (
+              <span className="flex items-center gap-0.5 text-xs text-emerald-400 ml-1" title="Episódio gerado">
+                <CheckCircle2 className="size-3" />
+              </span>
+            ) : isPast ? (
+              <span className="size-1.5 rounded-full bg-zinc-700 ml-1 shrink-0" title="Sem episódio" />
+            ) : null}
+          </>
         )}
         {slot.slot_id != null && (
           <span className="flex items-center gap-0.5 ml-1">
@@ -377,6 +484,26 @@ export default function Schedule() {
   })
   const missingReplays = new Set(replayStatus?.missing ?? [])
 
+  const { data: sourcesData } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["sources"],
+    queryFn: () => api.get<{ id: string; name: string }[]>("/sources"),
+    staleTime: 5 * 60_000,
+  })
+  const availableSources: SourceOption[] = (sourcesData ?? [])
+    .filter((s: { id: string; name: string; enabled?: boolean }) => s.enabled !== false)
+    .map((s) => ({ id: s.id, name: s.name }))
+
+  const { data: todayEpisodes } = useQuery<{ episodios: { horario: string }[] }>({
+    queryKey: ["episodes", todayStr],
+    queryFn: () => api.get(`/episodes?date=${todayStr}`),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  })
+  const generatedTimes = useMemo(
+    () => new Set((todayEpisodes?.episodios ?? []).map(ep => ep.horario)),
+    [todayEpisodes],
+  )
+
   const slots = data?.slots ?? []
 
   const todayStr = new Date().toISOString().slice(0, 10)
@@ -427,6 +554,36 @@ export default function Schedule() {
     }
     return map
   }, [visibleSlots])
+
+  // Slots que possuem slot_id (elegíveis como original de replay)
+  const slotsWithId = useMemo(
+    () => visibleSlots.map(v => v.slot).filter(s => s.slot_id != null),
+    [visibleSlots],
+  )
+
+  // Mapa slot_id → Slot (para lookup rápido do original)
+  const slotsBySlotId = useMemo(() => {
+    const map = new Map<number, Slot>()
+    for (const { slot } of visibleSlots) {
+      if (slot.slot_id != null) map.set(slot.slot_id, slot)
+    }
+    return map
+  }, [visibleSlots])
+
+  // Próximo slot_id livre (max + 1)
+  const suggestedSlotId = useMemo(() => {
+    const ids = slots.filter(s => s.slot_id != null).map(s => s.slot_id as number)
+    return ids.length === 0 ? 1 : Math.max(...ids) + 1
+  }, [slots])
+
+  const getReplayState = (slot: Slot): ReplayState => {
+    if (slot.replay_of == null) return null
+    if (generatedTimes.has(slot.time)) return "generated"
+    if (!missingReplays.has(slot.replay_of)) return null
+    const orig = slotsBySlotId.get(slot.replay_of)
+    if (!orig || orig.time > now) return "awaiting"
+    return "missing"
+  }
 
   const _highlight = (time: string) => {
     setHighlightedTime(time)
@@ -514,6 +671,10 @@ export default function Schedule() {
                   onSave={handleAdd}
                   onCancel={() => setAddingNew(false)}
                   saving={saveMutation.isPending}
+                  isNew
+                  availableSources={availableSources}
+                  slotsWithId={slotsWithId}
+                  suggestedSlotId={suggestedSlotId}
                 />
               </div>
             )}
@@ -546,7 +707,8 @@ export default function Schedule() {
                     slot={slot}
                     isPast={isPast}
                     isNext={isNext}
-                    originalMissing={slot.replay_of != null && missingReplays.has(slot.replay_of)}
+                    replayState={getReplayState(slot)}
+                    episodeGenerated={generatedTimes.has(slot.time)}
                     highlighted={slot.time === highlightedTime}
                     replayCount={replaysOf.length}
                     onToggleReplays={slot.slot_id != null ? () => setActiveReplayListId(id => id === slot.slot_id ? null : slot.slot_id!) : undefined}
@@ -592,6 +754,8 @@ export default function Schedule() {
                         onSave={() => handleUpdate(idx)}
                         onCancel={() => setEditingIdx(null)}
                         saving={saveMutation.isPending}
+                        availableSources={availableSources}
+                        slotsWithId={slotsWithId}
                       />
                     </div>
                   )}

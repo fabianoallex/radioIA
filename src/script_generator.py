@@ -1,3 +1,4 @@
+import re
 import litellm
 from datetime import datetime, timezone
 
@@ -81,7 +82,7 @@ def _build_news_card(i: int, item: dict) -> str:
 
 def _build_receita_card(i: int, item: dict) -> str:
     return (
-        f"[Receita: {item['title']}]\n"
+        f"[Receita {i}: {item['title']}]\n"
         f"Culinária: {item.get('channel', '')}\n"
         f"{item.get('text', '')}"
     )
@@ -129,26 +130,53 @@ DEFAULT_MODEL = 'claude-sonnet-4-6'
 _TIME_AWARE_TYPES = {'rss', 'clipping', 'clipping_auto', 'youtube', 'reddit'}
 
 
-_NORMALIZATION_BLOCK = """NORMALIZAÇÃO PARA LEITURA EM VOZ ALTA:
-Converta símbolos, siglas, abreviações, datas, horários, moedas, percentuais, medidas e números para a forma mais natural de fala em rádio. Nunca deixe símbolos ou abreviações que o locutor precise interpretar.
+_NORM_HEADER = (
+    "NORMALIZAÇÃO PARA LEITURA EM VOZ ALTA:\n"
+    "Converta para a forma mais natural de fala em rádio. "
+    "Nunca deixe símbolos ou abreviações que o locutor precise interpretar.\n"
+)
 
-Regras e exemplos:
-- Moeda BRL: R$ 3,2 milhões → "três milhões e duzentos mil reais" | R$ 1.234,56 → "mil duzentos e trinta e quatro reais e cinquenta e seis centavos"
-- Moeda USD: US$ 2,5 bilhões → "dois bilhões e meio de dólares"
-- Percentual: 15% → "quinze por cento"
-- Distância: 10 km → "dez quilômetros" | km/h → "quilômetros por hora"
-- Área/volume: m² → "metros quadrados" | m³ → "metros cúbicos"
-- Temperatura: 38°C → "trinta e oito graus Celsius"
-- Tempo: 3h45 → "três horas e quarenta e cinco minutos" | 09:30 → "nove e meia" ou "nove horas e trinta minutos"
-- Data: 21/06/2026 → "vinte e um de junho de dois mil e vinte e seis"
-- Rodovia: BR-163 → "BR cento e sessenta e três" | SP-330 → "SP trezentos e trinta"
-- Ordinal: 1º → "primeiro" | 2ª → "segunda" | nº 123 → "número cento e vinte e três"
-- Siglas conhecidas (escreva por extenso na primeira menção): CEO → "diretor executivo" | PIB → "Produto Interno Bruto" | IBGE → "I B G E" | IA → "inteligência artificial" | EUA → "Estados Unidos"
-- Siglas desconhecidas (soletre letra por letra): MCP → "M C P" | API → "A P I"
-- Tecnologia: 5G → "cinco G" | 4K → "quatro K"
-- Valores grandes: escreva por extenso — 1,2 trilhão → "um trilhão e duzentos bilhões"
+# Siglas incluídas sempre — presentes em quase todo conteúdo
+_NORM_ABBR_FIXED = (
+    '- Siglas conhecidas (escreva por extenso na primeira menção): '
+    'CEO → "diretor executivo" | PIB → "Produto Interno Bruto" | '
+    'IBGE → "I B G E" | IA → "inteligência artificial" | EUA → "Estados Unidos"\n'
+    '- Siglas desconhecidas (soletre letra por letra): MCP → "M C P" | API → "A P I"'
+)
 
-"""
+# Regras condicionais: só injetadas quando o padrão aparece no conteúdo
+_NORM_CONDITIONAL: list[tuple] = [
+    (re.compile(r'R\$'),
+     'Moeda BRL: R$ 3,2 milhões → "três milhões e duzentos mil reais" | R$ 1.234,56 → "mil duzentos e trinta e quatro reais e cinquenta e seis centavos"'),
+    (re.compile(r'US\$'),
+     'Moeda USD: US$ 2,5 bilhões → "dois bilhões e meio de dólares"'),
+    (re.compile(r'\d\s*%'),
+     'Percentual: 15% → "quinze por cento"'),
+    (re.compile(r'\bkm\b', re.IGNORECASE),
+     'Distância: 10 km → "dez quilômetros" | km/h → "quilômetros por hora"'),
+    (re.compile(r'm[²³]'),
+     'Área/volume: m² → "metros quadrados" | m³ → "metros cúbicos"'),
+    (re.compile(r'°[CcFf]|°\s*\d|\bgraus\s+[Cc]'),
+     'Temperatura: 38°C → "trinta e oito graus Celsius"'),
+    (re.compile(r'\d{1,2}h\d{2}|\b\d{1,2}:\d{2}\b'),
+     'Tempo: 3h45 → "três horas e quarenta e cinco minutos" | 09:30 → "nove e meia" ou "nove horas e trinta minutos"'),
+    (re.compile(r'\b\d{1,2}/\d{1,2}/\d{2,4}\b'),
+     'Data: 21/06/2026 → "vinte e um de junho de dois mil e vinte e seis"'),
+    (re.compile(r'\b(?:BR|SP|MT|RJ|GO|MG|RS|PR|SC|BA|CE|PE|PA|AM|ES|MS|MA|PI|RN|PB|SE|AL|TO|RO|AC|RR|AP)-\d+\b'),
+     'Rodovia: BR-163 → "BR cento e sessenta e três" | SP-330 → "SP trezentos e trinta"'),
+    (re.compile(r'\d[ºª]|\bnº\b', re.IGNORECASE),
+     'Ordinal: 1º → "primeiro" | 2ª → "segunda" | nº 123 → "número cento e vinte e três"'),
+    (re.compile(r'\b[2-9]G\b|\b[248]K\b'),
+     'Tecnologia: 5G → "cinco G" | 4K → "quatro K"'),
+    (re.compile(r'\b\d+[,.]?\d*\s*trilh|\b\d+[,.]?\d*\s*bilh', re.IGNORECASE),
+     'Valores grandes: escreva por extenso — 1,2 trilhão → "um trilhão e duzentos bilhões"'),
+]
+
+
+def _build_normalization_block(content: str) -> str:
+    matched = [rule for pat, rule in _NORM_CONDITIONAL if pat.search(content)]
+    cond_lines = ('\n'.join(f'- {r}' for r in matched) + '\n') if matched else ''
+    return f"{_NORM_HEADER}\n{cond_lines}{_NORM_ABBR_FIXED}\n\n"
 
 
 def generate_script(items: list[dict], narrators: list[dict], source_config: dict,
@@ -215,7 +243,7 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
         prompt = _radio_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
 
     if prompt.endswith('Roteiro:'):
-        prompt = prompt[:-len('Roteiro:')] + _NORMALIZATION_BLOCK + 'Roteiro:'
+        prompt = prompt[:-len('Roteiro:')] + _build_normalization_block(prompt) + 'Roteiro:'
 
     if generation_time and source_type in _TIME_AWARE_TYPES and prompt.endswith('Roteiro:'):
         prompt = (

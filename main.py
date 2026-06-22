@@ -448,7 +448,13 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
     voices       = {locutor_keys[i]: n['voice'] for i, n in enumerate(narrators)}
     tts_config   = config.get('tts', {})
     _tts_t0 = _local_now()
-    audio_files  = generate_audio_files(lines, voices, temp_dir, tts_config)
+    try:
+        audio_files = generate_audio_files(lines, voices, temp_dir, tts_config)
+    except Exception as e:
+        print(f"  [tts] Erro: {e}")
+        _write_status(source_id, source_name, 'erro', ativo=False, inicio=_inicio, erro=str(e))
+        _end_log()
+        return None
     _tts_t1 = _local_now()
 
     vinheta_config = {**config.get('vinheta', {}), 'station_name': radio_name}
@@ -627,7 +633,13 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
     voices = {locutor_keys[i]: n['voice'] for i, n in enumerate(narrators)}
     tts_config = config.get('tts', {})
     _tts_t0 = _local_now()
-    audio_files = generate_audio_files(lines, voices, temp_dir, tts_config)
+    try:
+        audio_files = generate_audio_files(lines, voices, temp_dir, tts_config)
+    except Exception as e:
+        print(f"  [tts] Erro: {e}")
+        _write_status(source_id, source_name, 'erro', ativo=False, inicio=_inicio, erro=str(e))
+        _end_log()
+        return None
     _tts_t1 = _local_now()
 
     vinheta_config = {**config.get('vinheta', {}), 'station_name': radio_name}

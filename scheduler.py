@@ -104,6 +104,7 @@ def _entry_active_today(entry: dict) -> bool:
 # ── Execution ─────────────────────────────────────────────────────────────────
 
 _SCHEDULER_DIR = os.path.dirname(os.path.abspath(__file__))
+_EPISODE_TIMEOUT = 15 * 60  # segundos — mata o subprocesso se main.py travar
 
 
 def _run(sources: list[str], label: str = ''):
@@ -115,14 +116,18 @@ def _run(sources: list[str], label: str = ''):
     print(f"[{ts}] {tag}python main.py {src}", flush=True)
     print(f"{'='*50}", flush=True)
     creation_flags = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
-    result = subprocess.run(
-        [sys.executable, os.path.join(_SCHEDULER_DIR, 'main.py')] + sources,
-        cwd=_SCHEDULER_DIR,
-        stdout=sys.stdout,
-        stderr=sys.stderr,
-        creationflags=creation_flags,
-    )
-    status = 'Concluido' if result.returncode == 0 else f'Erro (code {result.returncode})'
+    try:
+        result = subprocess.run(
+            [sys.executable, os.path.join(_SCHEDULER_DIR, 'main.py')] + sources,
+            cwd=_SCHEDULER_DIR,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            creationflags=creation_flags,
+            timeout=_EPISODE_TIMEOUT,
+        )
+        status = 'Concluido' if result.returncode == 0 else f'Erro (code {result.returncode})'
+    except subprocess.TimeoutExpired:
+        status = f'TIMEOUT ({_EPISODE_TIMEOUT // 60} min) — processo encerrado'
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {tag}{status}\n", flush=True)
 
 

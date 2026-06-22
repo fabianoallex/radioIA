@@ -12,7 +12,7 @@ interface RadioConfig    { name: string; background_music: string; background_vo
 interface Narrator       { name: string; voice: string; personality: string }
 interface LlmConfig      { model: string; modelos?: { id: string; descricao: string }[] }
 interface VinhetaConfig  { voice: string; rate: string }
-interface DownloadsConfig{ enabled: boolean; individual: boolean; concatenated: boolean; zip: boolean }
+interface DownloadsConfig{ enabled: boolean; individual: boolean; concatenated: boolean; zip: boolean; mp4: boolean }
 interface AnnouncConfig  { enabled: boolean }
 interface WelcomeConfig  { falas: string[] }
 
@@ -368,6 +368,7 @@ function DownloadsSection({ data }: { data: DownloadsConfig }) {
         <Toggle label="Arquivo individual" desc="Download por episódio" value={form.individual} onChange={(v) => setForm({ ...form, individual: v })} />
         <Toggle label="Concatenado" desc="Todos os episódios em um único MP3" value={form.concatenated} onChange={(v) => setForm({ ...form, concatenated: v })} />
         <Toggle label="ZIP" desc="Arquivo ZIP com todos os episódios" value={form.zip} onChange={(v) => setForm({ ...form, zip: v })} />
+        <Toggle label="MP4" desc="Vídeo com capa estática (requer ffmpeg)" value={form.mp4} onChange={(v) => setForm({ ...form, mp4: v })} />
       </div>
       <div className="flex justify-end mt-4">
         <SaveButton saving={mutation.isPending} saved={saved} />

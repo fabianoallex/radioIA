@@ -1,6 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
+import html as _html_mod
 import json
+import re
 import random
 from urllib.parse import urljoin, urlparse
 
@@ -10,6 +12,75 @@ import requests as _requests
 import trafilatura
 
 MAX_ARTICLE_CHARS = 1200
+
+
+# ── Limpeza de texto RSS ───────────────────────────────────────────────────────
+
+_HTML_TAG_RE         = re.compile(r'<[^>]+>')
+_AUTHOR_LINE_RE      = re.compile(r'^Por\s+\w.{0,100}[\|•]', re.IGNORECASE)
+_CAPTION_LINE_RE     = re.compile(r'^(—\s*)?(Foto|Imagem|Crédito|Legenda|Reprodução)\s*[:/]', re.IGNORECASE)
+_TRAILING_CAPTION_RE = re.compile(r'\s+[—–]\s*(Foto|Imagem|Crédito|Legenda|Reprodução)\s*[:/].{0,120}$', re.IGNORECASE)
+_PROMO_EMOJI_RE      = re.compile(
+    r'^[\U0001F300-\U0001FFFF☀-➿✂-➰➡👉🔗✅⚡🎯]\s*'
+    r'(Compre|Garanta|Acesse|Clique|Veja|Baixe|Aproveite|Confira agora)',
+    re.IGNORECASE,
+)
+_RSS_SECTION_RE = re.compile(
+    r'^(LEIA TAMB[EÉ]M|ASSISTA (AOS )?V[ÍI]DEOS|NOSSOS V[ÍI]DEOS|V[ÍI]DEOS (EM DESTAQUE|RELACIONADOS)|'
+    r'VEJA TAMB[EÉ]M|MAIS NOT[ÍI]CIAS|OUTROS DESTAQUES|CONTINUE LENDO|'
+    r'YOU MAY ALSO LIKE|RELATED ARTICLES|VOC[ÊE] TAMB[ÉE]M PODE|CONFIRA TAMB[EÉ]M)\b',
+    re.IGNORECASE,
+)
+
+
+def _clean_rss_text(title: str, text: str) -> str:
+    if not text:
+        return ''
+    # Decodifica entidades HTML e remove tags residuais (fallback do Google News)
+    text = _html_mod.unescape(text)
+    text = _HTML_TAG_RE.sub(' ', text)
+    # Normaliza espaços horizontais por linha, preservando quebras de linha
+    # \xa0 = non-breaking space gerado por &nbsp;
+    lines_raw = text.splitlines()
+    lines = [re.sub(r'[ \t\xa0]+', ' ', ln).strip() for ln in lines_raw]
+
+    out = []
+    skip_section = False
+    for line in lines:
+        s = line.strip()
+        if _RSS_SECTION_RE.match(s):
+            skip_section = True
+            continue
+        if skip_section:
+            if not s:
+                skip_section = False
+            continue
+        # Remove linha se for idêntica ao título (duplicação comum do trafilatura)
+        if title and s == title.strip():
+            continue
+        if _AUTHOR_LINE_RE.match(s):
+            continue
+        if _CAPTION_LINE_RE.match(s):
+            continue
+        if _PROMO_EMOJI_RE.match(s):
+            continue
+        # Remove legenda de foto no final de uma linha com conteúdo real
+        s = _TRAILING_CAPTION_RE.sub('', s).strip()
+        if s:
+            out.append(s)
+
+    # Colapsa linhas em branco consecutivas
+    result = []
+    prev_blank = False
+    for line in out:
+        blank = not line
+        if blank and prev_blank:
+            continue
+        result.append(line)
+        prev_blank = blank
+
+    cleaned = '\n'.join(result).strip()
+    return cleaned if len(cleaned) >= 20 else ''
 MAX_SCRAPE_CANDIDATES = 20
 _HTTP_TIMEOUT = 10
 _HTTP_HEADERS = {
@@ -171,7 +242,8 @@ def _items_from_rss_url(rss_url: str, feed_name: str, max_per_feed: int, cutoff:
             if not url or not title:
                 continue
             summary = entry.get('summary', '')
-            text = _extract_text(url) or summary[:MAX_ARTICLE_CHARS]
+            raw = _extract_text(url) or summary[:MAX_ARTICLE_CHARS]
+            text = _clean_rss_text(title, raw)
             items.append({
                 'id': url,
                 'title': title,
@@ -306,7 +378,8 @@ def fetch(source_config: dict, credentials=None) -> list[dict]:
             if not url or not title:
                 continue
             summary = entry.get('summary', '')
-            text = _extract_text(url) or summary[:MAX_ARTICLE_CHARS]
+            raw = _extract_text(url) or summary[:MAX_ARTICLE_CHARS]
+            text = _clean_rss_text(title, raw)
             all_items.append({
                 'id': url,
                 'title': title,

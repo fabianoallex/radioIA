@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useRef } from "react"
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
 import {
   ChevronLeft, ChevronRight,
@@ -173,8 +173,10 @@ type Section = "details" | "prompt" | "script" | "log"
 
 function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) {
   const [activeSection, setActiveSection] = useState<Section | null>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
   const streamUrl  = `/api/episodes/${ep.date}/${ep.pasta}/stream`
   const dlUrl      = `/api/episodes/${ep.date}/${ep.pasta}/download`
+  const dlMp4Url   = `/api/episodes/${ep.date}/${ep.pasta}/download/mp4`
   const promptUrl  = `/episodes/${ep.date}/${ep.pasta}/prompt`
   const scriptUrl  = `/episodes/${ep.date}/${ep.pasta}/script`
   const logUrl     = `/episodes/${ep.date}/${ep.pasta}/log`
@@ -183,6 +185,13 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
   const hasDetails = (ep.links && ep.links.length > 0) || ep.generation
 
   const toggle = (s: Section) => setActiveSection(prev => prev === s ? null : s)
+
+  const seekTo = (secs: number) => {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.currentTime = secs
+    audio.play().catch(() => {})
+  }
 
   const toggleStatus = useMutation({
     mutationFn: () => api.patch(`/episodes/${epPath}/status`, {
@@ -261,9 +270,17 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
             href={dlUrl}
             download
             className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Download"
+            title="Download MP3"
           >
             <Download className="size-3.5" />
+          </a>
+          <a
+            href={dlMp4Url}
+            download
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Download MP4 (vídeo com capa)"
+          >
+            <Film className="size-3.5" />
           </a>
           <button
             onClick={handleDelete}
@@ -278,7 +295,7 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
 
       {/* Player */}
       <div className="px-4 pb-3">
-        <audio controls preload="none" className="w-full h-8" style={{ colorScheme: "dark" }}>
+        <audio ref={audioRef} controls preload="none" className="w-full h-8" style={{ colorScheme: "dark" }}>
           <source src={streamUrl} type="audio/mpeg" />
         </audio>
         {ep.tamanho_bytes > 0 && (
@@ -337,6 +354,7 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
                             href={lnk.url}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
                             className="shrink-0 mt-0.5 text-muted-foreground hover:text-foreground"
                           >
                             <ExternalLink className="size-3" />
@@ -348,7 +366,13 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
                         {lnk.published_at && <span>· {lnk.published_at}</span>}
                         {lnk.views > 0 && <span>· {fmtNum(lnk.views)} views</span>}
                         {lnk.start_time_seconds !== undefined && (
-                          <span>· ⏱ {fmtSecs(lnk.start_time_seconds)}</span>
+                          <button
+                            onClick={() => seekTo(lnk.start_time_seconds!)}
+                            className="inline-flex items-center gap-0.5 hover:text-foreground transition-colors"
+                            title="Ouvir a partir daqui"
+                          >
+                            ⏱ {fmtSecs(lnk.start_time_seconds)}
+                          </button>
                         )}
                       </div>
                     </div>
