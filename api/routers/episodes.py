@@ -299,13 +299,21 @@ def download_mp4(dt: str, folder: str, background_tasks: BackgroundTasks):
         shutil.rmtree(tmp, ignore_errors=True)
         raise HTTPException(500, f"Erro ao gerar capa: {exc}")
 
+    filt = (
+        "[1:a]showwaves=s=1280x160:mode=cline:rate=25:colors=#a1a1aa[wv];"
+        "[wv]colorkey=color=black:similarity=0.3:blend=0.05[wv_key];"
+        "[0:v][wv_key]overlay=0:440:shortest=1[out]"
+    )
     cmd = [
         "ffmpeg", "-y",
         "-loop", "1", "-i", str(cover_path),
         "-i", str(audio),
-        "-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage",
+        "-filter_complex", filt,
+        "-map", "[out]", "-map", "1:a",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
         "-c:a", "aac", "-b:a", "192k",
         "-pix_fmt", "yuv420p",
+        "-r", "25",
         "-shortest",
         str(mp4_path),
     ]
