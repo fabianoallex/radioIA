@@ -354,35 +354,24 @@ def download_mp4(dt: str, folder: str, background_tasks: BackgroundTasks):
         srt_file = Path(tmp) / "sub.srt"
         srt_file.write_text(srt_content, encoding="utf-8")
 
+    sub_style = (
+        "FontName=Segoe UI,FontSize=24,PrimaryColour=&H00FFFFFF,"
+        "OutlineColour=&H00000000,Outline=2,Shadow=1,Bold=0,"
+        "Alignment=2,MarginV=50"
+    )
     if srt_file:
         srt_esc = str(srt_file).replace("\\", "/").replace(":", "\\:")
-        sub_style = (
-            "FontName=Segoe UI,FontSize=24,PrimaryColour=&H00FFFFFF,"
-            "OutlineColour=&H00000000,Outline=2,Shadow=1,Bold=0,"
-            "Alignment=2,MarginV=130"
-        )
-        filt = (
-            "[1:a]showwaves=s=1280x160:mode=cline:rate=25:colors=#a1a1aa[wv];"
-            "[wv]colorkey=color=black:similarity=0.3:blend=0.05[wv_key];"
-            f"[0:v][wv_key]overlay=0:440:shortest=1[with_wave];"
-            f"[with_wave]subtitles='{srt_esc}':force_style='{sub_style}'[out]"
-        )
+        vf = f"subtitles='{srt_esc}':force_style='{sub_style}'"
     else:
-        filt = (
-            "[1:a]showwaves=s=1280x160:mode=cline:rate=25:colors=#a1a1aa[wv];"
-            "[wv]colorkey=color=black:similarity=0.3:blend=0.05[wv_key];"
-            "[0:v][wv_key]overlay=0:440:shortest=1[out]"
-        )
+        vf = None
     cmd = [
         "ffmpeg", "-y",
         "-loop", "1", "-i", str(cover_path),
         "-i", str(audio),
-        "-filter_complex", filt,
-        "-map", "[out]", "-map", "1:a",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        *(["-vf", vf] if vf else []),
+        "-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage", "-crf", "23",
         "-c:a", "aac", "-b:a", "192k",
         "-pix_fmt", "yuv420p",
-        "-r", "25",
         "-shortest",
         str(mp4_path),
     ]
