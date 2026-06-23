@@ -449,7 +449,7 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
     tts_config   = config.get('tts', {})
     _tts_t0 = _local_now()
     try:
-        audio_files = generate_audio_files(lines, voices, temp_dir, tts_config)
+        audio_files, tts_usage = generate_audio_files(lines, voices, temp_dir, tts_config)
     except Exception as e:
         print(f"  [tts] Erro: {e}")
         _write_status(source_id, source_name, 'erro', ativo=False, inicio=_inicio, erro=str(e))
@@ -493,6 +493,7 @@ def _run_combined_source(source_config: dict, config: dict, credentials,
         'mix_seconds':   round((_mix_t1 - _mix_t0).total_seconds()),
         'script_words':  len(script.split()),
         'items_count':   len(items),
+        'tts':           tts_usage,
     }
     if llm_usage:
         _generation.update(llm_usage)
@@ -630,11 +631,11 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
                   progresso=f'{len(lines)} falas', inicio=_inicio)
 
     locutor_keys = ['LOCUTOR_A', 'LOCUTOR_B', 'LOCUTOR_C']
-    voices = {locutor_keys[i]: n['voice'] for i, n in enumerate(narrators)}
+    voices = {key: narrators[min(i, len(narrators) - 1)]['voice'] for i, key in enumerate(locutor_keys)}
     tts_config = config.get('tts', {})
     _tts_t0 = _local_now()
     try:
-        audio_files = generate_audio_files(lines, voices, temp_dir, tts_config)
+        audio_files, tts_usage = generate_audio_files(lines, voices, temp_dir, tts_config)
     except Exception as e:
         print(f"  [tts] Erro: {e}")
         _write_status(source_id, source_name, 'erro', ativo=False, inicio=_inicio, erro=str(e))
@@ -676,6 +677,7 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
         'mix_seconds':   round((_mix_t1 - _mix_t0).total_seconds()),
         'script_words':  len(script.split()),
         'items_count':   len(items),
+        'tts':           tts_usage,
     }
     if llm_usage:
         _generation.update(llm_usage)

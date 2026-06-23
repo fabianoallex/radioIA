@@ -24,9 +24,15 @@ from . import rate_to_speed
 
 
 class OpenAIProvider:
+    provider_name = 'openai'
+
     def __init__(self, config: dict):
         self._config  = config or {}
         self._model   = self._config.get('model', 'tts-1-hd')
+
+    @property
+    def model_name(self) -> str:
+        return self._model
         env_var       = self._config.get('api_key_env', 'OPENAI_API_KEY')
         self._api_key = os.getenv(env_var)
         self._voice_map = self._config.get('voice_map') or {}

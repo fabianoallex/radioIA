@@ -76,6 +76,13 @@ interface EpLink {
   start_time_seconds?: number
 }
 
+interface TtsUsage {
+  provider: string
+  model?: string
+  lines: number
+  characters: number
+}
+
 interface Generation {
   model?: string
   started_at?: string
@@ -89,6 +96,7 @@ interface Generation {
   prompt_tokens?: number
   completion_tokens?: number
   total_tokens?: number
+  tts?: TtsUsage
 }
 
 interface Episode {
@@ -416,6 +424,16 @@ function EpisodeCard({ ep, onMutated }: { ep: Episode; onMutated: () => void }) 
                     <span>Mix: <strong className="text-foreground">{fmtSecs(gen.mix_seconds)}</strong></span>
                   )}
                 </div>
+                {gen.tts && (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+                    <span>TTS provider: <strong className="text-foreground">{gen.tts.provider}</strong></span>
+                    {gen.tts.model && (
+                      <span>modelo: <strong className="text-foreground">{gen.tts.model}</strong></span>
+                    )}
+                    <span>falas: <strong className="text-foreground">{gen.tts.lines}</strong></span>
+                    <span>caracteres: <strong className="text-foreground">{fmtNum(gen.tts.characters)}</strong></span>
+                  </div>
+                )}
                 {gen.total_tokens !== undefined && (
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
                     <span>
