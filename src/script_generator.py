@@ -132,7 +132,7 @@ _TIME_AWARE_TYPES = {'rss', 'clipping', 'clipping_auto', 'youtube', 'reddit'}
 
 _NORM_HEADER = (
     "NORMALIZAÇÃO PARA LEITURA EM VOZ ALTA:\n"
-    "Converta para a forma mais natural de fala em rádio. "
+    "Converta símbolos, siglas, abreviações, datas, horários, moedas, percentuais, medidas e números para a forma mais natural de fala em rádio. "
     "Nunca deixe símbolos ou abreviações que o locutor precise interpretar.\n"
 )
 

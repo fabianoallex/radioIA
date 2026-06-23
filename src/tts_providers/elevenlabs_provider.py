@@ -21,9 +21,15 @@ import os
 
 
 class ElevenLabsProvider:
+    provider_name = 'elevenlabs'
+
     def __init__(self, config: dict):
         self._config    = config or {}
         self._model     = self._config.get('model', 'eleven_multilingual_v2')
+
+    @property
+    def model_name(self) -> str:
+        return self._model
         env_var         = self._config.get('api_key_env', 'ELEVENLABS_API_KEY')
         self._api_key   = os.getenv(env_var)
         self._voice_map = self._config.get('voice_map') or {}

@@ -553,7 +553,7 @@ def generate_episode(source_config: dict, output_dir: str,
 
     keys   = ['LOCUTOR_A', 'LOCUTOR_B', 'LOCUTOR_C']
     voices = {key: narrators_active[min(i, len(narrators_active) - 1)]['voice'] for i, key in enumerate(keys)}
-    audio_files = generate_audio_files(lines, voices, temp_dir, tts_config or {})
+    audio_files, _ = generate_audio_files(lines, voices, temp_dir, tts_config or {})
 
     _status('mixando')
     combined   = AudioSegment.empty()

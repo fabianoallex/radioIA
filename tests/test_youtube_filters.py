@@ -122,6 +122,78 @@ class TestCleanDescriptionBlockHeaders:
         assert "inteligência artificial" in result
 
 
+class TestCleanDescriptionChannelBoilerplate:
+    def test_esse_e_o_canal_skips_rest(self):
+        text = (
+            "Crédito: @myhoodbr | carusofabi\n"
+            "\n"
+            "Olá! \n"
+            "\n"
+            "Esse é o canal do g1, o portal de notícias da globo. "
+            "Aqui vamos trazer vídeos pra informar, inspirar e divertir.\n"
+            "\n"
+            "Quer entender um fato? Vem com a gente! 🤔\n"
+            "Quer ver histórias legais? Vem com a gente! 😊\n"
+        )
+        result = _clean_description(text)
+        assert "Esse é o canal" not in result
+        assert "Vem com a gente" not in result
+
+    def test_esse_e_o_canal_with_blank_lines_in_boilerplate(self):
+        # Boilerplate tem blank lines no meio — skip_block sozinho não bastaria
+        text = (
+            "Pernambucana faz 115 anos e é a sexta mais velha do mundo.\n"
+            "\n"
+            "Esse é o canal do g1, o portal de notícias da globo.\n"
+            "\n"
+            "Quer entender um fato? Vem com a gente! 🤔\n"
+            "\n"
+            "E muito mais conteúdo em g1.com.br\n"
+        )
+        result = _clean_description(text)
+        assert "g1, o portal" not in result
+        assert "Vem com a gente" not in result
+        assert "muito mais conteúdo" not in result
+
+    def test_content_before_esse_e_o_canal_preserved(self):
+        text = (
+            "Pernambucana faz 115 anos e é a sexta mais velha do mundo.\n"
+            "\n"
+            "Esse é o canal do g1, o portal de notícias da globo.\n"
+        )
+        result = _clean_description(text)
+        assert "115 anos" in result
+
+    def test_channel_cta_vem_com_a_gente_removed(self):
+        text = (
+            "A pesquisa mostra dados sobre saúde escolar de adolescentes.\n"
+            "Quer entender mais? Vem com a gente!\n"
+            "Mais informações no estudo completo publicado este mês.\n"
+        )
+        result = _clean_description(text)
+        assert "Vem com a gente" not in result
+        assert "saúde escolar" in result
+
+    def test_e_muito_mais_conteudo_removed(self):
+        text = (
+            "Cobertura completa do campeonato brasileiro de futebol.\n"
+            "E muito mais conteúdo em espn.com.br\n"
+        )
+        result = _clean_description(text)
+        assert "muito mais conteúdo" not in result
+        assert "campeonato brasileiro" in result
+
+    def test_sobre_o_canal_skips_rest(self):
+        text = (
+            "Episódio especial sobre astronomia e buracos negros.\n"
+            "Sobre o canal: somos um canal de ciência e curiosidades.\n"
+            "Se inscreva e ative o sininho!\n"
+        )
+        result = _clean_description(text)
+        assert "Sobre o canal" not in result
+        assert "astronomia" in result
+
+
 class TestCleanDescriptionEdgeCases:
     def test_empty_returns_empty(self):
         assert _clean_description("") == ""

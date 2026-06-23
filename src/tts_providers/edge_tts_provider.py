@@ -7,6 +7,9 @@ MAX_CHARS = 450   # limite conservador para evitar timeout no edge-tts
 
 
 class EdgeTTSProvider:
+    provider_name = 'edge_tts'
+    model_name: str | None = None
+
     def __init__(self, config: dict):
         self._config = config or {}
 

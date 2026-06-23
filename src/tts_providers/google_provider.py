@@ -25,6 +25,9 @@ from . import rate_to_speed
 
 
 class GoogleProvider:
+    provider_name = 'google'
+    model_name: str | None = None
+
     def __init__(self, config: dict):
         self._config    = config or {}
         self._lang      = self._config.get('language_code', 'pt-BR')

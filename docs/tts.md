@@ -143,6 +143,34 @@ python main.py --gen-time-clips --force   # regenera todos (ex: mudou a voz)
 
 ---
 
+## Monitoramento de consumo
+
+A cada episódio gerado, o RadioIA grava os dados de uso do TTS em `episode.json`, dentro do campo `generation.tts`:
+
+```json
+"generation": {
+  "tts": {
+    "provider": "openai",
+    "model": "tts-1-hd",
+    "lines": 18,
+    "characters": 1432
+  }
+}
+```
+
+| Campo | Descrição |
+|-------|-----------|
+| `provider` | Provider usado (`edge_tts`, `openai`, `elevenlabs`, `google`) |
+| `model` | Modelo do provider (ausente no Edge TTS, que é gratuito) |
+| `lines` | Número de falas sintetizadas |
+| `characters` | Total de caracteres enviados ao provider |
+
+Esses dados aparecem no painel de detalhes de cada episódio na Admin UI (Episódios → selecionar episódio).
+
+Para provedores pagos, `characters` é a base de cálculo do custo — consulte a tabela de preços do provider para estimar o gasto por episódio.
+
+---
+
 ## Testar TTS sem gerar episódio
 
 Via MCP: `testar_tts("Bem-vindos à nossa rádio!")`

@@ -84,7 +84,7 @@ async def _generate_all(lines: list[dict], voices: dict, temp_dir: str, provider
 
 
 def generate_audio_files(lines: list[dict], voices: dict, temp_dir: str,
-                         tts_config: dict = None) -> list[str]:
+                         tts_config: dict = None) -> tuple[list[str], dict]:
     from src.tts_providers import get_provider
     provider = get_provider(tts_config or {})
 
@@ -92,4 +92,16 @@ def generate_audio_files(lines: list[dict], voices: dict, temp_dir: str,
     if sys.platform == 'win32':
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-    return asyncio.run(_generate_all(lines, voices, temp_dir, provider))
+    total_chars = sum(len(line['text']) for line in lines)
+    paths = asyncio.run(_generate_all(lines, voices, temp_dir, provider))
+
+    tts_usage: dict = {
+        'provider':   provider.provider_name,
+        'lines':      len(lines),
+        'characters': total_chars,
+    }
+    model = getattr(provider, 'model_name', None)
+    if model:
+        tts_usage['model'] = model
+
+    return paths, tts_usage
