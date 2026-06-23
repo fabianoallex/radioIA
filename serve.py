@@ -1438,7 +1438,7 @@ function renderNotes(ep) {
     const meta = isMusic
       ? [lk.channel, lk.album].filter(Boolean).join(' · ')
       : [lk.channel, fmtViews(lk.views)].filter(Boolean).join(' · ');
-    const urlHtml = lk.url ? `<a class="link-url" href="${lk.url}" target="_blank">${lk.url}</a>` : '';
+    const urlHtml = lk.url ? `<a class="link-url" href="${lk.url}" target="_blank" onclick="event.stopPropagation()">${lk.url}</a>` : '';
     const comments = (lk.top_comments || []).filter(c => c.likes > 0);
     const commentsHtml = comments.length ? `
       <div class="comment-block">
