@@ -29,6 +29,19 @@ _BLOCK_HEADER_RE = re.compile(
     r'LEIA MAIS\s*:|SAIBA MAIS\s*:)',
     re.IGNORECASE,
 )
+# Cabeçalhos terminais — indicam que o restante da descrição é boilerplate de canal
+_BLOCK_TERMINAL_RE = re.compile(
+    r'(ESS[EO]\s+[EÉ]\s+O\s+CANAL|ESTE\s+[EÉ]\s+O\s+CANAL|'
+    r'SOMOS\s+O\s+CANAL|CONHE[CÇ]A\s+O\s+CANAL|SOBRE\s+O\s+CANAL)',
+    re.IGNORECASE,
+)
+# Linhas de CTA de canal que sobrevivem ao skip_block por terem blank lines ao redor
+_CHANNEL_CTA_RE = re.compile(
+    r'(vem com a gente|se inscreva.{0,20}canal|ative o sininho|'
+    r'clique em inscrev|curta e compartilh|deixe.{0,10}like|'
+    r'e muito mais conte[úu]do\b)',
+    re.IGNORECASE,
+)
 # Remove hashtags isolados no final do texto limpo
 _TRAILING_HASHTAGS_RE = re.compile(r'(\s+#\w+)+\s*$')
 
@@ -39,8 +52,14 @@ def _clean_description(text: str) -> str:
     lines = text.splitlines()
     out = []
     skip_block = False
+    skip_rest  = False
     for line in lines:
         s = line.strip()
+        if skip_rest:
+            continue
+        if _BLOCK_TERMINAL_RE.search(s):
+            skip_rest = True
+            continue
         if _BLOCK_HEADER_RE.search(s):
             skip_block = True
             continue
@@ -57,6 +76,8 @@ def _clean_description(text: str) -> str:
         if _EMAIL_RE.search(s):
             continue
         if _SOCIAL_LABEL_RE.match(s):
+            continue
+        if _CHANNEL_CTA_RE.search(s):
             continue
         out.append(line)
     # Colapsa linhas em branco consecutivas
