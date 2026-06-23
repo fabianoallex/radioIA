@@ -11,7 +11,7 @@ from lxml import html as lxml_html
 import requests as _requests
 import trafilatura
 
-MAX_ARTICLE_CHARS = 1200
+MAX_ARTICLE_CHARS = 2000
 
 
 # ── Limpeza de texto RSS ───────────────────────────────────────────────────────
