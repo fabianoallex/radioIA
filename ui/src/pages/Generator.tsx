@@ -116,6 +116,8 @@ export default function Generator() {
     reset()
     setIsGenerating(true)
 
+    let success = false
+
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -142,6 +144,7 @@ export default function Generator() {
           if (!dataLine) continue
           const data = dataLine.slice(6)
           if (data === "[CONCLUIDO]") {
+            success = true
             setDone(true)
             setLogLines((prev) => [...prev, data])
           } else if (data.startsWith("[ERRO")) {
@@ -158,6 +161,11 @@ export default function Generator() {
     } finally {
       setIsGenerating(false)
       queryClient.invalidateQueries({ queryKey: ["system"] })
+      if (success) {
+        setSelected(new Set())
+        setContexts({})
+        setExpandedCtx(new Set())
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, selected, contexts, urlText, urlContext, isGenerating, queryClient])
