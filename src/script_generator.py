@@ -176,7 +176,7 @@ _NORM_CONDITIONAL: list[tuple] = [
 def _build_normalization_block(content: str) -> str:
     matched = [rule for pat, rule in _NORM_CONDITIONAL if pat.search(content)]
     cond_lines = ('\n'.join(f'- {r}' for r in matched) + '\n') if matched else ''
-    return f"{_NORM_HEADER}\n{cond_lines}{_NORM_ABBR_FIXED}\n\n"
+    return f"{_NORM_HEADER}\nRegras e exemplos:\n{cond_lines}{_NORM_ABBR_FIXED}\n\n"
 
 
 def generate_script(items: list[dict], narrators: list[dict], source_config: dict,
