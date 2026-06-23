@@ -487,7 +487,7 @@ ESTRUTURA:
 REGRAS:
 - Cada fala: máximo 2 sentenças
 - Mencione sempre a fonte (G1, Folha, etc.)
-- Diga "materia completa nas notas, notícia [número]"
+- OBRIGATÓRIO: todo item DEVE encerrar com a frase exata "Matéria completa nas notas, notícia [número]." — sem exceção, inclusive itens curtos. É sempre a última fala do item, antes do próximo [ITEM_N]
 - Tom informativo — pode ter leveza mas sem exageros
 {solo_note}
 - Marcador: escreva [ITEM_1] (linha sozinha, sem dois-pontos) ANTES de qualquer fala sobre a Notícia 1 — inclusive o gancho ou antecipação; [ITEM_2] antes da Notícia 2 etc. — NÃO usar na abertura nem no encerramento
