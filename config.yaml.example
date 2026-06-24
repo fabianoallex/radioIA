@@ -313,6 +313,30 @@ sources:
   #       competition: BSA         # BSA=Brasileirão, CL=Champions
   #       api_key_env: FOOTBALL_DATA_API_KEY
 
+  # ── Plugin: Web Radio (Relay de Rádio Externa) ──────────────────────────────
+  # Baixa o MP3 atual de uma rádio web e inclui diretamente na programação.
+  # Sem TTS: o áudio externo é o episódio. Ideal para relay de rádio corporativa.
+  #
+  # Estratégia 1 — scraping: encontra o <audio src="..."> na página HTML.
+  # - id: radio-empresa
+  #   type: web_radio
+  #   name: "Rádio Empresa"
+  #   enabled: true
+  #   settings:
+  #     page_url: "https://empresa.com/radio/"
+  #
+  # Estratégia 2 — URL direta: constrói a URL com tokens de data (ex: padrão LAR).
+  # - id: radio-empresa
+  #   type: web_radio
+  #   name: "Rádio Empresa"
+  #   enabled: true
+  #   settings:
+  #     direct_url: "https://empresa.com/wp-content/uploads/{YYYY}/{MM}/{DDMMYYYY}.mp3"
+  #
+  # Tokens disponíveis em direct_url:
+  #   {DDMMYYYY} → 24062026  |  {YYYYMMDD} → 20260624  |  {YYYY-MM-DD} → 2026-06-24
+  #   {YYYY} → 2026  |  {MM} → 06  |  {DD} → 24  |  {HH} → 14  |  {MIN} → 30
+
   # ── Plugin: Filmes ────────────────────────────────────────────────────────────
   # - id: filmes
   #   type: filmes
