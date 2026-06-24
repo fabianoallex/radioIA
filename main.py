@@ -495,8 +495,13 @@ def _run_web_radio_source(source_config: dict, config: dict) -> str | None:
     except Exception:
         duration = 0.0
 
+    script_txt = ''
+    if intro_text:
+        script_txt += f'[LOCUTOR_A]: {intro_text}\n\n'
+    script_txt += f'— Áudio externo: {source_name} —\n{audio_url}'
+
     save_episode_metadata(
-        videos=[item], script=intro_text, output_dir=output_dir,
+        videos=[item], script=script_txt, output_dir=output_dir,
         duration_secs=duration, source_name=source_name,
     )
 
