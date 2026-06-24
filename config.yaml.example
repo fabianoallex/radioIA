@@ -477,6 +477,37 @@ downloads:
 #
 # Uso: python scheduler.py
 #      python scheduler.py --list   (apenas exibe a grade)
+# ── Publishers externos ───────────────────────────────────────────────────────
+# Após gerar cada episódio, entrega o MP3 para destinos externos.
+# Útil para integrar com players de rádio web corporativos.
+#
+# Para desativar em uma fonte específica, adicione na config da fonte:
+#   external_publish: false
+#
+# publishers:
+#
+#   # Cópia local — para nginx/apache servir como URL fixa
+#   - type: local
+#     path: /var/www/radio/
+#     filename: "latest.mp3"          # sempre o mesmo nome → URL fixa no player
+#     # filename: "{DDMMYYYY}.mp3"    # padrão LAR (ex: 23062026.mp3)
+#     # filename: "{source_id}.mp3"   # um arquivo por fonte (copa.mp3, noticias.mp3)
+#
+#   # Upload FTP — para WordPress ou qualquer servidor com FTP
+#   - type: ftp
+#     host: ftp.empresa.com
+#     port: 21                         # opcional, default 21
+#     path: /wp-content/uploads/{YYYY}/{MM}/
+#     filename: "{DDMMYYYY}.mp3"
+#     user_env: FTP_USER               # variável de ambiente com o usuário FTP
+#     password_env: FTP_PASSWORD       # variável de ambiente com a senha FTP
+#     passive: true                    # modo passivo, default true
+#
+# Tokens disponíveis em `filename` e `path`:
+#   {DDMMYYYY} → 23062026  |  {YYYYMMDD} → 20260623  |  {YYYY-MM-DD} → 2026-06-23
+#   {YYYY} → 2026  |  {MM} → 06  |  {DD} → 23  |  {HH} → 14  |  {MIN} → 30
+#   {source_id} → id da fonte configurada (copa, noticias, youtube…)
+
 schedule:
 
   # ── Manhã ────────────────────────────────────────────────────────────────────

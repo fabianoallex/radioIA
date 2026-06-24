@@ -697,6 +697,17 @@ def _run_source(source_config: dict, config: dict, credentials, seen_ids: set,
     _end_log(); return episode_path
 
 
+def _run_external_publishers(episode_path: str, source_config: dict, config: dict) -> None:
+    """Chama os publishers externos configurados, respeitando external_publish da fonte."""
+    if not source_config.get('external_publish', True):
+        return
+    publishers_cfg = config.get('publishers', [])
+    if not publishers_cfg:
+        return
+    from src.publishers import run_publishers
+    run_publishers(episode_path, publishers_cfg, source_id=source_config.get('id', ''))
+
+
 def _cmd_gen_time_clips():
     from src.time_clips import generate_atomic_clips
     config = load_config()
@@ -955,6 +966,7 @@ def main():
             path = fn(source_config, config, first_of_day)
             if path:
                 generated.append(path)
+                _run_external_publishers(path, source_config, config)
                 first_of_day = False
             continue
 
@@ -963,6 +975,7 @@ def main():
                                         publish=publish)
             if path:
                 generated.append(path)
+                _run_external_publishers(path, source_config, config)
                 first_of_day = False
                 seen_ids = load_seen_ids()
             continue
@@ -971,6 +984,7 @@ def main():
                            is_first_of_day=first_of_day, publish=publish)
         if path:
             generated.append(path)
+            _run_external_publishers(path, source_config, config)
             first_of_day = False  # subsequent sources are mid-day segments
             seen_ids = load_seen_ids()
 
