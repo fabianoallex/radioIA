@@ -256,7 +256,7 @@ def fetch(source_config: dict, credentials=None) -> list[dict]:
         'id':           f"copa-mundo-{today_iso}",
         'title':        'Copa do Mundo 2026 — Resultados e Agenda',
         'text':         text,
-        'url':          'https://www.fifa.com/pt/tournaments/mens/worldcup/canadamexicousa2026/scores-fixtures',
+        'url':          '',
         'source_name':  source_config.get('name', 'Copa do Mundo 2026'),
         'source_type':  source_config.get('type', 'copa_mundo'),
         'published_at': today_iso,

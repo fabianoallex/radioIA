@@ -286,6 +286,81 @@ def _run_spot_source(source_config: dict, config: dict, is_first_of_day: bool) -
     return episode_path
 
 
+def _run_web_radio_source(source_config: dict, config: dict) -> str | None:
+    source_id   = source_config['id']
+    source_name = source_config.get('name', 'Rádio Externa')
+    output_dir  = _episode_output_dir(source_id)
+
+    print(f"\n{'='*50}")
+    print(f"Fonte: {source_name} (web_radio)")
+    print(f"{'='*50}")
+
+    _inicio = _local_now().strftime('%H:%M:%S')
+    _write_status(source_id, source_name, 'buscando', inicio=_inicio)
+
+    plugin = SOURCE_MODULES.get('web_radio')
+    if not plugin:
+        print("  [web-radio] Plugin não carregado.")
+        _write_status(source_id, source_name, 'erro', ativo=False, inicio=_inicio, erro='plugin não carregado')
+        return None
+
+    items = plugin.fetch(source_config)
+    if not items:
+        _write_status(source_id, source_name, 'erro', ativo=False, inicio=_inicio, erro='sem audio disponivel')
+        return None
+
+    item      = items[0]
+    audio_url = item.get('audio_url', '') or item.get('url', '')
+    if not audio_url:
+        print("  [web-radio] URL de áudio não encontrada.")
+        _write_status(source_id, source_name, 'erro', ativo=False, inicio=_inicio, erro='url de audio ausente')
+        return None
+
+    _write_status(source_id, source_name, 'baixando', inicio=_inicio)
+    os.makedirs(output_dir, exist_ok=True)
+    episode_path = os.path.join(output_dir, 'episode.mp3')
+
+    try:
+        import requests as _req
+        ua = (source_config.get('settings') or {}).get(
+            'user_agent',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        )
+        timeout = int((source_config.get('settings') or {}).get('timeout', 30))
+        with _req.get(audio_url, headers={'User-Agent': ua}, stream=True, timeout=timeout) as r:
+            r.raise_for_status()
+            with open(episode_path, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=65536):
+                    if chunk:
+                        f.write(chunk)
+    except Exception as e:
+        print(f"  [web-radio] Erro ao baixar MP3: {e}")
+        _write_status(source_id, source_name, 'erro', ativo=False, inicio=_inicio, erro=str(e))
+        return None
+
+    size_mb = os.path.getsize(episode_path) / (1024 * 1024)
+
+    from src.audio_mixer import save_episode_metadata
+    try:
+        from pydub.utils import mediainfo
+        info    = mediainfo(episode_path)
+        duration = float(info.get('duration', 0))
+    except Exception:
+        duration = 0.0
+
+    save_episode_metadata(
+        videos=[item], script='', output_dir=output_dir,
+        duration_secs=duration, source_name=source_name,
+    )
+
+    _write_status(source_id, source_name, 'concluido', ativo=False, inicio=_inicio)
+
+    mins, secs = int(duration // 60), int(duration % 60)
+    print(f"\nEpisodio de relay gerado: {episode_path}")
+    print(f"Tamanho: {size_mb:.1f} MB | Duracao: {mins}m {secs}s")
+    return episode_path
+
+
 def _run_music_source(source_config: dict, config: dict, is_first_of_day: bool) -> str | None:
     source_id   = source_config['id']
     source_name = source_config.get('name', 'Selecao Musical')
@@ -947,6 +1022,13 @@ def main():
                 print(f"  Parametro CLI: par {n} ({label})")
             except ValueError:
                 print(f"  Parametro invalido '{param}' — usando rotacao automatica.")
+
+        if source_config.get('type') == 'web_radio':
+            path = _run_web_radio_source(source_config, config)
+            if path:
+                generated.append(path)
+                first_of_day = False
+            continue
 
         if source_config.get('type') in ('music', 'utility', 'spot'):
             fn = {'music': _run_music_source,
