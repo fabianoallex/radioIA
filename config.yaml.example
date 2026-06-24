@@ -336,6 +336,22 @@ sources:
   # Tokens disponíveis em direct_url:
   #   {DDMMYYYY} → 24062026  |  {YYYYMMDD} → 20260624  |  {YYYY-MM-DD} → 2026-06-24
   #   {YYYY} → 2026  |  {MM} → 06  |  {DD} → 24  |  {HH} → 14  |  {MIN} → 30
+  #
+  # Introdução narrada antes do MP3 externo (opcional):
+  #   intro_mode: fixed   → lê intro_text via TTS (usa voz do primeiro narrador)
+  #   intro_mode: llm     → gera o texto da intro com LLM e narra via TTS
+  #   (omitir intro_mode) → sem introdução, reproduz o MP3 diretamente
+  #
+  # - id: radio-empresa
+  #   type: web_radio
+  #   name: "Rádio Empresa"
+  #   enabled: true
+  #   model: "claude-haiku-4-5-20251001"   # usado apenas com intro_mode: llm
+  #   settings:
+  #     direct_url: "https://empresa.com/wp-content/uploads/{YYYY}/{MM}/{DDMMYYYY}.mp3"
+  #     intro_mode: fixed
+  #     intro_text: "E agora, a programação da Rádio Empresa para você."
+  #     # intro_mode: llm   # alternativa: gera o texto da intro automaticamente
 
   # ── Plugin: Filmes ────────────────────────────────────────────────────────────
   # - id: filmes
