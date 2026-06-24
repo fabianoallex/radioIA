@@ -286,6 +286,78 @@ def _run_spot_source(source_config: dict, config: dict, is_first_of_day: bool) -
     return episode_path
 
 
+def _web_radio_intro_text(source_config: dict, config: dict) -> str:
+    """Resolve o texto da intro conforme intro_mode configurado."""
+    settings    = source_config.get('settings') or {}
+    intro_mode  = settings.get('intro_mode', '').strip()
+    intro_text  = settings.get('intro_text', '').strip()
+    source_name = source_config.get('name', 'Rádio Externa')
+
+    if intro_mode == 'fixed':
+        return intro_text or f"E agora, {source_name}."
+
+    if intro_mode == 'llm':
+        import litellm
+        radio_name  = config.get('radio', {}).get('name', 'RadioIA')
+        llm_cfg     = config.get('llm', config.get('claude', {}))
+        model       = source_config.get('model') or llm_cfg.get('model', 'claude-haiku-4-5-20251001')
+        context     = source_config.get('context', '')
+        context_line = f"\nContexto adicional: {context}" if context else ''
+        prompt = (
+            f"Você é o locutor da rádio {radio_name}. "
+            f"Crie uma apresentação curta (1 a 2 frases) para introduzir o bloco '{source_name}' "
+            f"que será reproduzido a seguir.{context_line} "
+            f"Responda apenas com o texto da locução, sem aspas nem explicações."
+        )
+        try:
+            resp = litellm.completion(
+                model=model,
+                messages=[{'role': 'user', 'content': prompt}],
+                max_tokens=120,
+                temperature=0.8,
+            )
+            return resp.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"  [web-radio] Erro ao gerar intro via LLM: {e}")
+            return f"E agora, {source_name}."
+
+    return ''
+
+
+def _web_radio_prepend_intro(intro_text: str, external_mp3: str,
+                              output_dir: str, config: dict) -> None:
+    """Gera TTS da intro_text e concatena antes do external_mp3 (in-place)."""
+    from src.tts_generator import parse_script, generate_audio_files
+    from pydub import AudioSegment
+
+    narrators = config.get('narrators', [{}])
+    narrator  = narrators[0]
+    voices    = {'LOCUTOR_A': narrator.get('voice', 'pt-BR-FranciscaNeural')}
+    tts_cfg   = config.get('tts', {})
+
+    script = f'[LOCUTOR_A]: {intro_text}'
+    lines  = parse_script(script)
+    if not lines:
+        return
+
+    print(f"  [web-radio] Gerando intro TTS: \"{intro_text[:60]}\"")
+    temp_dir = os.path.join(output_dir, '_intro_tmp')
+    try:
+        paths, _ = generate_audio_files(lines, voices, temp_dir, tts_cfg)
+        if not paths:
+            return
+
+        intro_seg   = sum((AudioSegment.from_mp3(p) for p in paths), AudioSegment.empty())
+        external_seg = AudioSegment.from_mp3(external_mp3)
+        combined    = intro_seg + external_seg
+        combined.export(external_mp3, format='mp3')
+        print(f"  [web-radio] Intro concatenada ({len(intro_seg)/1000:.1f}s + {len(external_seg)/1000:.1f}s)")
+    except Exception as e:
+        print(f"  [web-radio] Erro ao gerar intro: {e} — continuando sem intro.")
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
 def _run_web_radio_source(source_config: dict, config: dict) -> str | None:
     source_id   = source_config['id']
     source_name = source_config.get('name', 'Rádio Externa')
@@ -322,9 +394,8 @@ def _run_web_radio_source(source_config: dict, config: dict) -> str | None:
 
     try:
         import requests as _req
-        ua = (source_config.get('settings') or {}).get(
-            'user_agent',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        ua      = (source_config.get('settings') or {}).get(
+            'user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         )
         timeout = int((source_config.get('settings') or {}).get('timeout', 30))
         with _req.get(audio_url, headers={'User-Agent': ua}, stream=True, timeout=timeout) as r:
@@ -338,18 +409,23 @@ def _run_web_radio_source(source_config: dict, config: dict) -> str | None:
         _write_status(source_id, source_name, 'erro', ativo=False, inicio=_inicio, erro=str(e))
         return None
 
+    intro_text = _web_radio_intro_text(source_config, config)
+    if intro_text:
+        _write_status(source_id, source_name, 'narrando intro', inicio=_inicio)
+        _web_radio_prepend_intro(intro_text, episode_path, output_dir, config)
+
     size_mb = os.path.getsize(episode_path) / (1024 * 1024)
 
     from src.audio_mixer import save_episode_metadata
     try:
         from pydub.utils import mediainfo
-        info    = mediainfo(episode_path)
+        info     = mediainfo(episode_path)
         duration = float(info.get('duration', 0))
     except Exception:
         duration = 0.0
 
     save_episode_metadata(
-        videos=[item], script='', output_dir=output_dir,
+        videos=[item], script=intro_text, output_dir=output_dir,
         duration_secs=duration, source_name=source_name,
     )
 
