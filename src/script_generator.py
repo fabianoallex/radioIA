@@ -236,6 +236,9 @@ def generate_script(items: list[dict], narrators: list[dict], source_config: dic
     elif source_type == 'utility':
         content = items[0].get('text', '') if items else ''
         prompt = _utility_prompt(active, names, source_name, content, is_first_of_day, station_name)
+    elif source_type == 'copa_mundo':
+        content = items[0].get('text', '') if items else ''
+        prompt = _copa_mundo_prompt(active, names, source_name, content, is_first_of_day, station_name)
     elif source_type == 'combined':
         cards = [_build_combined_card(i, item) for i, item in enumerate(items, 1)]
         prompt = _combined_prompt(active, names, source_name, '\n\n'.join(cards), is_first_of_day, station_name)
@@ -1277,6 +1280,76 @@ REGRAS:
 - A última fala de cada item deve encerrar aquele item. Ganchos ou antecipações do próximo item NUNCA aparecem antes do marcador — vêm DEPOIS do [ITEM_N] seguinte, como primeira fala daquele item. Se o mesmo locutor abre o próximo item, o gancho e a primeira fala ficam juntos no mesmo bloco [LOCUTOR_X], após o marcador
 
 RECEITA:
+{content}
+
+Roteiro:"""
+
+
+def _copa_mundo_prompt(narrators: list[dict], names: list[str], source_name: str,
+                       content: str, is_first_of_day: bool = True,
+                       station_name: str = 'RadioIA') -> str:
+    n = len(narrators)
+    narrator_block = _narrator_block(narrators)
+    format_block   = _format_block(narrators)
+    names_str = ', '.join(names[:-1]) + f' e {names[-1]}' if n > 1 else names[0]
+
+    solo_note = (
+        "- Programa solo: use só [LOCUTOR_A], tom direto de locutor esportivo"
+        if n == 1 else
+        f"- Distribua as falas de forma equilibrada entre os {n} apresentadores"
+    )
+
+    if is_first_of_day:
+        abertura = (
+            f"1. ABERTURA: {names_str} dão bom dia, dizem que os ouvintes estão na {station_name} "
+            f"e anunciam o boletim \"{source_name}\" com os resultados e a agenda do dia (2-3 falas)"
+        )
+        encerramento = "4. Encerramento: convide o ouvinte a continuar na programação (1-2 falas)"
+    else:
+        abertura = (
+            f'1. ENTRADA: entre direto no boletim — "É hora do {source_name}!", '
+            f'"Confira os resultados e a agenda da Copa..." ou similar. SEM bom dia. (1-2 falas)'
+        )
+        encerramento = "4. Encerramento rápido sinalizando que a programação continua (1 fala)"
+
+    return f"""Você é um roteirista de boletim esportivo de rádio FM brasileira.
+Crie o roteiro do segmento "{source_name}" — um boletim objetivo com resultados e agenda da Copa do Mundo.
+
+APRESENTADORES:
+{narrator_block}
+
+{format_block}
+
+ATENÇÃO: responda APENAS com as linhas do roteiro no formato acima. Sem títulos, sem markdown, sem asteriscos, sem tracejados, sem comentários fora do roteiro. Use português correto com pontuação e com todos os acentos (ã, é, ê, ç, à, â, í, ó, ô, ú etc.) — nunca escreva "voce", "nao", "tambem", escreva "você", "não", "também".
+
+PERSONALIDADES: respeite o perfil de cada apresentador mesmo no tom esportivo.
+
+ESTILO OBRIGATÓRIO:
+- Boletim esportivo objetivo — sem inventar emoções, rivalidades ou contextos que não estejam nos dados
+- Para cada jogo encerrado: mencione time da casa, placar, time visitante, grupo ou fase e quando foi
+- Para cada jogo agendado: mencione os times, horário de Brasília, grupo ou fase e estádio/cidade se disponível
+- Não chame os dados de "vídeo", "canal", "conteúdo" ou qualquer termo de mídia digital
+- Não diga "link nas notas" — não há link relevante para o ouvinte de rádio neste contexto
+
+ESTRUTURA:
+{abertura}
+2. RESULTADOS RECENTES (se houver): leia os placares de forma clara — time A N x N time B, horário e local (3-6 falas)
+3. JOGOS DE HOJE (se houver): agenda com horário BRT, times, grupo/fase e estádio (2-4 falas)
+4. PRÓXIMOS JOGOS (se houver): agenda resumida (1-3 falas)
+{encerramento}
+
+REGRAS:
+- Cada fala: máximo 2 sentenças
+- Leia os placares como locutor esportivo: "Brasil venceu a Escócia por dois a zero"
+- Mencione o horário de Brasília para jogos agendados: "às dezenove horas, horário de Brasília"
+- Mencione fase e grupo quando disponíveis: "pela fase de grupos, Grupo C"
+- Mencione estádio e cidade quando disponíveis: "no NRG Stadium, em Houston"
+- Se não houver jogos em alguma seção, pule-a sem mencionar a ausência
+{solo_note}
+- NÃO use marcadores [ITEM_N] — este segmento é um bloco contínuo sem itens individuais
+- NÃO invente placares, horários ou qualquer dado que não esteja abaixo
+
+DADOS DA COPA:
 {content}
 
 Roteiro:"""
