@@ -142,3 +142,137 @@ class TestTriviaPlugin:
             items = fetch({'settings': {'amount': 1}})
         assert '&amp;' not in items[0]['title']
         assert '&amp;' not in items[0]['text']
+
+
+# ── Copa do Mundo plugin (HTTP mockado) ───────────────────────────────────────
+
+class TestCopaPlugin:
+    BASE_CONFIG = {
+        'id': 'copa', 'name': 'Copa do Mundo 2026', 'type': 'copa_mundo',
+        'settings': {'api_key_env': 'FOOTBALL_DATA_API_KEY'},
+    }
+
+    def _api_response(self, matches=None):
+        if matches is None:
+            matches = [
+                {
+                    'utcDate': '2026-06-23T17:00:00Z',
+                    'status': 'FINISHED',
+                    'stage': 'GROUP_STAGE',
+                    'group': 'GROUP_K',
+                    'homeTeam': {'name': 'Portugal', 'shortName': 'Portugal'},
+                    'awayTeam': {'name': 'Uzbekistan', 'shortName': 'Uzbekistan'},
+                    'score': {'fullTime': {'home': 5, 'away': 0}},
+                    'venue': 'MetLife Stadium',
+                },
+                {
+                    'utcDate': '2026-06-24T22:00:00Z',
+                    'status': 'SCHEDULED',
+                    'stage': 'GROUP_STAGE',
+                    'group': 'GROUP_C',
+                    'homeTeam': {'name': 'Scotland', 'shortName': 'Scotland'},
+                    'awayTeam': {'name': 'Brazil', 'shortName': 'Brazil'},
+                    'score': {'fullTime': {'home': None, 'away': None}},
+                    'venue': 'NRG Stadium',
+                },
+            ]
+        return {'matches': matches}
+
+    def _mock_get(self, data):
+        mock = MagicMock()
+        mock.json.return_value = data
+        mock.raise_for_status = MagicMock()
+        return mock
+
+    def test_retorna_contrato_valido(self, monkeypatch):
+        from plugins.copa_mundo import fetch
+        monkeypatch.setenv('FOOTBALL_DATA_API_KEY', 'test-key')
+        with patch('plugins.copa_mundo.requests.get',
+                   return_value=self._mock_get(self._api_response())):
+            items = fetch(self.BASE_CONFIG)
+        assert_valid_plugin_items(items)
+
+    def test_retorna_um_item(self, monkeypatch):
+        from plugins.copa_mundo import fetch
+        monkeypatch.setenv('FOOTBALL_DATA_API_KEY', 'test-key')
+        with patch('plugins.copa_mundo.requests.get',
+                   return_value=self._mock_get(self._api_response())):
+            items = fetch(self.BASE_CONFIG)
+        assert len(items) == 1
+
+    def test_texto_contem_resultado_encerrado(self, monkeypatch):
+        from plugins.copa_mundo import fetch
+        monkeypatch.setenv('FOOTBALL_DATA_API_KEY', 'test-key')
+        with patch('plugins.copa_mundo.requests.get',
+                   return_value=self._mock_get(self._api_response())):
+            items = fetch(self.BASE_CONFIG)
+        text = items[0]['text']
+        assert 'Portugal' in text
+        assert '5' in text
+        assert 'RESULTADOS RECENTES' in text
+
+    def test_texto_contem_jogo_agendado(self, monkeypatch):
+        from plugins.copa_mundo import fetch
+        monkeypatch.setenv('FOOTBALL_DATA_API_KEY', 'test-key')
+        with patch('plugins.copa_mundo.requests.get',
+                   return_value=self._mock_get(self._api_response())):
+            items = fetch(self.BASE_CONFIG)
+        text = items[0]['text']
+        assert 'Brasil' in text
+        assert 'a jogar' in text
+
+    def test_texto_contem_estadio_e_cidade(self, monkeypatch):
+        from plugins.copa_mundo import fetch
+        monkeypatch.setenv('FOOTBALL_DATA_API_KEY', 'test-key')
+        with patch('plugins.copa_mundo.requests.get',
+                   return_value=self._mock_get(self._api_response())):
+            items = fetch(self.BASE_CONFIG)
+        text = items[0]['text']
+        assert 'MetLife Stadium' in text
+        assert 'East Rutherford' in text
+
+    def test_url_vazia(self, monkeypatch):
+        from plugins.copa_mundo import fetch
+        monkeypatch.setenv('FOOTBALL_DATA_API_KEY', 'test-key')
+        with patch('plugins.copa_mundo.requests.get',
+                   return_value=self._mock_get(self._api_response())):
+            items = fetch(self.BASE_CONFIG)
+        assert items[0]['url'] == ''
+
+    def test_retorna_vazio_sem_api_key(self, monkeypatch):
+        from plugins.copa_mundo import fetch
+        monkeypatch.delenv('FOOTBALL_DATA_API_KEY', raising=False)
+        items = fetch(self.BASE_CONFIG)
+        assert items == []
+
+    def test_retorna_vazio_em_erro_de_rede(self, monkeypatch):
+        from plugins.copa_mundo import fetch
+        monkeypatch.setenv('FOOTBALL_DATA_API_KEY', 'test-key')
+        with patch('plugins.copa_mundo.requests.get', side_effect=Exception('timeout')):
+            items = fetch(self.BASE_CONFIG)
+        assert items == []
+
+    def test_retorna_vazio_sem_jogos_no_periodo(self, monkeypatch):
+        from plugins.copa_mundo import fetch
+        monkeypatch.setenv('FOOTBALL_DATA_API_KEY', 'test-key')
+        with patch('plugins.copa_mundo.requests.get',
+                   return_value=self._mock_get({'matches': []})):
+            items = fetch(self.BASE_CONFIG)
+        assert items == []
+
+    def test_traduz_nome_do_time(self, monkeypatch):
+        from plugins.copa_mundo import fetch
+        monkeypatch.setenv('FOOTBALL_DATA_API_KEY', 'test-key')
+        with patch('plugins.copa_mundo.requests.get',
+                   return_value=self._mock_get(self._api_response())):
+            items = fetch(self.BASE_CONFIG)
+        assert 'Brasil' in items[0]['text']
+        assert 'Brazil' not in items[0]['text']
+
+    def test_source_type_propagado(self, monkeypatch):
+        from plugins.copa_mundo import fetch
+        monkeypatch.setenv('FOOTBALL_DATA_API_KEY', 'test-key')
+        with patch('plugins.copa_mundo.requests.get',
+                   return_value=self._mock_get(self._api_response())):
+            items = fetch(self.BASE_CONFIG)
+        assert items[0]['source_type'] == 'copa_mundo'

@@ -118,6 +118,85 @@ class TestCombinedPrompt:
         assert 'Notícia 2' in captured['prompt']
 
 
+class TestCopaMundoPrompt:
+    CONTENT = (
+        '[RESULTADOS RECENTES]\n'
+        'Data: 23 de junho, terça-feira | Horário: 14:00 (Brasília) | Fase: Fase de Grupos | '
+        'Grupo: Grupo K | Jogo: Portugal x Uzbequistão | Resultado: Portugal 5 x 0 Uzbequistão | '
+        'Estádio: MetLife Stadium | Local: East Rutherford / Nova York\n'
+        '[JOGOS DE HOJE]\n'
+        'Data: 24 de junho, quarta-feira | Horário: 19:00 (Brasília) | Fase: Fase de Grupos | '
+        'Grupo: Grupo C | Jogo: Escócia x Brasil | Resultado: a jogar | '
+        'Estádio: NRG Stadium | Local: Houston'
+    )
+
+    def _copa_item(self):
+        return {
+            'id': 'copa-mundo-2026-06-24', 'title': 'Copa do Mundo 2026 — Resultados e Agenda',
+            'text': self.CONTENT, 'url': '', 'source_name': 'Copa do Mundo 2026',
+            'source_type': 'copa_mundo', 'published_at': '2026-06-24',
+            'views': 0, 'comments': [], 'channel': 'Copa do Mundo 2026',
+        }
+
+    def test_dados_aparecem_no_prompt(self, narrators, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(litellm, 'completion', _mock_completion(captured))
+        generate_script([self._copa_item()], narrators,
+                        {'type': 'copa_mundo', 'name': 'Copa do Mundo 2026'})
+        assert 'Portugal' in captured['prompt']
+        assert 'Brasil' in captured['prompt']
+        assert 'RESULTADOS RECENTES' in captured['prompt']
+
+    def test_prompt_termina_com_roteiro(self, narrators, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(litellm, 'completion', _mock_completion(captured))
+        generate_script([self._copa_item()], narrators,
+                        {'type': 'copa_mundo', 'name': 'Copa do Mundo 2026'})
+        assert captured['prompt'].endswith('Roteiro:')
+
+    def test_prompt_nao_menciona_video_ou_canal(self, narrators, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(litellm, 'completion', _mock_completion(captured))
+        generate_script([self._copa_item()], narrators,
+                        {'type': 'copa_mundo', 'name': 'Copa do Mundo 2026'})
+        prompt = captured['prompt'].lower()
+        assert 'link do video' not in prompt
+        assert 'visualizações' not in prompt
+        assert 'canal:' not in prompt
+
+    def test_prompt_nao_usa_marcadores_item_n(self, narrators, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(litellm, 'completion', _mock_completion(captured))
+        generate_script([self._copa_item()], narrators,
+                        {'type': 'copa_mundo', 'name': 'Copa do Mundo 2026'})
+        assert 'NÃO use marcadores [ITEM_N]' in captured['prompt']
+
+    def test_prompt_instrui_variacao_de_linguagem(self, narrators, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(litellm, 'completion', _mock_completion(captured))
+        generate_script([self._copa_item()], narrators,
+                        {'type': 'copa_mundo', 'name': 'Copa do Mundo 2026'})
+        assert 'VARIAÇÃO DE LINGUAGEM' in captured['prompt']
+
+    def test_nomes_dos_narradores_no_prompt(self, narrators, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(litellm, 'completion', _mock_completion(captured))
+        generate_script([self._copa_item()], narrators,
+                        {'type': 'copa_mundo', 'name': 'Copa do Mundo 2026'})
+        assert 'Ana' in captured['prompt']
+        assert 'João' in captured['prompt']
+
+    def test_context_produtor_injetado(self, narrators, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(litellm, 'completion', _mock_completion(captured))
+        generate_script(
+            [self._copa_item()], narrators,
+            {'type': 'copa_mundo', 'name': 'Copa do Mundo 2026',
+             'context': 'foco nos jogos do Brasil'},
+        )
+        assert 'INSTRUÇÃO DO PRODUTOR: foco nos jogos do Brasil' in captured['prompt']
+
+
 class TestBuildCombinedCard:
     def test_rss_item_labeled_noticia(self):
         card = _build_combined_card(1, _news_item(1, 'rss'))
