@@ -781,7 +781,20 @@ sources:
   #     mode: random                      # random | book | passage
   #     max_items: 3
 
-  # ── Plugin: Futebol ──────────────────────────────────────────────────────────
+  # ── Plugin: Copa do Mundo 2026 ───────────────────────────────────────────────
+  # Resultados e agenda com: dia, dia da semana, horário BRT, estádio, cidade,
+  # fase, grupo e placar. Fonte: football-data.org (requer FOOTBALL_DATA_API_KEY)
+  # - id: copa
+  #   type: copa_mundo
+  #   name: "Copa do Mundo 2026"
+  #   enabled: true
+  #   model: claude-haiku-4-5-20251001
+  #   settings:
+  #     api_key_env: FOOTBALL_DATA_API_KEY
+  #     days_lookback: 2   # dias passados de resultados incluídos
+  #     days_ahead: 1      # dias à frente de agenda incluídos
+
+  # ── Plugin: Futebol (utility) ────────────────────────────────────────────────
   # - id: brasileirao
   #   type: utility
   #   name: "Brasileirão"
@@ -792,7 +805,7 @@ sources:
   #     lottery: {enabled: false}
   #     football:
   #       enabled: true
-  #       competition: BSA         # BSA=Brasileirão, CL=Champions, WC=Copa do Mundo
+  #       competition: BSA         # BSA=Brasileirão, CL=Champions
   #       api_key_env: FOOTBALL_DATA_API_KEY
 
   # ── Plugin: Filmes ────────────────────────────────────────────────────────────

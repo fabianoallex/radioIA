@@ -142,6 +142,7 @@ _NORM_ABBR_FIXED = (
     'CEO → "diretor executivo" | PIB → "Produto Interno Bruto" | '
     'IBGE → "I B G E" | IA → "inteligência artificial" | EUA → "Estados Unidos"\n'
     '- Siglas desconhecidas (soletre letra por letra): MCP → "M C P" | API → "A P I"'
+    '- Números sempre por extenso: 2 mil views  → duas mil views | 2000 carros  → dois mil carros '
 )
 
 # Regras condicionais: só injetadas quando o padrão aparece no conteúdo
