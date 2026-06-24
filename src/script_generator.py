@@ -1326,24 +1326,40 @@ PERSONALIDADES: respeite o perfil de cada apresentador mesmo no tom esportivo.
 
 ESTILO OBRIGATÓRIO:
 - Boletim esportivo objetivo — sem inventar emoções, rivalidades ou contextos que não estejam nos dados
-- Para cada jogo encerrado: mencione time da casa, placar, time visitante, grupo ou fase e quando foi
-- Para cada jogo agendado: mencione os times, horário de Brasília, grupo ou fase e estádio/cidade se disponível
 - Não chame os dados de "vídeo", "canal", "conteúdo" ou qualquer termo de mídia digital
 - Não diga "link nas notas" — não há link relevante para o ouvinte de rádio neste contexto
 
 ESTRUTURA:
 {abertura}
-2. RESULTADOS RECENTES (se houver): leia os placares de forma clara — time A N x N time B, horário e local (3-6 falas)
-3. JOGOS DE HOJE (se houver): agenda com horário BRT, times, grupo/fase e estádio (2-4 falas)
+2. RESULTADOS RECENTES (se houver): leia os placares cobrindo todos os jogos (3-6 falas)
+3. JOGOS DE HOJE (se houver): agenda com horário BRT, times, grupo/fase e cidade (2-4 falas)
 4. PRÓXIMOS JOGOS (se houver): agenda resumida (1-3 falas)
 {encerramento}
 
+VARIAÇÃO DE LINGUAGEM — OBRIGATÓRIO:
+Cada jogo deve ser apresentado de uma forma diferente. Varie livremente a estrutura da frase.
+Exemplos de formas distintas de apresentar o mesmo jogo (use todas e crie outras):
+
+Resultados:
+- "A Argentina fez dois a zero na Áustria, pelo Grupo J"
+- "Portugal goleou — cinco a zero no Uzbequistão, Grupo K"
+- "Noruega e Senegal fizeram um jogo animado: três a dois para os noruegueses, pelo Grupo..."
+- "Vitória da Colômbia sobre o Congo, um a zero, Grupo..."
+- "França sem dificuldades: três a zero no Iraque, pelo Grupo I"
+- "No Grupo L, Inglaterra e Gana ficaram no zero a zero"
+- "Dois a zero. Foi o placar de Argentina sobre Áustria ontem à tarde, Grupo J"
+
+Jogos agendados:
+- "Hoje às dezenove horas, Escócia recebe o Brasil no Grupo C"
+- "Pelo Grupo B, Suíça e Canadá se enfrentam às dezesseis"
+- "E tem Brasil em campo hoje — Escócia x Brasil, dezenove horas, Grupo C, no NRG Stadium em Houston"
+- "Às dezesseis horas, dois jogos simultâneos pelo Grupo B: Suíça e Canadá, e Bósnia contra o Catar"
+- "Para fechar o dia, Grupo A às vinte e duas: México enfrenta a Czechia"
+
 REGRAS:
 - Cada fala: máximo 2 sentenças
-- Leia os placares como locutor esportivo: "Brasil venceu a Escócia por dois a zero"
-- Mencione o horário de Brasília para jogos agendados: "às dezenove horas, horário de Brasília"
-- Mencione fase e grupo quando disponíveis: "pela fase de grupos, Grupo C"
-- Mencione estádio e cidade quando disponíveis: "no NRG Stadium, em Houston"
+- Toda informação disponível deve aparecer: placar, times, grupo/fase, horário, estádio/cidade — distribua naturalmente
+- Agrupe jogos simultâneos ou do mesmo grupo numa mesma fala quando couber
 - Se não houver jogos em alguma seção, pule-a sem mencionar a ausência
 {solo_note}
 - NÃO use marcadores [ITEM_N] — este segmento é um bloco contínuo sem itens individuais
