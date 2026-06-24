@@ -286,7 +286,52 @@ def _run_spot_source(source_config: dict, config: dict, is_first_of_day: bool) -
     return episode_path
 
 
-def _web_radio_intro_text(source_config: dict, config: dict) -> str:
+def _web_radio_transcribe(episode_path: str, settings: dict, output_dir: str) -> str:
+    """Transcreve os primeiros N segundos do MP3 via Groq Whisper."""
+    import requests as _req
+    from pydub import AudioSegment
+
+    api_key_env = settings.get('transcribe_api_key_env', 'GROQ_API_KEY')
+    api_key     = os.getenv(api_key_env, '')
+    if not api_key:
+        print(f"  [web-radio] {api_key_env} não encontrada — transcrição indisponível.")
+        return ''
+
+    seconds   = int(settings.get('transcribe_seconds', 90))
+    temp_path = os.path.join(output_dir, '_transcribe_tmp.mp3')
+    try:
+        audio   = AudioSegment.from_mp3(episode_path)
+        excerpt = audio[:seconds * 1000]
+        excerpt.export(temp_path, format='mp3')
+    except Exception as e:
+        print(f"  [web-radio] Erro ao extrair trecho para transcrição: {e}")
+        return ''
+
+    try:
+        print(f"  [web-radio] Transcrevendo primeiros {seconds}s via Groq Whisper...")
+        with open(temp_path, 'rb') as f:
+            resp = _req.post(
+                'https://api.groq.com/openai/v1/audio/transcriptions',
+                headers={'Authorization': f'Bearer {api_key}'},
+                files={'file': ('audio.mp3', f, 'audio/mpeg')},
+                data={'model': 'whisper-large-v3', 'language': 'pt',
+                      'response_format': 'text'},
+                timeout=60,
+            )
+            resp.raise_for_status()
+            text = resp.text.strip()
+            print(f"  [web-radio] Transcrição: {text[:100]}{'...' if len(text) > 100 else ''}")
+            return text
+    except Exception as e:
+        print(f"  [web-radio] Erro na transcrição Groq: {e}")
+        return ''
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+def _web_radio_intro_text(source_config: dict, config: dict,
+                           episode_path: str = '', output_dir: str = '') -> str:
     """Resolve o texto da intro conforme intro_mode configurado."""
     settings    = source_config.get('settings') or {}
     intro_mode  = settings.get('intro_mode', '').strip()
@@ -296,17 +341,28 @@ def _web_radio_intro_text(source_config: dict, config: dict) -> str:
     if intro_mode == 'fixed':
         return intro_text or f"E agora, {source_name}."
 
-    if intro_mode == 'llm':
+    if intro_mode in ('llm', 'transcribe'):
         import litellm
-        radio_name  = config.get('radio', {}).get('name', 'RadioIA')
-        llm_cfg     = config.get('llm', config.get('claude', {}))
-        model       = source_config.get('model') or llm_cfg.get('model', 'claude-haiku-4-5-20251001')
-        context     = source_config.get('context', '')
-        context_line = f"\nContexto adicional: {context}" if context else ''
+        radio_name = config.get('radio', {}).get('name', 'RadioIA')
+        llm_cfg    = config.get('llm', config.get('claude', {}))
+        model      = source_config.get('model') or llm_cfg.get('model', 'claude-haiku-4-5-20251001')
+        context    = source_config.get('context', '')
+
+        if intro_mode == 'transcribe' and episode_path and output_dir:
+            transcription = _web_radio_transcribe(episode_path, settings, output_dir)
+            if transcription:
+                context_line = (
+                    f"\n\nTranscrição dos primeiros instantes do áudio:\n\"{transcription}\""
+                )
+            else:
+                context_line = f"\nContexto adicional: {context}" if context else ''
+        else:
+            context_line = f"\nContexto adicional: {context}" if context else ''
+
         prompt = (
             f"Você é o locutor da rádio {radio_name}. "
             f"Crie uma apresentação curta (1 a 2 frases) para introduzir o bloco '{source_name}' "
-            f"que será reproduzido a seguir.{context_line} "
+            f"que será reproduzido a seguir.{context_line}\n"
             f"Responda apenas com o texto da locução, sem aspas nem explicações."
         )
         try:
@@ -314,7 +370,7 @@ def _web_radio_intro_text(source_config: dict, config: dict) -> str:
                 model=model,
                 messages=[{'role': 'user', 'content': prompt}],
                 max_tokens=120,
-                temperature=0.8,
+                temperature=0.7,
             )
             return resp.choices[0].message.content.strip()
         except Exception as e:
@@ -409,7 +465,9 @@ def _run_web_radio_source(source_config: dict, config: dict) -> str | None:
         _write_status(source_id, source_name, 'erro', ativo=False, inicio=_inicio, erro=str(e))
         return None
 
-    intro_text = _web_radio_intro_text(source_config, config)
+    intro_text = _web_radio_intro_text(source_config, config,
+                                        episode_path=episode_path,
+                                        output_dir=output_dir)
     if intro_text:
         _write_status(source_id, source_name, 'narrando intro', inicio=_inicio)
         _web_radio_prepend_intro(intro_text, episode_path, output_dir, config)

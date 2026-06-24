@@ -338,20 +338,28 @@ sources:
   #   {YYYY} → 2026  |  {MM} → 06  |  {DD} → 24  |  {HH} → 14  |  {MIN} → 30
   #
   # Introdução narrada antes do MP3 externo (opcional):
-  #   intro_mode: fixed   → lê intro_text via TTS (usa voz do primeiro narrador)
-  #   intro_mode: llm     → gera o texto da intro com LLM e narra via TTS
-  #   (omitir intro_mode) → sem introdução, reproduz o MP3 diretamente
+  #   intro_mode: fixed      → lê intro_text via TTS (usa voz do primeiro narrador)
+  #   intro_mode: llm        → LLM gera a intro sem contexto do áudio
+  #   intro_mode: transcribe → transcreve os primeiros N segundos via Groq Whisper
+  #                            e usa a transcrição como contexto para a LLM gerar a intro
+  #   (omitir intro_mode)    → sem introdução, reproduz o MP3 diretamente
   #
   # - id: radio-empresa
   #   type: web_radio
   #   name: "Rádio Empresa"
   #   enabled: true
-  #   model: "claude-haiku-4-5-20251001"   # usado apenas com intro_mode: llm
+  #   model: "claude-haiku-4-5-20251001"   # usado com intro_mode: llm e transcribe
   #   settings:
   #     direct_url: "https://empresa.com/wp-content/uploads/{YYYY}/{MM}/{DDMMYYYY}.mp3"
+  #
+  #     # Modo fixo:
   #     intro_mode: fixed
   #     intro_text: "E agora, a programação da Rádio Empresa para você."
-  #     # intro_mode: llm   # alternativa: gera o texto da intro automaticamente
+  #
+  #     # Modo com transcrição (recomendado — intro precisa e baseada no conteúdo real):
+  #     # intro_mode: transcribe
+  #     # transcribe_seconds: 90              # quantos segundos transcrever (default: 90)
+  #     # transcribe_api_key_env: GROQ_API_KEY # variável de ambiente com a chave Groq
 
   # ── Plugin: Filmes ────────────────────────────────────────────────────────────
   # - id: filmes
