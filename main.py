@@ -347,29 +347,42 @@ def _web_radio_intro_text(source_config: dict, config: dict,
         llm_cfg    = config.get('llm', config.get('claude', {}))
         model      = source_config.get('model') or llm_cfg.get('model', 'claude-haiku-4-5-20251001')
         context    = source_config.get('context', '')
+        now        = _local_now()
+        weekdays   = ['segunda-feira', 'terça-feira', 'quarta-feira',
+                      'quinta-feira', 'sexta-feira', 'sábado', 'domingo']
+        months     = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+                      'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
+        date_str   = f"{now.day} de {months[now.month - 1]}, {weekdays[now.weekday()]}"
 
         if intro_mode == 'transcribe' and episode_path and output_dir:
             transcription = _web_radio_transcribe(episode_path, settings, output_dir)
-            if transcription:
-                context_line = (
-                    f"\n\nTranscrição dos primeiros instantes do áudio:\n\"{transcription}\""
-                )
-            else:
-                context_line = f"\nContexto adicional: {context}" if context else ''
+            transcription_block = (
+                f"\n\nTranscrição dos primeiros instantes do áudio:\n\"{transcription}\""
+                if transcription else ''
+            )
         else:
-            context_line = f"\nContexto adicional: {context}" if context else ''
+            transcription_block = ''
+
+        context_block = f"\nContexto adicional: {context}" if context else ''
 
         prompt = (
-            f"Você é o locutor da rádio {radio_name}. "
-            f"Crie uma apresentação curta (1 a 2 frases) para introduzir o bloco '{source_name}' "
-            f"que será reproduzido a seguir.{context_line}\n"
-            f"Responda apenas com o texto da locução, sem aspas nem explicações."
+            f"Você é o locutor da rádio {radio_name}.\n"
+            f"Hoje é {date_str}.\n"
+            f"Crie uma apresentação para introduzir o bloco '{source_name}' que será reproduzido a seguir.\n"
+            f"\n"
+            f"REGRAS OBRIGATÓRIAS:\n"
+            f"- Mínimo de 2 frases completas — frases curtas causam problemas de pronúncia no sintetizador de voz\n"
+            f"- Mencione o nome '{source_name}' e a data de forma natural ao longo do texto\n"
+            f"- Se a transcrição indicar um assunto específico, mencione-o brevemente\n"
+            f"- Linguagem natural de locutor de rádio, fluida e em português do Brasil\n"
+            f"- Responda apenas com o texto da locução, sem aspas nem explicações"
+            f"{transcription_block}{context_block}"
         )
         try:
             resp = litellm.completion(
                 model=model,
                 messages=[{'role': 'user', 'content': prompt}],
-                max_tokens=120,
+                max_tokens=180,
                 temperature=0.7,
             )
             return resp.choices[0].message.content.strip()
