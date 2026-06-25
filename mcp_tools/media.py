@@ -521,3 +521,318 @@ def limpar_cache_jamendo(confirmar: bool = False) -> str:
         'arquivos_removidos': removidos,
         'espaco_liberado_mb': round(total_bytes / 1024 / 1024, 1),
     }, ensure_ascii=False, indent=2)
+
+
+# ── Enriquecimento de metadados ───────────────────────────────────────────────
+
+@mcp.tool()
+def enriquecer_musicas(
+    paths: list = None,
+    todos: bool = False,
+    write_back: bool = True,
+    min_score: int = 80,
+) -> str:
+    """
+    Busca metadados de músicas locais no MusicBrainz e atualiza as tags ID3/FLAC/M4A/OGG.
+    Antes de sobrescrever qualquer dado, salva os valores originais (incluindo capa APIC)
+    em music/metadata_backup.json para restore posterior.
+
+    Parâmetros:
+    - paths:      Lista de caminhos absolutos a enriquecer. Se omitido com todos=True,
+                  processa músicas sem artista ou álbum.
+    - todos:      Se True e paths não informado, varre toda a biblioteca local.
+                  Default: False (proteção contra alteração em massa acidental).
+    - write_back: Se False, apenas retorna o que seria gravado sem modificar arquivos.
+                  Default: True.
+    - min_score:  Score mínimo de confiança MusicBrainz (0–100). Default: 80.
+
+    Rate limit: respeita 1 req/s para o MusicBrainz (termos de uso).
+    Use restaurar_metadados_musica() para desfazer. Use listar_backup_musicas() para ver
+    o que está no backup.
+    """
+    import time
+    from src.sources.music_enricher import enrich_file, _read_current_tags
+    from mcp_tools._utils import PROJECT_DIR
+
+    audio_exts = {'.mp3', '.m4a', '.ogg', '.wav', '.flac'}
+    music_dir  = os.path.join(PROJECT_DIR, 'music')
+
+    if paths:
+        targets = [os.path.abspath(p) for p in paths if os.path.isfile(p)]
+    elif todos:
+        targets = []
+        jamendo_cache = os.path.abspath(os.path.join(music_dir, 'cache', 'jamendo'))
+        if os.path.isdir(music_dir):
+            for dirpath, _, filenames in os.walk(music_dir):
+                if os.path.abspath(dirpath).startswith(jamendo_cache):
+                    continue
+                for f in filenames:
+                    if os.path.splitext(f)[1].lower() in audio_exts:
+                        targets.append(os.path.join(dirpath, f))
+        config = _load_config()
+        for src in config.get('sources', []):
+            if src.get('type') == 'music' and (src.get('settings') or {}).get('source') == 'local':
+                for extra in (src['settings'].get('paths') or []):
+                    if os.path.isdir(extra):
+                        for dirpath, _, filenames in os.walk(extra):
+                            for f in filenames:
+                                if os.path.splitext(f)[1].lower() in audio_exts:
+                                    targets.append(os.path.join(dirpath, f))
+        # Filtra apenas arquivos sem metadados completos
+        incomplete = []
+        for p in targets:
+            info = _read_current_tags(p)
+            if not info['artist'] or not info['album']:
+                incomplete.append(p)
+        targets = incomplete
+    else:
+        return json.dumps({
+            'status':   'erro',
+            'mensagem': 'Informe paths ou use todos=True para processar toda a biblioteca.',
+        }, ensure_ascii=False, indent=2)
+
+    if not targets:
+        return json.dumps({
+            'status':   'ok',
+            'mensagem': 'Nenhum arquivo para processar.',
+        }, ensure_ascii=False, indent=2)
+
+    results = {'ok': [], 'no_match': [], 'error': []}
+    for i, path in enumerate(targets):
+        if i > 0:
+            time.sleep(1)   # Rate limit MusicBrainz
+        r   = enrich_file(path, write_back=write_back, min_score=min_score)
+        key = r.get('status', 'error')
+        if key not in results:
+            key = 'error'
+        results[key].append({
+            'path':  path,
+            'match': r.get('match'),
+            'cover': r.get('has_cover', False),
+            'msg':   r.get('message', ''),
+        })
+
+    return json.dumps({
+        'status':       'ok',
+        'total':        len(targets),
+        'enriquecidos': len(results['ok']),
+        'sem_match':    len(results['no_match']),
+        'erros':        len(results['error']),
+        'write_back':   write_back,
+        'detalhes':     results,
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def restaurar_metadados_musica(path: str = '', todos: bool = False) -> str:
+    """
+    Restaura os metadados originais (título, artista, álbum e capa APIC) de uma música
+    a partir do backup gerado pelo enriquecer_musicas(). Remove a entrada do backup após
+    restaurar com sucesso.
+
+    Parâmetros:
+    - path:  Caminho absoluto do arquivo a restaurar. Obrigatório se todos=False.
+    - todos: Se True, restaura todos os arquivos presentes no backup. Default: False.
+    """
+    from src.sources.music_enricher import restore_file, list_backup
+
+    if todos:
+        entries = list_backup()
+        if not entries:
+            return json.dumps({
+                'status':   'ok',
+                'mensagem': 'Nenhum backup encontrado para restaurar.',
+            }, ensure_ascii=False, indent=2)
+        results = [restore_file(e['path']) for e in entries]
+        ok      = [r for r in results if r['status'] == 'ok']
+        erros   = [r for r in results if r['status'] != 'ok']
+        return json.dumps({
+            'status':      'ok',
+            'restaurados': len(ok),
+            'erros':       len(erros),
+            'detalhes':    results,
+        }, ensure_ascii=False, indent=2)
+
+    if not path:
+        return json.dumps({
+            'status':   'erro',
+            'mensagem': 'Informe path ou use todos=True.',
+        }, ensure_ascii=False, indent=2)
+
+    return json.dumps(restore_file(os.path.abspath(path)), ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def listar_backup_musicas() -> str:
+    """
+    Lista todos os arquivos de música com backup de metadados disponível para restore.
+    Mostra os valores originais (antes do enriquecimento), incluindo se havia capa APIC.
+    """
+    from src.sources.music_enricher import list_backup
+    entries = list_backup()
+    if not entries:
+        return json.dumps({
+            'status':   'ok',
+            'mensagem': 'Nenhum backup encontrado.',
+            'backup':   [],
+        }, ensure_ascii=False, indent=2)
+    return json.dumps({
+        'status': 'ok',
+        'total':  len(entries),
+        'backup': entries,
+    }, ensure_ascii=False, indent=2)
+
+
+# ── Renomeação de arquivos ────────────────────────────────────────────────────
+
+@mcp.tool()
+def renomear_musicas(
+    paths: list = None,
+    todos: bool = False,
+    padrao: str = 'artist_title',
+    dry_run: bool = True,
+) -> str:
+    """
+    Renomeia arquivos de música com base nas tags ID3/FLAC/M4A existentes.
+    Executa em modo simulação por padrão — use dry_run=False para aplicar.
+
+    Padrões disponíveis:
+    - "artist_title":       "Artista - Título.mp3"         (padrão)
+    - "artist_album_title": "Artista - Álbum - Título.mp3"
+
+    Parâmetros:
+    - paths:   Lista de caminhos absolutos a renomear. Se omitido, requer todos=True.
+    - todos:   Se True, processa toda a biblioteca local (exclui cache Jamendo).
+    - padrao:  Padrão de nomenclatura. Default: "artist_title".
+    - dry_run: Se True (padrão), simula sem renomear — mostra old_name → new_name.
+               Passe dry_run=False para aplicar as renomeações.
+
+    O nome original é salvo em music/metadata_backup.json antes de renomear.
+    Use restaurar_nomes_musicas() para desfazer e listar_renomes_musicas() para ver
+    o que está no backup.
+
+    Dica: rode enriquecer_musicas() antes para garantir que as tags estão corretas.
+    """
+    from src.sources.music_enricher import rename_file
+    from mcp_tools._utils import PROJECT_DIR
+
+    audio_exts = {'.mp3', '.m4a', '.ogg', '.wav', '.flac'}
+    music_dir  = os.path.join(PROJECT_DIR, 'music')
+
+    if paths:
+        targets = [os.path.abspath(p) for p in paths if os.path.isfile(p)]
+    elif todos:
+        targets       = []
+        jamendo_cache = os.path.abspath(os.path.join(music_dir, 'cache', 'jamendo'))
+        if os.path.isdir(music_dir):
+            for dirpath, _, filenames in os.walk(music_dir):
+                if os.path.abspath(dirpath).startswith(jamendo_cache):
+                    continue
+                for f in filenames:
+                    if os.path.splitext(f)[1].lower() in audio_exts:
+                        targets.append(os.path.join(dirpath, f))
+        config = _load_config()
+        for src in config.get('sources', []):
+            if src.get('type') == 'music' and (src.get('settings') or {}).get('source') == 'local':
+                for extra in (src['settings'].get('paths') or []):
+                    if os.path.isdir(extra):
+                        for dirpath, _, filenames in os.walk(extra):
+                            for f in filenames:
+                                if os.path.splitext(f)[1].lower() in audio_exts:
+                                    targets.append(os.path.join(dirpath, f))
+    else:
+        return json.dumps({
+            'status':   'erro',
+            'mensagem': 'Informe paths ou use todos=True.',
+        }, ensure_ascii=False, indent=2)
+
+    if not targets:
+        return json.dumps({
+            'status':   'ok',
+            'mensagem': 'Nenhum arquivo encontrado.',
+        }, ensure_ascii=False, indent=2)
+
+    buckets = {'ok': [], 'unchanged': [], 'skip': [], 'collision': [], 'error': []}
+    for path in targets:
+        r   = rename_file(path, pattern=padrao, dry_run=dry_run)
+        key = r.get('status', 'error')
+        if key == 'dry_run':
+            key = 'ok'
+        if key not in buckets:
+            key = 'error'
+        buckets[key].append(r)
+
+    return json.dumps({
+        'status':      'simulacao' if dry_run else 'ok',
+        'dry_run':     dry_run,
+        'padrao':      padrao,
+        'total':       len(targets),
+        'renomeados':  len(buckets['ok']),
+        'sem_mudanca': len(buckets['unchanged']),
+        'sem_titulo':  len(buckets['skip']),
+        'colisoes':    len(buckets['collision']),
+        'erros':       len(buckets['error']),
+        'detalhes':    buckets,
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def restaurar_nomes_musicas(path: str = '', todos: bool = False) -> str:
+    """
+    Restaura os nomes originais de arquivos renomeados pelo renomear_musicas().
+    Remove a entrada do backup após restaurar com sucesso.
+
+    Parâmetros:
+    - path:  Caminho atual (pós-rename) do arquivo a restaurar. Requerido se todos=False.
+    - todos: Se True, restaura todos os arquivos com rename no backup.
+    """
+    from src.sources.music_enricher import restore_rename, list_renames
+
+    if todos:
+        entries = list_renames()
+        if not entries:
+            return json.dumps({
+                'status':   'ok',
+                'mensagem': 'Nenhum rename registrado no backup.',
+            }, ensure_ascii=False, indent=2)
+        results = [restore_rename(e['current_path']) for e in entries]
+        ok      = [r for r in results if r['status'] == 'ok']
+        erros   = [r for r in results if r['status'] != 'ok']
+        return json.dumps({
+            'status':      'ok',
+            'restaurados': len(ok),
+            'erros':       len(erros),
+            'detalhes':    results,
+        }, ensure_ascii=False, indent=2)
+
+    if not path:
+        return json.dumps({
+            'status':   'erro',
+            'mensagem': 'Informe path ou use todos=True.',
+        }, ensure_ascii=False, indent=2)
+
+    return json.dumps(
+        restore_rename(os.path.abspath(path)),
+        ensure_ascii=False, indent=2,
+    )
+
+
+@mcp.tool()
+def listar_renomes_musicas() -> str:
+    """
+    Lista todos os arquivos que tiveram o nome alterado por renomear_musicas(),
+    mostrando o nome atual e o original disponível para restore.
+    """
+    from src.sources.music_enricher import list_renames
+    entries = list_renames()
+    if not entries:
+        return json.dumps({
+            'status':   'ok',
+            'mensagem': 'Nenhum rename registrado no backup.',
+            'renomes':  [],
+        }, ensure_ascii=False, indent=2)
+    return json.dumps({
+        'status':  'ok',
+        'total':   len(entries),
+        'renomes': entries,
+    }, ensure_ascii=False, indent=2)
