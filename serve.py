@@ -5,7 +5,7 @@ import sys
 import json
 import webbrowser
 import threading
-from flask import Flask, jsonify, send_from_directory, render_template_string
+from flask import Flask, jsonify, send_from_directory, render_template_string, request
 
 app = Flask(__name__)
 OUTPUT_DIR = 'output'
@@ -268,6 +268,15 @@ audio { width: 100%; height: 36px; accent-color: #6366f1; }
 .fallback-icon { font-size: 36px; margin-bottom: 10px; }
 .fallback-name { font-size: 15px; font-weight: 600; color: #d6d3d1; margin-bottom: 4px; }
 .fallback-hint { font-size: 12px; color: #78716c; }
+
+.track-cover-wrap { text-align: center; margin-bottom: 14px; }
+.track-cover { width: 160px; height: 160px; object-fit: cover; border-radius: 8px;
+               box-shadow: 0 2px 10px rgba(0,0,0,.5); }
+.enrich-btn { background: #1f2937; border: 1px solid #374151; color: #9ca3af;
+              font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+              margin-top: 8px; display: inline-block; }
+.enrich-btn:hover:not(:disabled) { background: #374151; color: #e5e7eb; }
+.enrich-btn:disabled { opacity: 0.5; cursor: default; }
 
 /* ── Mobile nav bar ───────────────────────────────────────────────────────── */
 .mobile-nav { display: none; }
@@ -1024,21 +1033,67 @@ async function enterFallback() {
   playFallbackTrack();
 }
 
+function _renderFallbackCard(track) {
+  const title       = track.title || track.name.replace(/\.[^.]+$/, '');
+  const meta        = [track.artist, track.album].filter(Boolean).join(' · ');
+  const coverUrl    = track.cover || `/api/music-art?p=${encodeURIComponent(track.url)}`;
+  const isLocal     = track.url.startsWith('/music/') || track.url.startsWith('/music-extra/');
+  const needsEnrich = isLocal && (!track.artist || !track.album);
+  document.getElementById('notes').innerHTML = `
+    <div class="link-card" id="current-track-card">
+      <div class="track-cover-wrap">
+        <img class="track-cover" src="${coverUrl}"
+             onerror="this.parentElement.style.display='none'" alt="">
+      </div>
+      <div class="link-num">🎵</div>
+      <div class="link-title">${title}</div>
+      ${meta ? `<div class="link-meta">${meta}</div>` : ''}
+      ${needsEnrich ? `<button class="enrich-btn" data-url="${track.url}" onclick="enrichTrack(this.dataset.url)">🔍 Enriquecer</button>` : ''}
+      <div class="fallback-hint" style="margin-top:6px">Aguardando novos episódios...</div>
+    </div>`;
+}
+
 function _playTrack(track) {
   const badge = document.getElementById('player-badge');
   badge.className = 'player-badge badge-fallback';
   badge.textContent = '🎵 Modo Musical';
-  document.getElementById('player-name').textContent = track.title || track.name.replace(/\.[^.]+$/, '');
+  const title = track.title || track.name.replace(/\.[^.]+$/, '');
+  document.getElementById('player-name').textContent = title;
   document.getElementById('player-track').textContent = track.artist || 'Tocando músicas enquanto aguarda novos episódios...';
   const audio = document.getElementById('audio');
   audio.src = track.url;
   audio.play().catch(() => {});
-  document.getElementById('notes').innerHTML = `
-    <div class="fallback-card">
-      <div class="fallback-icon">🎵</div>
-      <div class="fallback-name">${track.title || track.name.replace(/\.[^.]+$/, '')}</div>
-      <div class="fallback-hint">${track.artist ? track.artist + ' · ' : ''}Aguardando novos episódios...</div>
-    </div>`;
+  _renderFallbackCard(track);
+  if (isMobile()) setTab('fontes');
+}
+
+async function enrichTrack(url) {
+  const card = document.getElementById('current-track-card');
+  const btn  = card && card.querySelector('.enrich-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Buscando...'; }
+  try {
+    const r    = await fetch('/api/music-enrich', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({url}),
+    });
+    const data = await r.json();
+    if (data.status === 'ok' && data.match) {
+      const track = musicFiles.find(t => t.url === url);
+      if (track) {
+        if (data.match.title)  track.title  = data.match.title;
+        if (data.match.artist) track.artist = data.match.artist;
+        if (data.match.album)  track.album  = data.match.album;
+        if (data.has_cover)    track.cover  = `/api/music-art?p=${encodeURIComponent(url)}&t=${Date.now()}`;
+        _renderFallbackCard(track);
+        document.getElementById('player-track').textContent = track.artist || '';
+      }
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = '🔍 Sem match'; }
+    }
+  } catch (_) {
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 Enriquecer'; }
+  }
 }
 
 const S_SPOTS = 'radioIA_spots';
@@ -1819,6 +1874,27 @@ def _extra_music_paths() -> list[str]:
         return []
 
 
+def _read_audio_tags(path: str) -> dict:
+    title, artist, album = '', '', ''
+    try:
+        from mutagen import File as MutagenFile
+        af = MutagenFile(path, easy=True)
+        if af:
+            title  = str(af.get('title',  [''])[0]).strip()
+            artist = str(af.get('artist', [''])[0]).strip()
+            album  = str(af.get('album',  [''])[0]).strip()
+    except Exception:
+        pass
+    if not title:
+        name = os.path.splitext(os.path.basename(path))[0]
+        if not artist and ' - ' in name:
+            parts = name.split(' - ', 1)
+            artist, title = parts[0].strip(), parts[1].strip()
+        else:
+            title = name
+    return {'title': title, 'artist': artist, 'album': album}
+
+
 def scan_music_files():
     files = []
     audio_exts = {'.mp3', '.m4a', '.ogg', '.wav', '.flac'}
@@ -1831,9 +1907,11 @@ def scan_music_files():
                 continue
             for f in sorted(filenames):
                 if os.path.splitext(f)[1].lower() in audio_exts:
-                    rel = os.path.relpath(os.path.join(dirpath, f), MUSIC_DIR).replace(os.sep, '/')
+                    full_path = os.path.join(dirpath, f)
+                    rel = os.path.relpath(full_path, MUSIC_DIR).replace(os.sep, '/')
+                    info = _read_audio_tags(full_path)
                     files.append({'name': f, 'url': f'/music/{rel}',
-                                   'title': os.path.splitext(f)[0], 'artist': ''})
+                                   'title': info['title'], 'artist': info['artist'], 'album': info['album']})
 
     # Paths extras configurados em musica-local
     seen_abs = set()
@@ -1848,8 +1926,9 @@ def scan_music_files():
                     full = os.path.abspath(os.path.join(dirpath, f))
                     if full not in seen_abs:
                         seen_abs.add(full)
+                        info = _read_audio_tags(full)
                         files.append({'name': f, 'url': f'/music-extra/{full.replace(os.sep, "/")}',
-                                       'title': os.path.splitext(f)[0], 'artist': ''})
+                                       'title': info['title'], 'artist': info['artist'], 'album': info['album']})
 
     # Cache Jamendo
     catalog_path = os.path.join(MUSIC_DIR, 'cache', 'jamendo', 'catalog.json')
@@ -1862,7 +1941,9 @@ def scan_music_files():
                 files.append({'name':   meta['file'],
                                'url':    f'/music-cache/{meta["file"]}',
                                'title':  meta.get('title', ''),
-                               'artist': meta.get('artist', '')})
+                               'artist': meta.get('artist', ''),
+                               'album':  meta.get('album', ''),
+                               'cover':  meta.get('image', '')})
     return files
 
 
@@ -2534,6 +2615,62 @@ def api_next_scheduled():
 @app.route('/api/music-files')
 def api_music_files():
     return jsonify(scan_music_files())
+
+
+def _url_to_path(url: str) -> str | None:
+    if url.startswith('/music/'):
+        return os.path.abspath(os.path.join(MUSIC_DIR, url[len('/music/'):]))
+    if url.startswith('/music-cache/'):
+        return os.path.abspath(os.path.join(MUSIC_DIR, 'cache', 'jamendo', url[len('/music-cache/'):]))
+    if url.startswith('/music-extra/'):
+        raw = url[len('/music-extra/'):]
+        abs_path = raw if os.path.isabs(raw) else '/' + raw
+        return abs_path.replace('/', os.sep)
+    return None
+
+
+@app.route('/api/music-art')
+def api_music_art():
+    from flask import Response
+    from src.sources.music_enricher import get_embedded_cover, get_folder_cover
+    url  = request.args.get('p', '')
+    path = _url_to_path(url)
+    if not path or not os.path.exists(path):
+        return ('', 404)
+    result = get_embedded_cover(path) or get_folder_cover(path)
+    if not result:
+        return ('', 404)
+    data, mime = result
+    return Response(data, mimetype=mime)
+
+
+@app.route('/api/music-enrich', methods=['POST'])
+def api_music_enrich():
+    from src.sources.music_enricher import enrich_file
+    body = request.get_json(silent=True) or {}
+    url  = body.get('url', '')
+    path = _url_to_path(url)
+    if not path or not os.path.exists(path):
+        return jsonify({'status': 'error', 'message': 'Arquivo não encontrado.'}), 404
+    return jsonify(enrich_file(path))
+
+
+@app.route('/api/music-restore', methods=['POST'])
+def api_music_restore():
+    from src.sources.music_enricher import restore_file
+    body = request.get_json(silent=True) or {}
+    url  = body.get('url', '')
+    path = _url_to_path(url)
+    if not path or not os.path.exists(path):
+        return jsonify({'status': 'error', 'message': 'Arquivo não encontrado.'}), 404
+    return jsonify(restore_file(path))
+
+
+@app.route('/api/music-backup')
+def api_music_backup():
+    from src.sources.music_enricher import list_backup
+    return jsonify(list_backup())
+
 
 @app.route('/audio/<path:episode_id>')
 def serve_audio(episode_id):

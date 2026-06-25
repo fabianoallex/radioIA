@@ -43,8 +43,9 @@ YOUTUBE_API_KEY=AIza...
 # Opcionais (conforme os módulos habilitados)
 OPENWEATHER_API_KEY=...        # Clima e previsão do tempo
 JAMENDO_CLIENT_ID=...          # Músicas do Jamendo
-FOOTBALL_DATA_API_KEY=...      # Futebol (football-data.org)
+FOOTBALL_DATA_API_KEY=...      # Futebol — Copa do Mundo, Brasileirão (football-data.org)
 TMDB_API_KEY=...               # Filmes (themoviedb.org)
+GROQ_API_KEY=...               # Transcrição de áudio via Groq Whisper (web_radio)
 ```
 
 | Chave | Onde obter | Custo |
@@ -55,6 +56,7 @@ TMDB_API_KEY=...               # Filmes (themoviedb.org)
 | `JAMENDO_CLIENT_ID` | [developer.jamendo.com](https://developer.jamendo.com) | Gratuito |
 | `FOOTBALL_DATA_API_KEY` | [football-data.org](https://www.football-data.org) | Gratuito (10 req/min) |
 | `TMDB_API_KEY` | [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) | Gratuito |
+| `GROQ_API_KEY` | [console.groq.com](https://console.groq.com) → API Keys | Gratuito (free tier generoso) |
 
 ### 2. Arquivo de configuração (`config.yaml`)
 
@@ -63,7 +65,7 @@ O `config.yaml` concentra toda a configuração da rádio. Seções principais:
 | Seção | O que configura |
 |-------|----------------|
 | `radio` | Nome da rádio e mixagem de áudio |
-| `sources` | Fontes de conteúdo (YouTube, RSS, Utilidades, etc.) |
+| `sources` | Fontes de conteúdo (YouTube, RSS, Utilidades, Web Radio, etc.) |
 | `narrators` | Narradores e suas personalidades |
 | `vinheta` | Voz e velocidade da vinheta |
 | `llm` | Modelo de linguagem e provedor |
@@ -180,7 +182,7 @@ radioIA/
 
 | Documento | Conteúdo |
 |-----------|----------|
-| [docs/fontes.md](docs/fontes.md) | Todas as fontes: YouTube, RSS, Utilidades, Reddit, Clipping, Filmes, etc. |
+| [docs/fontes.md](docs/fontes.md) | Todas as fontes: YouTube, RSS, Utilidades, Reddit, Clipping, Copa do Mundo, Web Radio, etc. |
 | [docs/tts.md](docs/tts.md) | Motor de voz, narradores, vinheta, provedores TTS, voice_map |
 | [docs/llm.md](docs/llm.md) | Modelos LLM, provedores, override por fonte, contexto adicional |
 | [docs/scheduler.md](docs/scheduler.md) | Programação automática, `slot_id`/`replay_of`, filtro por dias |
@@ -208,12 +210,60 @@ python -m pytest tests/ -v
 | `test_scheduler.py` | Lógica do scheduler — dias da semana, replay |
 | `test_plugin_contract.py` | Contrato de plugins — estrutura do retorno de `fetch()` |
 | `test_script_context.py` | Injeção de contexto nos prompts |
-| `test_script_new_types.py` | Prompts dos tipos `utility` e `combined` |
+| `test_script_new_types.py` | Prompts dos tipos `utility`, `combined` e `copa_mundo` |
 | `test_utility_format.py` | Formatação de dados para prompt de utilidades |
 | `test_parse_value.py` | `_parse_value()` em `mcp_tools._utils` |
 | `test_mcp_parse_fonte.py` | `_parse_fonte()` em `mcp_tools._utils` |
 | `test_adicionar_fonte.py` | `adicionar_fonte()` em `mcp_tools.config` |
 | `test_url_plugin.py` | Plugin `url` — extração e estrutura do item |
+
+---
+
+## Plugins de conteúdo disponíveis
+
+| Plugin | Tipo | Descrição | API Key necessária |
+|--------|------|-----------|-------------------|
+| `youtube` | nativo | Vídeos de canais e inscrições | `YOUTUBE_API_KEY` |
+| `rss` | nativo | Feeds RSS de portais e podcasts | — |
+| `music` | nativo | Músicas via Jamendo ou pasta local | `JAMENDO_CLIENT_ID` (opcional) |
+| `utility` | nativo | Clima, câmbio, Ibovespa, loteria, nascer do sol | `OPENWEATHER_API_KEY` (opcional) |
+| `combined` | nativo | Bloco com múltiplas fontes em um só episódio | — |
+| `copa_mundo` | plugin | Resultados e agenda da Copa do Mundo 2026 — dia, horário BRT, estádio, fase, placar | `FOOTBALL_DATA_API_KEY` |
+| `web_radio` | plugin | Relay de rádio web externa — baixa o MP3 do dia e inclui na programação com intro narrada | `GROQ_API_KEY` (opcional, para intro com transcrição) |
+| `clipping` | plugin | Clipping de notícias sobre um tema via CLI | — |
+| `clipping_auto` | plugin | Detecta automaticamente o assunto mais discutido do dia | — |
+| `reddit` | plugin | Posts em alta de subreddits brasileiros | — |
+| `horoscopo` | plugin | Horóscopo diário (pares de signos em rotação) | — |
+| `trivia` | plugin | Quiz com perguntas de cultura geral | — |
+| `efemerides` | plugin | Efemérides — eventos históricos do dia | — |
+| `filmes` | plugin | Filmes em cartaz, tendências ou mais bem avaliados | `TMDB_API_KEY` |
+| `biblia` | plugin | Versículo bíblico diário | — |
+| `receitas` | plugin | Receitas culinárias | — |
+
+### Plugin `web_radio` — intro inteligente
+
+O `web_radio` suporta três modos de introdução narrada antes do MP3 externo:
+
+| `intro_mode` | Comportamento |
+|---|---|
+| `fixed` | Lê `intro_text` via TTS — texto fixo configurado manualmente |
+| `llm` | LLM gera a intro baseada no nome da fonte e data |
+| `transcribe` | Transcreve os primeiros N segundos via **Groq Whisper** e usa o conteúdo real do áudio como contexto para a LLM gerar a intro |
+
+```yaml
+- id: radio-empresa
+  type: web_radio
+  name: "Rádio Empresa"
+  enabled: true
+  model: "claude-haiku-4-5-20251001"
+  settings:
+    direct_url: "https://empresa.com/uploads/{YYYY}/{MM}/{DDMMYYYY}.mp3"
+    intro_mode: transcribe
+    transcribe_seconds: 90
+    transcribe_api_key_env: GROQ_API_KEY
+```
+
+Tokens disponíveis em `direct_url`: `{DDMMYYYY}`, `{YYYYMMDD}`, `{YYYY}`, `{MM}`, `{DD}`, `{HH}`, `{MIN}`.
 
 ---
 

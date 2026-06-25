@@ -171,6 +171,7 @@ def download_cache(source_config: dict) -> int:
                     'title':  track.get('name', ''),
                     'artist': track.get('artist_name', ''),
                     'album':  track.get('album_name', ''),
+                    'image':  track.get('image', ''),
                     'tags':   tags,
                     'file':   os.path.basename(path),
                 }
@@ -205,6 +206,7 @@ def _get_jamendo_tracks(jamendo_cfg: dict, num_tracks: int) -> list[dict]:
                     'title':  track.get('name', ''),
                     'artist': track.get('artist_name', ''),
                     'album':  track.get('album_name', ''),
+                    'image':  track.get('image', ''),
                     'tags':   tags,
                     'file':   os.path.basename(path),
                 }
