@@ -260,6 +260,18 @@ def _artist_similarity(a: str, b: str) -> float:
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def enrich_file(path: str, write_back: bool = True, min_score: int = _MIN_SCORE) -> dict:
+    # Detect corrupted/unreadable files before any network request
+    if os.path.splitext(path)[1].lower() == '.mp3':
+        try:
+            from mutagen.id3 import ID3
+            ID3(path)
+        except Exception as e:
+            return {
+                'status':  'error',
+                'path':    path,
+                'message': f'Arquivo MP3 corrompido ou ilegível — verifique se toca normalmente. ({e})',
+            }
+
     current = _read_current_tags(path)
     title   = current['title']
     artist  = current['artist']

@@ -558,7 +558,16 @@ def enriquecer_musicas(
     music_dir  = os.path.join(PROJECT_DIR, 'music')
 
     if paths:
-        targets = [os.path.abspath(p) for p in paths if os.path.isfile(p)]
+        targets = []
+        for p in paths:
+            ap = os.path.abspath(p)
+            if os.path.isfile(ap):
+                targets.append(ap)
+            elif os.path.isdir(ap):
+                for dirpath, _, filenames in os.walk(ap):
+                    for f in filenames:
+                        if os.path.splitext(f)[1].lower() in audio_exts:
+                            targets.append(os.path.join(dirpath, f))
     elif todos:
         targets = []
         jamendo_cache = os.path.abspath(os.path.join(music_dir, 'cache', 'jamendo'))
@@ -722,7 +731,16 @@ def renomear_musicas(
     music_dir  = os.path.join(PROJECT_DIR, 'music')
 
     if paths:
-        targets = [os.path.abspath(p) for p in paths if os.path.isfile(p)]
+        targets = []
+        for p in paths:
+            ap = os.path.abspath(p)
+            if os.path.isfile(ap):
+                targets.append(ap)
+            elif os.path.isdir(ap):
+                for dirpath, _, filenames in os.walk(ap):
+                    for f in filenames:
+                        if os.path.splitext(f)[1].lower() in audio_exts:
+                            targets.append(os.path.join(dirpath, f))
     elif todos:
         targets       = []
         jamendo_cache = os.path.abspath(os.path.join(music_dir, 'cache', 'jamendo'))
