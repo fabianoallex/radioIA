@@ -558,16 +558,22 @@ def enriquecer_musicas(
     music_dir  = os.path.join(PROJECT_DIR, 'music')
 
     if paths:
-        targets = []
+        targets     = []
+        path_issues = []
         for p in paths:
             ap = os.path.abspath(p)
             if os.path.isfile(ap):
                 targets.append(ap)
             elif os.path.isdir(ap):
+                before = len(targets)
                 for dirpath, _, filenames in os.walk(ap):
                     for f in filenames:
                         if os.path.splitext(f)[1].lower() in audio_exts:
                             targets.append(os.path.join(dirpath, f))
+                if len(targets) == before:
+                    path_issues.append(f'diretório sem áudio: {ap}')
+            else:
+                path_issues.append(f'não encontrado (arquivo nem diretório): {ap}')
     elif todos:
         targets = []
         jamendo_cache = os.path.abspath(os.path.join(music_dir, 'cache', 'jamendo'))
@@ -601,10 +607,10 @@ def enriquecer_musicas(
         }, ensure_ascii=False, indent=2)
 
     if not targets:
-        return json.dumps({
-            'status':   'ok',
-            'mensagem': 'Nenhum arquivo para processar.',
-        }, ensure_ascii=False, indent=2)
+        resp = {'status': 'ok', 'mensagem': 'Nenhum arquivo para processar.'}
+        if paths and path_issues:
+            resp['paths_problematicos'] = path_issues
+        return json.dumps(resp, ensure_ascii=False, indent=2)
 
     results = {'ok': [], 'no_match': [], 'error': []}
     for i, path in enumerate(targets):
