@@ -290,6 +290,91 @@ class TestRenameFile:
         assert result['new_name'].endswith('.flac')
 
 
+# ── _parse_filename ───────────────────────────────────────────────────────────
+
+class TestParseFilename:
+    def test_artist_and_title(self):
+        assert enricher._parse_filename('Engenheiros do Hawaii - Números') == \
+               ('Engenheiros do Hawaii', 'Números')
+
+    def test_strips_leading_track_number_space(self):
+        artist, title = enricher._parse_filename('03 Song Title')
+        assert artist == ''
+        assert title  == 'Song Title'
+
+    def test_strips_leading_number_dot_dash(self):
+        artist, title = enricher._parse_filename('13 - Terra de Gigantes - Números')
+        assert artist == 'Terra de Gigantes'
+        assert title  == 'Números'
+
+    def test_strips_parenthetical_suffix(self):
+        artist, title = enricher._parse_filename('Artist - Title (ao vivo)')
+        assert artist == 'Artist'
+        assert title  == 'Title'
+
+    def test_strips_bracket_suffix(self):
+        _, title = enricher._parse_filename('Artist - Title [live]')
+        assert title == 'Title'
+
+    def test_strips_part_suffix(self):
+        _, title = enricher._parse_filename(
+            'Luz Da Minha Vida - Ultimo Adeus - Part.Bruno e Marrone')
+        assert 'Bruno' not in title
+        assert 'Part'  not in title
+
+    def test_strips_feat_suffix(self):
+        _, title = enricher._parse_filename('Title - feat. Guest Artist')
+        assert 'Guest' not in title
+
+    def test_parenthetical_number_at_end(self):
+        artist, title = enricher._parse_filename('mILIONARIO E jOSE rICO (10)')
+        assert artist    == ''
+        assert '(10)' not in title
+        assert 'rICO'  in title
+
+    def test_no_separator_returns_empty_artist(self):
+        artist, title = enricher._parse_filename('SOSSEGO')
+        assert artist == ''
+        assert title  == 'SOSSEGO'
+
+    def test_three_parts_uses_first_and_last(self):
+        artist, title = enricher._parse_filename('Artist - Album - Title')
+        assert artist == 'Artist'
+        assert title  == 'Title'
+
+    def test_plain_artist_title(self):
+        assert enricher._parse_filename('Artist - Title') == ('Artist', 'Title')
+
+
+# ── _artist_similarity ────────────────────────────────────────────────────────
+
+class TestArtistSimilarity:
+    def test_identical(self):
+        assert enricher._artist_similarity('Engenheiros do Hawaii', 'Engenheiros do Hawaii') == 1.0
+
+    def test_completely_different(self):
+        assert enricher._artist_similarity('X-Men Soundtrack', 'Milionario e Jose Rico') == 0.0
+
+    def test_partial_match(self):
+        sim = enricher._artist_similarity('Milionario e Jose Rico', 'Milionario Jose Rico')
+        assert sim > 0.5
+
+    def test_empty_first_returns_zero(self):
+        assert enricher._artist_similarity('', 'Artist') == 0.0
+
+    def test_empty_second_returns_zero(self):
+        assert enricher._artist_similarity('Artist', '') == 0.0
+
+    def test_both_empty_returns_zero(self):
+        assert enricher._artist_similarity('', '') == 0.0
+
+    def test_single_word_match(self):
+        assert enricher._artist_similarity('Sossego', 'Sossego') == 1.0
+
+    def test_case_insensitive(self):
+        assert enricher._artist_similarity('ARTIST', 'artist') == 1.0
+
+
 # ── restore_rename ────────────────────────────────────────────────────────────
 
 class TestRestoreRename:

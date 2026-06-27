@@ -214,6 +214,49 @@ def backup_tags(path: str) -> dict:
     return entry
 
 
+# ── Filename parsing ──────────────────────────────────────────────────────────
+
+def _parse_filename(name: str) -> tuple[str, str]:
+    """
+    Parse a music filename (without extension) into (artist, title).
+    Handles track-number prefixes, parentheticals, and Part./Feat. suffixes.
+    Returns ('', cleaned_name) when artist cannot be determined.
+    """
+    cleaned = name
+    # Strip leading track number: "03 ", "03. ", "03 - "
+    cleaned = re.sub(r'^\d+\s*[-.]?\s*', '', cleaned).strip()
+    # Strip parenthetical annotations: "(ao vivo)", "[live]", "(Part. X)"
+    cleaned = re.sub(r'\s*[\(\[].*?[\)\]]', '', cleaned).strip()
+    # Strip Part./Feat. participation suffixes
+    cleaned = re.sub(r'\s*[-–]?\s*(part\.|feat\.|ft\.)\s*.+$', '', cleaned,
+                     flags=re.IGNORECASE).strip()
+
+    if ' - ' not in cleaned:
+        return '', cleaned
+
+    parts = [p.strip() for p in cleaned.split(' - ')]
+    if len(parts) == 2:
+        return parts[0], parts[1]
+    # 3+ parts: "Artist - Album - Title" → use first and last
+    return parts[0], parts[-1]
+
+
+# ── Artist similarity ─────────────────────────────────────────────────────────
+
+_MIN_ARTIST_SIMILARITY = 0.3
+
+
+def _artist_similarity(a: str, b: str) -> float:
+    """Word-overlap similarity between two artist names (0.0–1.0)."""
+    if not a or not b:
+        return 0.0
+    norm = lambda s: set(re.sub(r'[^\w\s]', '', s.lower()).split())
+    w1, w2 = norm(a), norm(b)
+    if not w1 or not w2:
+        return 0.0
+    return len(w1 & w2) / min(len(w1), len(w2))
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def enrich_file(path: str, write_back: bool = True, min_score: int = _MIN_SCORE) -> dict:
@@ -221,12 +264,14 @@ def enrich_file(path: str, write_back: bool = True, min_score: int = _MIN_SCORE)
     title   = current['title']
     artist  = current['artist']
 
-    if not title:
+    # Fill gaps from filename using smart parser
+    if not title or not artist:
         name = os.path.splitext(os.path.basename(path))[0]
-        if not artist and ' - ' in name:
-            artist, title = [p.strip() for p in name.split(' - ', 1)]
-        else:
-            title = name
+        parsed_artist, parsed_title = _parse_filename(name)
+        if not title:
+            title = parsed_title
+        if not artist:
+            artist = parsed_artist
 
     match = _search_musicbrainz(title, artist)
     if not match or match['score'] < min_score:
@@ -235,6 +280,17 @@ def enrich_file(path: str, write_back: bool = True, min_score: int = _MIN_SCORE)
             'path':    path,
             'message': 'Nenhum match encontrado com score suficiente.',
         }
+
+    # Reject match when returned artist diverges significantly from known artist
+    if artist and match.get('artist'):
+        sim = _artist_similarity(artist, match['artist'])
+        if sim < _MIN_ARTIST_SIMILARITY:
+            return {
+                'status':  'no_match',
+                'path':    path,
+                'message': (f"Match rejeitado: artista MusicBrainz '{match['artist']}' "
+                            f"incompatível com '{artist}' (similaridade {sim:.2f})."),
+            }
 
     cover_bytes = _fetch_cover_art(match['release_mbid']) if match.get('release_mbid') else None
 

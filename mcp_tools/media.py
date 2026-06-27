@@ -578,11 +578,11 @@ def enriquecer_musicas(
                             for f in filenames:
                                 if os.path.splitext(f)[1].lower() in audio_exts:
                                     targets.append(os.path.join(dirpath, f))
-        # Filtra apenas arquivos sem metadados completos
+        # Filtra arquivos sem metadados completos OU sem capa embutida
         incomplete = []
         for p in targets:
             info = _read_current_tags(p)
-            if not info['artist'] or not info['album']:
+            if not info['artist'] or not info['album'] or not info['apic']:
                 incomplete.append(p)
         targets = incomplete
     else:
@@ -603,6 +603,8 @@ def enriquecer_musicas(
             time.sleep(1)   # Rate limit MusicBrainz
         r   = enrich_file(path, write_back=write_back, min_score=min_score)
         key = r.get('status', 'error')
+        if key == 'found':   # write_back=False com match → conta como ok
+            key = 'ok'
         if key not in results:
             key = 'error'
         results[key].append({
