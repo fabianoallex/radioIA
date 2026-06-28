@@ -450,9 +450,16 @@ function SlotRow({
 }
 
 // ─── Calendar view ──────────────────────────────────────────────
+const CANDIDATE_INTERVALS = [5, 10, 15, 20, 30]
+
+type HourItem =
+  | { kind: "real"; slot: Slot; minute: number }
+  | { kind: "ghost"; minute: number }
+
 function CalendarView({ slots, now }: { slots: Slot[]; now: string }) {
   const nowHour = parseInt(now.split(":")[0])
-  const [activeSlotId, setActiveSlotId] = useState<number | null>(null)
+  const [activeSlotId, setActiveSlotId]         = useState<number | null>(null)
+  const [candidateInterval, setCandidateInterval] = useState<number | null>(null)
 
   function handleBadgeClick(slot: Slot) {
     const targetId = slot.replay_of ?? slot.slot_id ?? null
@@ -479,84 +486,155 @@ function CalendarView({ slots, now }: { slots: Slot[]; now: string }) {
     return { minHour: min, maxHour: max, slotsByHour: map }
   }, [slots])
 
+  function buildItems(hour: number, hourSlots: Slot[]): HourItem[] {
+    const items: HourItem[] = hourSlots.map((slot) => ({
+      kind: "real",
+      slot,
+      minute: parseInt(slot.time.split(":")[1]),
+    }))
+
+    if (candidateInterval) {
+      for (let min = 0; min < 60; min += candidateInterval) {
+        const occupied = hourSlots.some((s) => {
+          const m = parseInt(s.time.split(":")[1])
+          return m >= min && m < min + candidateInterval
+        })
+        if (!occupied) items.push({ kind: "ghost", minute: min })
+      }
+    }
+
+    items.sort((a, b) => a.minute - b.minute)
+    return items
+  }
+
   const hourRange = Array.from({ length: maxHour - minHour + 1 }, (_, i) => minHour + i)
 
   return (
-    <div className="divide-y divide-border/30">
-      {hourRange.map((hour) => {
-        const hourSlots = slotsByHour.get(hour) ?? []
-        const isEmpty = hourSlots.length === 0
-        const isCurrent = hour === nowHour
-        const isPast = hour < nowHour
-
-        return (
-          <div
-            key={hour}
+    <div>
+      {/* Toolbar de candidatos */}
+      <div className="sticky top-0 z-10 flex items-center gap-1.5 px-4 py-2 border-b bg-background">
+        <span className="text-xs text-muted-foreground mr-0.5">Candidatos:</span>
+        {CANDIDATE_INTERVALS.map((n) => (
+          <button
+            key={n}
+            onClick={() => setCandidateInterval((prev) => (prev === n ? null : n))}
             className={cn(
-              "flex items-start gap-0 min-h-[2.75rem]",
-              isCurrent && "bg-primary/5",
-              isPast && !isCurrent && "opacity-40",
+              "text-xs px-2 py-0.5 rounded border transition-colors",
+              candidateInterval === n
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground",
             )}
           >
-            {/* Faixa da hora */}
-            <div className={cn(
-              "w-14 shrink-0 flex items-start justify-end pr-3 pt-2.5 self-stretch border-r",
-              isCurrent ? "border-primary/40" : "border-border/40",
-            )}>
-              <span className={cn(
-                "text-xs font-mono font-semibold leading-none",
-                isCurrent ? "text-primary" : isEmpty ? "text-muted-foreground/30" : "text-muted-foreground",
-              )}>
-                {String(hour).padStart(2, "0")}h
-              </span>
-            </div>
+            {n}min
+          </button>
+        ))}
+        {candidateInterval && (
+          <button
+            onClick={() => setCandidateInterval(null)}
+            className="ml-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            title="Limpar"
+          >
+            ✕
+          </button>
+        )}
+      </div>
 
-            {/* Conteúdo */}
-            <div className="flex-1 px-3 py-2 flex flex-wrap gap-1.5 items-start min-h-[2.75rem]">
-              {isEmpty ? (
-                <span className="self-center w-full border-t border-dashed border-border/25" />
-              ) : (
-                hourSlots.map((slot, i) => {
-                  const hl = badgeHighlight(slot)
-                  const isClickable = slot.replay_of != null || slot.slot_id != null
-                  return (
-                    <span
-                      key={i}
-                      title={slot.sources ? slot.sources.join(", ") : slot.replay_of != null ? `replay de #${slot.replay_of}` : ""}
-                      onClick={() => handleBadgeClick(slot)}
-                      className={cn(
-                        "inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md leading-none transition-all duration-150",
-                        slotBadgeClass(slot),
-                        isClickable && "cursor-pointer",
-                        hl === "highlighted" && "ring-1 ring-current ring-offset-1 ring-offset-background font-medium",
-                        hl === "dimmed" && "opacity-20",
-                      )}
-                    >
-                      <span className="font-mono opacity-50 text-[10px]">
-                        {slot.time.split(":")[1]}
+      {/* Grade por hora */}
+      <div className="divide-y divide-border/30">
+        {hourRange.map((hour) => {
+          const hourSlots = slotsByHour.get(hour) ?? []
+          const items = buildItems(hour, hourSlots)
+          const isEmpty = items.length === 0
+          const isCurrent = hour === nowHour
+          const isPast = hour < nowHour
+
+          return (
+            <div
+              key={hour}
+              className={cn(
+                "flex items-start gap-0 min-h-[2.75rem]",
+                isCurrent && "bg-primary/5",
+                isPast && !isCurrent && "opacity-40",
+              )}
+            >
+              {/* Faixa da hora */}
+              <div className={cn(
+                "w-14 shrink-0 flex items-start justify-end pr-3 pt-2.5 self-stretch border-r",
+                isCurrent ? "border-primary/40" : "border-border/40",
+              )}>
+                <span className={cn(
+                  "text-xs font-mono font-semibold leading-none",
+                  isCurrent
+                    ? "text-primary"
+                    : isEmpty
+                    ? "text-muted-foreground/30"
+                    : "text-muted-foreground",
+                )}>
+                  {String(hour).padStart(2, "0")}h
+                </span>
+              </div>
+
+              {/* Conteúdo */}
+              <div className="flex-1 px-3 py-2 flex flex-wrap gap-1.5 items-start min-h-[2.75rem]">
+                {isEmpty ? (
+                  <span className="self-center w-full border-t border-dashed border-border/25" />
+                ) : (
+                  items.map((item, i) => {
+                    if (item.kind === "ghost") {
+                      const hh = String(hour).padStart(2, "0")
+                      const mm = String(item.minute).padStart(2, "0")
+                      return (
+                        <span
+                          key={`ghost-${item.minute}`}
+                          className="inline-flex items-center text-[10px] px-2 py-1 rounded-md leading-none border border-dashed border-muted-foreground/20 text-muted-foreground/35 font-mono"
+                        >
+                          {hh}:{mm}
+                        </span>
+                      )
+                    }
+
+                    const { slot } = item
+                    const hl = badgeHighlight(slot)
+                    const isClickable = slot.replay_of != null || slot.slot_id != null
+                    return (
+                      <span
+                        key={i}
+                        title={slot.sources ? slot.sources.join(", ") : slot.replay_of != null ? `replay de #${slot.replay_of}` : ""}
+                        onClick={() => handleBadgeClick(slot)}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md leading-none transition-all duration-150",
+                          slotBadgeClass(slot),
+                          isClickable && "cursor-pointer",
+                          hl === "highlighted" && "ring-1 ring-current ring-offset-1 ring-offset-background font-medium",
+                          hl === "dimmed" && "opacity-20",
+                        )}
+                      >
+                        <span className="font-mono opacity-50 text-[10px]">
+                          {slot.time.split(":")[1]}
+                        </span>
+                        {slot.replay_of != null && (
+                          <span className="opacity-50 text-[10px] font-mono">↩#{slot.replay_of}</span>
+                        )}
+                        <span className="max-w-36 truncate">{slot.label}</span>
+                        {slot.slot_id != null && (
+                          <span className="opacity-30 text-[10px]">#{slot.slot_id}</span>
+                        )}
                       </span>
-                      {slot.replay_of != null && (
-                        <span className="opacity-50 text-[10px] font-mono">↩#{slot.replay_of}</span>
-                      )}
-                      <span className="max-w-36 truncate">{slot.label}</span>
-                      {slot.slot_id != null && (
-                        <span className="opacity-30 text-[10px]">#{slot.slot_id}</span>
-                      )}
-                    </span>
-                  )
-                })
+                    )
+                  })
+                )}
+              </div>
+
+              {/* Indicador "agora" */}
+              {isCurrent && (
+                <div className="shrink-0 self-stretch flex items-center pr-3">
+                  <span className="text-[10px] text-primary font-medium">{now}</span>
+                </div>
               )}
             </div>
-
-            {/* Indicador "agora" */}
-            {isCurrent && (
-              <div className="shrink-0 self-stretch flex items-center pr-3">
-                <span className="text-[10px] text-primary font-medium">{now}</span>
-              </div>
-            )}
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }
