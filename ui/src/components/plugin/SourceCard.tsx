@@ -3,7 +3,7 @@ import {
   Rss, Music, Layers, PlayCircle, BarChart2, Newspaper,
   TrendingUp, MessageSquare, Star, BookOpen, Utensils,
   Film, Book, HelpCircle, Link, Mic, MessageCircle,
-  Award, Package, Settings, Radio,
+  Award, Package, Settings, Radio, Clock,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { api } from "@/lib/api"
@@ -52,12 +52,15 @@ interface Source {
   plugin_info: PluginInfo
 }
 
+const MAX_VISIBLE_SLOTS = 6
+
 interface SourceCardProps {
   source: Source
   onConfigure: (source: Source) => void
+  slots?: string[]
 }
 
-export function SourceCard({ source, onConfigure }: SourceCardProps) {
+export function SourceCard({ source, onConfigure, slots }: SourceCardProps) {
   const queryClient = useQueryClient()
 
   const toggleMutation = useMutation({
@@ -99,6 +102,32 @@ export function SourceCard({ source, onConfigure }: SourceCardProps) {
             enabled ? "translate-x-4" : "translate-x-0",
           )} />
         </button>
+      </div>
+
+      {/* Horários na grade */}
+      <div className="min-h-[1.75rem]">
+        {slots && slots.length > 0 ? (
+          <div className="flex items-center gap-1 flex-wrap">
+            <Clock className="size-3 text-muted-foreground shrink-0" />
+            {slots.slice(0, MAX_VISIBLE_SLOTS).map((t) => (
+              <span
+                key={t}
+                className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground leading-none"
+              >
+                {t}
+              </span>
+            ))}
+            {slots.length > MAX_VISIBLE_SLOTS && (
+              <span className="text-[10px] text-muted-foreground">
+                +{slots.length - MAX_VISIBLE_SLOTS}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className="text-[10px] text-muted-foreground/50 italic">
+            Não agendado
+          </span>
+        )}
       </div>
 
       <div className="flex items-center justify-between">

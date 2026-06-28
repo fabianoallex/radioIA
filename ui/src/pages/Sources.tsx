@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Radio, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -19,6 +19,12 @@ interface Source {
     has_metadata: boolean
     config_schema: unknown[]
   }
+}
+
+interface ScheduleSlot {
+  time: string
+  sources?: string[]
+  replay_of?: number
 }
 
 interface PluginType {
@@ -46,6 +52,24 @@ export default function Sources() {
     queryFn: () => api.get<PluginType[]>("/plugins"),
     enabled: tab === "disponiveis",
   })
+
+  const { data: scheduleData } = useQuery<{ slots: ScheduleSlot[] }>({
+    queryKey: ["schedule"],
+    queryFn: () => api.get<{ slots: ScheduleSlot[] }>("/schedule"),
+  })
+
+  const sourceSlots = useMemo(() => {
+    const map: Record<string, string[]> = {}
+    for (const slot of scheduleData?.slots ?? []) {
+      if (!slot.sources) continue
+      for (const src of slot.sources) {
+        const baseId = src.split(":")[0]
+        if (!map[baseId]) map[baseId] = []
+        map[baseId].push(String(slot.time))
+      }
+    }
+    return map
+  }, [scheduleData])
 
   const active   = sources.filter((s) => s.enabled !== false)
   const inactive = sources.filter((s) => s.enabled === false)
@@ -155,6 +179,7 @@ export default function Sources() {
                       <SourceCard
                         key={s.id}
                         source={s}
+                        slots={sourceSlots[s.id]}
                         onConfigure={setConfiguringSource}
                       />
                     ))}
@@ -173,6 +198,7 @@ export default function Sources() {
                       <SourceCard
                         key={s.id}
                         source={s}
+                        slots={sourceSlots[s.id]}
                         onConfigure={setConfiguringSource}
                       />
                     ))}
