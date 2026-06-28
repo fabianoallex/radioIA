@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, Pencil, Trash2, Check, X, RefreshCw, AlertTriangle, Clock, CheckCircle2 } from "lucide-react"
+import { Plus, Pencil, Trash2, Check, X, RefreshCw, AlertTriangle, Clock, CheckCircle2, LayoutList, LayoutGrid } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { api } from "@/lib/api"
 
@@ -449,10 +449,102 @@ function SlotRow({
   )
 }
 
+// ─── Calendar view ──────────────────────────────────────────────
+function CalendarView({ slots, now }: { slots: Slot[]; now: string }) {
+  const nowHour = parseInt(now.split(":")[0])
+
+  const { minHour, maxHour, slotsByHour } = useMemo(() => {
+    const hours = slots.map((s) => parseInt(s.time.split(":")[0]))
+    const min = hours.length ? Math.min(Math.min(...hours), 7) : 7
+    const max = hours.length ? Math.max(Math.max(...hours), 22) : 22
+    const map = new Map<number, Slot[]>()
+    for (let h = min; h <= max; h++) map.set(h, [])
+    for (const slot of slots) {
+      const h = parseInt(slot.time.split(":")[0])
+      map.get(h)?.push(slot)
+    }
+    return { minHour: min, maxHour: max, slotsByHour: map }
+  }, [slots])
+
+  const hourRange = Array.from({ length: maxHour - minHour + 1 }, (_, i) => minHour + i)
+
+  return (
+    <div className="divide-y divide-border/30">
+      {hourRange.map((hour) => {
+        const hourSlots = slotsByHour.get(hour) ?? []
+        const isEmpty = hourSlots.length === 0
+        const isCurrent = hour === nowHour
+        const isPast = hour < nowHour
+
+        return (
+          <div
+            key={hour}
+            className={cn(
+              "flex items-start gap-0 min-h-[2.75rem]",
+              isCurrent && "bg-primary/5",
+              isPast && !isCurrent && "opacity-40",
+            )}
+          >
+            {/* Faixa da hora */}
+            <div className={cn(
+              "w-14 shrink-0 flex items-start justify-end pr-3 pt-2.5 self-stretch border-r",
+              isCurrent ? "border-primary/40" : "border-border/40",
+            )}>
+              <span className={cn(
+                "text-xs font-mono font-semibold leading-none",
+                isCurrent ? "text-primary" : isEmpty ? "text-muted-foreground/30" : "text-muted-foreground",
+              )}>
+                {String(hour).padStart(2, "0")}h
+              </span>
+            </div>
+
+            {/* Conteúdo */}
+            <div className="flex-1 px-3 py-2 flex flex-wrap gap-1.5 items-start min-h-[2.75rem]">
+              {isEmpty ? (
+                <span className="self-center w-full border-t border-dashed border-border/25" />
+              ) : (
+                hourSlots.map((slot, i) => (
+                  <span
+                    key={i}
+                    title={slot.sources ? slot.sources.join(", ") : slot.replay_of != null ? `replay de #${slot.replay_of}` : ""}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md leading-none",
+                      slotBadgeClass(slot),
+                    )}
+                  >
+                    <span className="font-mono opacity-50 text-[10px]">
+                      {slot.time.split(":")[1]}
+                    </span>
+                    {slot.replay_of != null && (
+                      <span className="opacity-40 text-[10px]">↩</span>
+                    )}
+                    <span className="max-w-36 truncate">{slot.label}</span>
+                    {slot.slot_id != null && (
+                      <span className="opacity-30 text-[10px]">#{slot.slot_id}</span>
+                    )}
+                  </span>
+                ))
+              )}
+            </div>
+
+            {/* Indicador "agora" */}
+            {isCurrent && (
+              <div className="shrink-0 self-stretch flex items-center pr-3">
+                <span className="text-[10px] text-primary font-medium">{now}</span>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── Page ───────────────────────────────────────────────────────
 export default function Schedule() {
   const queryClient = useQueryClient()
   const [now, setNow] = useState(nowHHMM())
+  const [view, setView] = useState<"list" | "calendar">("list")
   const [editingIdx, setEditingIdx] = useState<number | null>(null)
   const [editForm, setEditForm] = useState<SlotForm>(emptyForm())
   const [addingNew, setAddingNew] = useState(false)
@@ -633,18 +725,49 @@ export default function Schedule() {
             )}
           </p>
         </div>
-        <button
-          onClick={() => {
-            setAddingNew(true)
-            setEditingIdx(null)
-            setNewForm(emptyForm())
-            listRef.current?.scrollTo({ top: 0, behavior: "smooth" })
-          }}
-          className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="size-3.5" />
-          Novo slot
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Toggle de visualização */}
+          <div className="flex rounded-md border overflow-hidden">
+            <button
+              onClick={() => setView("list")}
+              title="Visualização em lista"
+              className={cn(
+                "p-1.5 transition-colors",
+                view === "list"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted",
+              )}
+            >
+              <LayoutList className="size-3.5" />
+            </button>
+            <button
+              onClick={() => setView("calendar")}
+              title="Visualização por hora"
+              className={cn(
+                "p-1.5 transition-colors",
+                view === "calendar"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted",
+              )}
+            >
+              <LayoutGrid className="size-3.5" />
+            </button>
+          </div>
+
+          <button
+            onClick={() => {
+              setAddingNew(true)
+              setEditingIdx(null)
+              setNewForm(emptyForm())
+              listRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+            }}
+            disabled={view === "calendar"}
+            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40"
+          >
+            <Plus className="size-3.5" />
+            Novo slot
+          </button>
+        </div>
       </div>
 
       {/* Timeline strip */}
@@ -652,7 +775,7 @@ export default function Schedule() {
         <TimelineStrip slots={visibleSlots.map(v => v.slot)} now={now} />
       </div>
 
-      {/* List */}
+      {/* Conteúdo */}
       <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5">
         {isLoading ? (
           <div className="space-y-1">
@@ -660,6 +783,8 @@ export default function Schedule() {
               <div key={i} className="h-9 rounded-md bg-muted/50 animate-pulse" />
             ))}
           </div>
+        ) : view === "calendar" ? (
+          <CalendarView slots={visibleSlots.map((v) => v.slot)} now={now} />
         ) : (
           <>
             {/* Add new form at top if addingNew */}
