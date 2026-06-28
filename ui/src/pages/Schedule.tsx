@@ -452,6 +452,19 @@ function SlotRow({
 // ─── Calendar view ──────────────────────────────────────────────
 function CalendarView({ slots, now }: { slots: Slot[]; now: string }) {
   const nowHour = parseInt(now.split(":")[0])
+  const [activeSlotId, setActiveSlotId] = useState<number | null>(null)
+
+  function handleBadgeClick(slot: Slot) {
+    const targetId = slot.replay_of ?? slot.slot_id ?? null
+    if (targetId === null) return
+    setActiveSlotId((prev) => (prev === targetId ? null : targetId))
+  }
+
+  function badgeHighlight(slot: Slot): "highlighted" | "dimmed" | "normal" {
+    if (activeSlotId === null) return "normal"
+    if (slot.slot_id === activeSlotId || slot.replay_of === activeSlotId) return "highlighted"
+    return "dimmed"
+  }
 
   const { minHour, maxHour, slotsByHour } = useMemo(() => {
     const hours = slots.map((s) => parseInt(s.time.split(":")[0]))
@@ -503,27 +516,35 @@ function CalendarView({ slots, now }: { slots: Slot[]; now: string }) {
               {isEmpty ? (
                 <span className="self-center w-full border-t border-dashed border-border/25" />
               ) : (
-                hourSlots.map((slot, i) => (
-                  <span
-                    key={i}
-                    title={slot.sources ? slot.sources.join(", ") : slot.replay_of != null ? `replay de #${slot.replay_of}` : ""}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md leading-none",
-                      slotBadgeClass(slot),
-                    )}
-                  >
-                    <span className="font-mono opacity-50 text-[10px]">
-                      {slot.time.split(":")[1]}
+                hourSlots.map((slot, i) => {
+                  const hl = badgeHighlight(slot)
+                  const isClickable = slot.replay_of != null || slot.slot_id != null
+                  return (
+                    <span
+                      key={i}
+                      title={slot.sources ? slot.sources.join(", ") : slot.replay_of != null ? `replay de #${slot.replay_of}` : ""}
+                      onClick={() => handleBadgeClick(slot)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md leading-none transition-all duration-150",
+                        slotBadgeClass(slot),
+                        isClickable && "cursor-pointer",
+                        hl === "highlighted" && "ring-1 ring-current ring-offset-1 ring-offset-background font-medium",
+                        hl === "dimmed" && "opacity-20",
+                      )}
+                    >
+                      <span className="font-mono opacity-50 text-[10px]">
+                        {slot.time.split(":")[1]}
+                      </span>
+                      {slot.replay_of != null && (
+                        <span className="opacity-50 text-[10px] font-mono">↩#{slot.replay_of}</span>
+                      )}
+                      <span className="max-w-36 truncate">{slot.label}</span>
+                      {slot.slot_id != null && (
+                        <span className="opacity-30 text-[10px]">#{slot.slot_id}</span>
+                      )}
                     </span>
-                    {slot.replay_of != null && (
-                      <span className="opacity-50 text-[10px] font-mono">↩#{slot.replay_of}</span>
-                    )}
-                    <span className="max-w-36 truncate">{slot.label}</span>
-                    {slot.slot_id != null && (
-                      <span className="opacity-30 text-[10px]">#{slot.slot_id}</span>
-                    )}
-                  </span>
-                ))
+                  )
+                })
               )}
             </div>
 
