@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from api.routers import system, sources, generate, episodes, schedule, spots, settings
+from api.routers import system, sources, generate, episodes, schedule, spots, settings, rss_preview
 
 app = FastAPI(title="RadioIA Admin", version="1.0.0")
 
@@ -23,6 +23,7 @@ app.include_router(episodes.router, prefix="/api")
 app.include_router(schedule.router, prefix="/api")
 app.include_router(spots.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
+app.include_router(rss_preview.router, prefix="/api")
 
 _dist = Path(__file__).parent.parent / "ui" / "dist"
 if _dist.exists():

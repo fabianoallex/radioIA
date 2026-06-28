@@ -9,6 +9,7 @@ import {
   Megaphone,
   Settings,
   ExternalLink,
+  Rss,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { api } from "@/lib/api"
@@ -16,8 +17,9 @@ import { api } from "@/lib/api"
 const NAV = [
   { to: "/",         icon: LayoutDashboard, label: "Dashboard",    end: true },
   { to: "/generator",icon: Zap,             label: "Gerador"              },
-  { to: "/sources",  icon: Radio,           label: "Fontes"               },
-  { to: "/schedule", icon: CalendarDays,    label: "Grade"                },
+  { to: "/sources",      icon: Radio,        label: "Fontes"               },
+  { to: "/rss-preview",  icon: Rss,         label: "Feeds RSS"            },
+  { to: "/schedule",     icon: CalendarDays, label: "Grade"               },
   { to: "/episodes", icon: Headphones,      label: "Episódios"            },
   { to: "/spots",    icon: Megaphone,       label: "Spots"                },
   { to: "/settings", icon: Settings,        label: "Configurações"        },

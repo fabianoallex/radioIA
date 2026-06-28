@@ -8,6 +8,7 @@ import Schedule from "@/pages/Schedule"
 import Episodes from "@/pages/Episodes"
 import Spots from "@/pages/Spots"
 import Settings from "@/pages/Settings"
+import RssPreview from "@/pages/RssPreview"
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="schedule" element={<Schedule />} />
             <Route path="episodes" element={<Episodes />} />
             <Route path="spots" element={<Spots />} />
+            <Route path="rss-preview" element={<RssPreview />} />
             <Route path="settings" element={<Settings />} />
           </Route>
         </Routes>
