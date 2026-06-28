@@ -486,7 +486,7 @@ function CalendarView({ slots, now }: { slots: Slot[]; now: string }) {
     return { minHour: min, maxHour: max, slotsByHour: map }
   }, [slots])
 
-  function buildItems(hour: number, hourSlots: Slot[]): HourItem[] {
+  function buildItems(_hour: number, hourSlots: Slot[]): HourItem[] {
     const items: HourItem[] = hourSlots.map((slot) => ({
       kind: "real",
       slot,
