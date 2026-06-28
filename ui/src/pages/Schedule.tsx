@@ -516,7 +516,7 @@ function CalendarView({ slots, now }: { slots: Slot[]; now: string }) {
                       {slot.time.split(":")[1]}
                     </span>
                     {slot.replay_of != null && (
-                      <span className="opacity-40 text-[10px]">↩</span>
+                      <span className="opacity-50 text-[10px] font-mono">↩#{slot.replay_of}</span>
                     )}
                     <span className="max-w-36 truncate">{slot.label}</span>
                     {slot.slot_id != null && (
